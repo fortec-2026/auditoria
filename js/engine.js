@@ -191,7 +191,7 @@ var Fiscal = (function () {
   var PIS = 0.0165, COF = 0.076;
 
   function emptyTot() {
-    return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0, compOut: 0,
+    return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0, compOut: 0, compIns: 0,
       stE: 0, ibs: 0, cbs: 0, nS: 0, nE: 0, pisDest: 0, cofDest: 0 };
   }
   function addTot(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; }
@@ -256,6 +256,7 @@ var Fiscal = (function () {
           if (classe === 'revenda') seg = true;
           else if (classe === 'uso') nat = 'uso';
           else if (classe === 'ativo') nat = 'ativo';
+          else if (classe === 'insumo') nat = 'insumo';
           else prodPend = true;
           var pr = res.produtos[pk] || (res.produtos[pk] = { k: pk, cp: it.cp, x: it.x, ncm: it.ncm, fc: nt.eC, fn: nt.eN, n: 0, v: 0, ult: '', classe: classe, origem: origem, mono: mono });
           pr.n++; pr.v += it.vp - it.vd; if (nt.dt > pr.ult) { pr.ult = nt.dt; pr.x = it.x; }
@@ -272,6 +273,7 @@ var Fiscal = (function () {
           if (stAnterior) { /* regime de ST: imposto encerrado, sem crédito */ }
           else if (nat === 'uso') { T.icmsUso += it.v; T.compOut += receita + it.vIPI; }
           else if (nat === 'ativo') { T.ciap += it.v; T.compOut += receita + it.vIPI; }
+          else if (nat === 'insumo') { T.icmsUso += it.v; T.compIns += receita + it.vIPI; }
           else T.icmsC += it.v;
           T.stE += it.vst;
         }
@@ -288,6 +290,9 @@ var Fiscal = (function () {
           T.compras += receita + it.vIPI;
           if (mono) res.mono.compras += receita;
           else { var bc = Math.max(0, receita + it.vIPI - it.v); T.pisC += bc * PIS; T.cofC += bc * COF; }
+        } else if (dir === 'E' && nat === 'insumo') {
+          // insumo da prestação de serviço: crédito de PIS/COFINS (art. 3º, II), sem crédito de ICMS
+          if (!mono) { var bi = Math.max(0, receita + it.vIPI - it.v); T.pisC += bi * PIS; T.cofC += bi * COF; }
         } else if (dir === 'S' && nat === 'devCompra') {
           if (!mono) { var be = Math.max(0, receita + it.vIPI - it.v); T.pisC -= be * PIS; T.cofC -= be * COF; }
         }
@@ -346,6 +351,9 @@ var Fiscal = (function () {
             var credPC = Math.max(0, receita + it.vIPI - it.v) * (PIS + COF);
             issue('alerta', it, 'PROD_PEND', 'Produto sem classificação (NCM ' + it.ncm + ', fora de pneus e autopeças). Classifique na aba Produtos: se for uso e consumo ou ativo, o crédito de ICMS e de PIS/COFINS sai da apuração.', it.v + credPC);
           }
+          if (nat === 'insumo' && mono) {
+            issue('info', it, 'INSUMO_MONO', 'Insumo de serviço com NCM monofásico. A compra de revendedor vem com alíquota zero e não gera crédito de PIS/COFINS; confira se veio do fabricante.', 0);
+          }
           if (nat === 'compra' && mono && (it.vP > 0 || it.vC > 0) && it.cP !== '02') {
             issue('info', it, 'MONO_FORN', 'Fornecedor destacou PIS/COFINS em item monofásico. A compra para revenda não gera crédito.', 0);
           }
@@ -353,7 +361,7 @@ var Fiscal = (function () {
       });
       if (semDifal && !nt.dif) issue('alerta', null, 'DIFAL', 'Venda interestadual a não contribuinte sem o grupo de partilha do DIFAL.', 0);
 
-      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
+      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'compIns', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
 
       var resumo = { ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
         parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length,

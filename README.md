@@ -45,7 +45,7 @@ Em **Redirect URLs**, adicione o endereço do site, por exemplo `https://fortec-
 | `empresas` | Clientes do escritório. Guarda a data de corte da ST e a lista de NCM monofásicos de cada um. |
 | `notas` | Uma linha por chave de acesso, com a nota lida do XML e a marca de publicada. |
 | `cancelamentos` | Chaves de notas canceladas. |
-| `produtos` e `ncm_regras` | Classificação de produtos: revenda, uso e consumo ou ativo. |
+| `produtos` e `ncm_regras` | Classificação de produtos: revenda, insumo de serviço, uso e consumo ou ativo. |
 | `classificacao_historico` | Quem mudou cada classificação, quando, e de qual classe para qual. |
 | `empresa_usuarios` | Quais e-mails veem quais empresas. |
 | `perfis` | Papel de cada usuário: escritório ou cliente. |
@@ -60,6 +60,11 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
   - Entradas com ST antes do corte não geram crédito. Uso e consumo não gera crédito. Ativo segue o CIAP.
 - **PIS/COFINS não cumulativo:** 1,65% e 7,6%. O ICMS fica fora da base do débito (Tema 69/STF) e da base do crédito (Lei 14.592/2023).
 - **Monofásicos (Lei 10.485/2002):** sem débito na revenda e sem crédito na compra.
+- **Classificação de produtos comprados:**
+  - Revenda: crédito de ICMS e de PIS/COFINS, este último só se o produto não for monofásico.
+  - Insumo de serviço (peça aplicada na prestação do serviço): crédito de PIS/COFINS (art. 3º, II, das Leis 10.637/2002 e 10.833/2003), sem crédito de ICMS.
+  - Uso e consumo: sem crédito de nenhum dos tributos.
+  - Ativo: ICMS pelo CIAP.
 - **Auditoria:**
   - Saída ainda emitida como ST após o corte.
   - Fornecedor que reteve ST ou emitiu com CST 60.
