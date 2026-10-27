@@ -6,8 +6,6 @@ var Banco = (function () {
   var URL_SB = 'https://ekhtiductqttqgpyetlk.supabase.co';
   var CHAVE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVraHRpZHVjdHF0dHFncHlldGxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NzY5MTksImV4cCI6MjEwNzA1MjkxOX0.tiTZqNOGEv8jZGo7hjbvGswe_wEzG4Cx6skp3SVSFEk';
   var sb = window.supabase.createClient(URL_SB, CHAVE, { auth: { persistSession: true, storageKey: 'portal-fiscal-auth' } });
-  // cliente separado para cadastrar acessos sem trocar a sessão do escritório
-  var sbCadastro = window.supabase.createClient(URL_SB, CHAVE, { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'portal-fiscal-cadastro' } });
 
   function ok(r) { if (r.error) throw r.error; return r.data; }
   function urlSite() { return location.origin + location.pathname; }
@@ -89,11 +87,15 @@ var Banco = (function () {
 
   /* ---------- acessos dos clientes ---------- */
   async function acessos(cnpj) { return ok(await sb.rpc('clientes_da_empresa', { p_cnpj: cnpj })); }
+  // a conta é criada no servidor (função criar-acesso), que confere se quem pede é do escritório
   async function criarAcesso(cnpj, email, senha) {
-    var r = await sbCadastro.auth.signUp({ email: email, password: senha, options: { emailRedirectTo: urlSite() } });
-    if (r.error && !/already|registered|exists/i.test(r.error.message)) throw r.error;
-    await sbCadastro.auth.signOut().catch(function () {});
-    return ok(await sb.rpc('vincular_cliente', { p_email: email, p_cnpj: cnpj }));
+    var r = await sb.functions.invoke('criar-acesso', { body: { email: email, senha: senha, cnpj: cnpj } });
+    if (r.error) {
+      var msg = r.error.message;
+      try { var j = await r.error.context.json(); if (j && j.erro) msg = j.erro; } catch (e) {}
+      throw new Error(msg);
+    }
+    return r.data;
   }
   async function removerAcesso(cnpj, userId) { return ok(await sb.from('empresa_usuarios').delete().eq('empresa_cnpj', cnpj).eq('user_id', userId)); }
 

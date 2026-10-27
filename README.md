@@ -23,13 +23,16 @@ As regras de acesso ficam no próprio banco (RLS). Mesmo quem tentar acessar o b
 
 ## Primeiro acesso do escritório
 
-1. No site, clique em **Criar conta** e cadastre o e-mail do escritório.
-2. Confirme pelo link recebido por e-mail.
-3. Promova a conta a escritório no Supabase: abra o **SQL Editor** do projeto e rode o comando abaixo, trocando o e-mail.
+O cadastro público fica desligado por segurança: só o escritório cria contas.
+
+1. No painel do Supabase, abra **Authentication › Users › Add user › Create new user**, informe o e-mail e a senha do escritório e marque **Auto Confirm User**.
+2. Promova a conta a escritório: no **SQL Editor** do projeto, rode o comando abaixo, trocando o e-mail.
 
 ```sql
 update public.perfis set papel = 'escritorio' where email = 'seu-email@escritorio.com.br';
 ```
+
+As contas dos clientes são criadas pelo próprio portal, em **Escritório › Acessos do cliente**, pela função `criar-acesso` do Supabase. A função confere se quem pede é do escritório antes de criar.
 
 ## Configuração do Supabase (Authentication › URL Configuration)
 

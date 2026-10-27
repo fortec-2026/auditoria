@@ -125,6 +125,7 @@ function erroTexto(e) {
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
   if (/Email not confirmed/i.test(m)) return 'Confirme seu e-mail antes de entrar. Procure a mensagem de confirmação na sua caixa de entrada.';
   if (/Password should be at least/i.test(m)) return 'A senha precisa ter pelo menos 8 caracteres.';
+  if (/Signups not allowed|signup.*disabled/i.test(m)) return 'O cadastro é feito pelo escritório. Peça ao escritório para liberar o seu acesso.';
   if (/rate limit|too many/i.test(m)) return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
   if (/sem permissão|row-level security|permission denied/i.test(m)) return 'Seu usuário não tem permissão para isso.';
   if (/usuário não encontrado/i.test(m)) return 'Não encontramos esse e-mail cadastrado.';
@@ -203,7 +204,7 @@ function vLogin() {
   if (S.erro) h += '<div class="banner">' + esc(S.erro) + '</div>';
   if (S.aviso) h += '<div class="banner ok">' + esc(S.aviso) + '</div>';
   h += '<button class="btn primary" type="submit"' + (S.ocupado ? ' disabled' : '') + '>' + I.lock + (S.ocupado ? 'Aguarde…' : criar ? 'Criar conta' : esq ? 'Enviar link' : 'Entrar') + '</button></form>';
-  h += '<div class="row small" style="justify-content:space-between">' + (S.telaLogin !== 'entrar' ? '<button class="link" type="button" data-login="entrar">Já tenho conta</button>' : '<button class="link" type="button" data-login="esqueci">Esqueci a senha</button><button class="link" type="button" data-login="criar">Criar conta</button>') + '</div>';
+  h += '<div class="row small" style="justify-content:space-between">' + (S.telaLogin !== 'entrar' ? '<button class="link" type="button" data-login="entrar">Já tenho conta</button>' : '<button class="link" type="button" data-login="esqueci">Esqueci a senha</button><span>Sem acesso? Fale com o escritório.</span>') + '</div>';
   h += '<div class="small">Quer conhecer antes? <button class="link" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></div>';
   return h;
 }
@@ -282,7 +283,7 @@ function renderOffice() {
     else if (!S.acessos.length) h += '<p class="small">Nenhum acesso cadastrado.</p>';
     else h += '<div class="tscroll"><table><tbody>' + S.acessos.map(function (a) { return '<tr><td>' + esc(a.email) + '<div class="small">' + (a.confirmado ? (a.ultimo_acesso ? 'último acesso ' + new Date(a.ultimo_acesso).toLocaleDateString('pt-BR') : 'nunca entrou') : 'aguardando confirmar o e-mail') + '</div></td><td class="r"><button class="link" type="button" data-remover="' + esc(a.user_id) + '">Remover</button></td></tr>'; }).join('') + '</tbody></table></div>';
     h += '<form id="fAcesso" class="row"><div class="field"><label for="acEmail">E-mail do cliente</label><input id="acEmail" type="email" required autocomplete="off"></div><div class="field"><label for="acSenha">Senha inicial</label><input id="acSenha" type="text" minlength="8" required autocomplete="off"></div><button class="btn" type="submit">Liberar acesso</button></form>';
-    h += '<p class="note">Se o e-mail ainda não tem conta, ela é criada com essa senha e o cliente recebe um e-mail para confirmar. Se já tem conta, só o acesso a esta empresa é liberado. Envie a senha ao cliente por um canal diferente do e-mail.</p>';
+    h += '<p class="note">Se o e-mail ainda não tem conta, ela é criada já pronta para entrar com essa senha. Se já tem conta, só o acesso a esta empresa é liberado e a senha dele não muda. Envie a senha ao cliente por um canal diferente do e-mail e peça para trocá-la em "Esqueci a senha".</p>';
   }
   h += '</div></div>';
   el.innerHTML = h;
@@ -675,7 +676,7 @@ document.addEventListener('submit', async function (ev) {
     catch (e) { S.erro = erroTexto(e); render(); }
   } else if (f.id === 'fAcesso') {
     var em = $('acEmail').value.trim(), sn = $('acSenha').value;
-    try { await B.criarAcesso(S.emp.id, em, sn); toast('Acesso liberado para ' + em + '.'); carregarAcessos(); }
+    try { var ra = await B.criarAcesso(S.emp.id, em, sn); toast((ra && ra.criado ? 'Conta criada e acesso liberado para ' : 'Acesso liberado para ') + em + '.'); carregarAcessos(); }
     catch (e) { toast('Não foi possível liberar: ' + erroTexto(e)); }
   }
 });
