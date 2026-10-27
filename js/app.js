@@ -1,20 +1,21 @@
-/* ===== Portal Fiscal — interface (site estático para GitHub Pages) ===== */
+/* ===== Portal Fiscal — interface (GitHub Pages + Supabase) ===== */
 (function () {
 'use strict';
-var F = Fiscal, C = Cofre, M = F.money;
+var F = Fiscal, B = Banco, M = F.money;
 var MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 var EXEMPLO_URL = 'exemplos/notas-exemplo.zip';
 
 var S = {
-  view: 'inicio',          // inicio | cliente | escritorio | painel
-  emp: null,               // {id, meta, notas, canc, prodCad, ncmCad, hist, senha}
-  readonly: true, exemplo: false, sujo: false, modo: 'cliente',
-  locais: [], res: null, per: null,
+  view: 'carregando',      // carregando | login | recuperar | escritorio | cliente | painel
+  usuario: null,           // {id, email, papel}
+  empresas: [], contagens: {},
+  emp: null,               // {id, meta, notas, pub, canc, prodCad, ncmCad, hist}
+  readonly: true, exemplo: false, modo: 'cliente',
+  res: null, per: null, acessos: null,
   periodo: 'all', grupo: 'semana', tab: 'apuracao', det: 'semana',
   q: '', fQuem: 'todos', fSev: 'todos', fImp: 'todos', fProd: 'todos', porNcm: false,
-  imp: null, confirmDel: false, publicando: false, erro: '', ocupado: false, gh: lerGh()
+  imp: null, confirmDel: false, ocupado: false, erro: '', aviso: '', telaLogin: 'entrar'
 };
-
 /* ---------- utilidades ---------- */
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -25,8 +26,6 @@ function fmtCnpj(c) { c = String(c || '').replace(/\D/g, ''); return c.length ==
 function m0(v) { if (Math.abs(v) < 0.005) v = 0; return v < 0 ? '−' + M(-v) : M(v); }
 function toast(t) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { el.hidden = true; }, 3800); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
-function lerGh() { try { return JSON.parse(ls('pf.github') || 'null'); } catch (e) { return null; } }
-function linkCliente(id) { return location.origin + location.pathname + '#c=' + id; }
 function bate(q, campos) { if (!q) return true; q = q.toLowerCase(); return campos.some(function (c) { return String(c || '').toLowerCase().indexOf(q) >= 0; }); }
 
 var I = {
@@ -90,28 +89,16 @@ function detectarCnpj(notas) {
 function nomeDe(notas, cnpj) { for (var i = 0; i < notas.length; i++) { if (notas[i].eC === cnpj) return notas[i].eN; if (notas[i].dC === cnpj) return notas[i].dN; } return ''; }
 
 /* ---------- espaço de trabalho ---------- */
-function novaEmpresa(cnpj, nome) {
-  return { id: C.gerarId(), meta: { cnpj: cnpj, nome: nome || '', corte: '2026-10-01', mono: F.DEFAULT_MONO.slice(), publicado: null, criado: Date.now() },
-    notas: [], canc: {}, prodCad: {}, ncmCad: {}, hist: [], senha: '' };
+function montarEmpresa(e, d) {
+  var canc = {}; d.canc.forEach(function (c) { canc[c.chave] = 1; });
+  var prodCad = {}; d.produtos.forEach(function (p) { prodCad[p.chave_produto] = { c: p.classe, ncm: p.ncm, x: p.descricao, em: p.atualizado_em }; });
+  var ncmCad = {}; d.ncm.forEach(function (r) { ncmCad[r.ncm_prefixo] = { c: r.classe, em: r.atualizado_em }; });
+  var pub = {}; d.notas.forEach(function (n) { pub[n.chave] = n.publicada; });
+  return { id: e.cnpj, meta: metaDe(e), notas: d.notas.map(function (n) { return n.dados; }), pub: pub, canc: canc, prodCad: prodCad, ncmCad: ncmCad,
+    hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova }; }).reverse() };
 }
-function deArquivo(d, senha) {
-  var canc = {}; (d.canc || []).forEach(function (c) { canc[c] = 1; });
-  return { id: d.meta.id, meta: d.meta, notas: d.notas || [], canc: canc, prodCad: d.prodCad || {}, ncmCad: d.ncmCad || {}, hist: d.hist || [], senha: senha || '' };
-}
-function paraArquivo(e) {
-  var meta = Object.assign({}, e.meta, { id: e.id, publicado: Date.now() });
-  return { v: 1, meta: meta, notas: e.notas, canc: Object.keys(e.canc), prodCad: e.prodCad, ncmCad: e.ncmCad, hist: e.hist };
-}
-function salvarLocal() {
-  if (!S.emp || S.exemplo || S.readonly) return;
-  clearTimeout(salvarLocal._t);
-  salvarLocal._t = setTimeout(function () {
-    var e = S.emp;
-    C.local.gravar({ id: e.id, meta: e.meta, notas: e.notas, canc: e.canc, prodCad: e.prodCad, ncmCad: e.ncmCad, hist: e.hist, senha: e.senha, sujo: S.sujo, alterado: Date.now() })
-      .catch(function () { toast('Não foi possível guardar o rascunho neste navegador.'); });
-  }, 400);
-}
-function mudou() { S.sujo = true; salvarLocal(); }
+function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, mono: e.ncm_monofasico || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
+function pendentesPublicar() { if (!S.emp || S.exemplo) return 0; var n = 0; for (var k in S.emp.pub) if (!S.emp.pub[k]) n++; return n; }
 
 function cfgAtual() {
   var e = S.emp, m = e.meta;
@@ -133,97 +120,131 @@ function diasSel() {
   if (S.periodo[0] === 'w') { var w = S.per.semanas.filter(function (x) { return x.ini === k; })[0]; return w ? w.dias : []; }
   var m = S.per.meses.filter(function (x) { return x.mes === k; })[0]; return m ? m.dias : [];
 }
-
-/* ---------- roteamento ---------- */
-function rota() {
-  var h = location.hash.replace(/^#/, '');
-  S.erro = '';
-  if (/^c=[a-z0-9]{6,}$/.test(h)) { S.view = 'cliente'; S.codigo = h.slice(2); S.emp = null; }
-  else if (h === 'escritorio') { S.view = 'escritorio'; S.emp = null; carregarLocais(); }
-  else { S.view = 'inicio'; S.emp = null; S.arquivoPendente = null; }
-  render();
+function erroTexto(e) {
+  var m = (e && (e.message || e.error_description)) || String(e);
+  if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (/Email not confirmed/i.test(m)) return 'Confirme seu e-mail antes de entrar. Procure a mensagem de confirmação na sua caixa de entrada.';
+  if (/Password should be at least/i.test(m)) return 'A senha precisa ter pelo menos 8 caracteres.';
+  if (/rate limit|too many/i.test(m)) return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
+  if (/sem permissão|row-level security|permission denied/i.test(m)) return 'Seu usuário não tem permissão para isso.';
+  if (/usuário não encontrado/i.test(m)) return 'Não encontramos esse e-mail cadastrado.';
+  if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o servidor. Verifique a internet e tente de novo.';
+  return m;
 }
-async function carregarLocais() {
-  try { S.locais = (await C.local.listar()) || []; } catch (e) { S.locais = []; }
-  S.locais.sort(function (a, b) { return (b.alterado || 0) - (a.alterado || 0); });
+
+/* ---------- início e sessão ---------- */
+async function iniciar() {
+  if (S.view === 'recuperar') { render(); return; }
+  try {
+    var p = await B.perfil();
+    if (!p) { S.usuario = null; S.view = S.view === 'recuperar' ? 'recuperar' : 'login'; render(); return; }
+    S.usuario = p;
+    S.empresas = await B.empresas();
+    if (p.papel === 'escritorio') { S.view = 'escritorio'; render(); contarTudo(); }
+    else if (S.empresas.length === 1) await abrirDoBanco(S.empresas[0].cnpj, true);
+    else { S.view = 'cliente'; render(); }
+  } catch (e) { S.view = 'login'; S.erro = erroTexto(e); render(); }
+}
+async function contarTudo() {
+  for (var i = 0; i < S.empresas.length; i++) {
+    var c = S.empresas[i].cnpj;
+    try { S.contagens[c] = await B.contarNotas(c); } catch (e) {}
+  }
   if (S.view === 'escritorio') render();
+}
+async function abrirDoBanco(cnpj, readonly) {
+  S.ocupado = true; S.view = S.view === 'painel' ? 'painel' : S.view; render();
+  try {
+    var e = S.empresas.filter(function (x) { return x.cnpj === cnpj; })[0];
+    var d = await B.carregar(cnpj, !readonly);
+    abrirEmpresa(montarEmpresa(e, d), readonly, false);
+    if (!readonly) carregarAcessos();
+  } catch (err) { toast('Não foi possível abrir a empresa: ' + erroTexto(err)); }
+  S.ocupado = false; render();
+}
+async function carregarAcessos() {
+  if (!S.emp || S.readonly || S.exemplo) return;
+  try { S.acessos = await B.acessos(S.emp.id); } catch (e) { S.acessos = []; }
+  renderOffice();
+}
+function abrirEmpresa(e, readonly, exemplo) {
+  S.emp = e; S.readonly = !!readonly; S.exemplo = !!exemplo; S.acessos = null;
+  S.view = 'painel'; S.periodo = 'all'; S.q = ''; S.imp = null; S.confirmDel = false;
+  S.modo = readonly || exemplo ? 'cliente' : (e.notas.length ? 'cliente' : 'escritorio');
+  recalcular(); render(); window.scrollTo(0, 0);
+}
+function voltarEmpresas() {
+  S.emp = null; S.res = null; S.exemplo = false;
+  S.view = S.usuario && S.usuario.papel === 'escritorio' ? 'escritorio' : 'cliente';
+  render(); if (S.view === 'escritorio') B.empresas().then(function (l) { S.empresas = l; contarTudo(); });
 }
 
 /* ---------- render geral ---------- */
 function render() {
   var app = $('app');
-  if (S.view === 'inicio') app.innerHTML = vInicio();
-  else if (S.view === 'cliente') app.innerHTML = vCliente();
+  if (S.view === 'carregando') app.innerHTML = '<div class="empty"><h2>Carregando…</h2></div>';
+  else if (S.view === 'login') app.innerHTML = vLogin();
+  else if (S.view === 'recuperar') app.innerHTML = vRecuperar();
   else if (S.view === 'escritorio') app.innerHTML = vEscritorio();
+  else if (S.view === 'cliente') app.innerHTML = vListaCliente();
   else { app.innerHTML = vPainel(); renderOffice(); renderMain(); }
 }
 function nav(extra) {
-  var destino = (S.view === 'escritorio' || (S.view === 'painel' && !S.readonly)) ? '#escritorio' : '#';
-  return '<nav class="nav"><a class="brand" href="' + destino + '"><span class="mk">' + I.mark + '</span>Portal Fiscal</a><div class="nav-r">' + (extra || '') + '</div></nav>';
+  var quem = S.usuario ? '<span class="small">' + esc(S.usuario.email) + '</span><button class="btn ghost" type="button" data-act="sair">Sair</button>' : '';
+  return '<nav class="nav"><button type="button" class="brand" data-act="inicio" style="border:0;background:none;cursor:pointer;font:inherit"><span class="mk">' + I.mark + '</span>Portal Fiscal</button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
 }
 
-function vInicio() {
-  return nav('<a class="btn ghost" href="#escritorio">Área do escritório</a>') +
-    '<div class="card gate"><span class="eyebrow">Acesso do cliente</span><h1>Apuração da sua empresa</h1>' +
-    '<p class="note">Use o código e a senha que o escritório enviou. Os dados chegam cifrados e só são abertos aqui no seu navegador.</p>' +
-    '<form id="fCodigo" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="codigo">Código da empresa</label><input id="codigo" autocomplete="username" required></div>' +
-    '<div class="field"><label for="senhaC">Senha</label><input id="senhaC" type="password" autocomplete="current-password" required></div>' +
-    (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') +
-    '<button class="btn primary" type="submit"' + (S.ocupado ? ' disabled' : '') + '>' + I.lock + (S.ocupado ? 'Abrindo…' : 'Entrar') + '</button></form>' +
-    '<div class="small">Recebeu um arquivo em vez de código? <label class="link" for="arqCliente">Abrir arquivo</label><input type="file" id="arqCliente" accept=".json" hidden></div></div>';
-}
-function vCliente() {
-  return nav('<a class="btn ghost" href="#">Outra empresa</a>') +
-    '<div class="card gate"><span class="eyebrow">Acesso do cliente · código ' + esc(S.codigo) + '</span><h1>Digite a senha</h1>' +
-    '<p class="note">A apuração desta empresa está cifrada. A senha foi enviada pelo escritório.</p>' +
-    '<form id="fSenha" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="senhaC">Senha</label><input id="senhaC" type="password" autocomplete="current-password" required autofocus></div>' +
-    (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') +
-    '<button class="btn primary" type="submit"' + (S.ocupado ? ' disabled' : '') + '>' + I.lock + (S.ocupado ? 'Abrindo…' : 'Abrir apuração') + '</button></form></div>';
-}
-function vEscritorio() {
-  var h = nav('<a class="btn ghost" href="#">Acesso do cliente</a>');
-  h += '<header class="top"><div><span class="eyebrow">Departamento contábil · Área do escritório</span><h1>Empresas</h1><div class="sub">Rascunhos guardados neste navegador. Publique para o cliente ver.</div></div>' +
-    '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></header>';
-  if (S.imp && S.imp.lendo) h += '<div class="banner info">Lendo ' + S.imp.arquivos + ' arquivos…</div>';
-  if (S.locais.length) {
-    h += '<div class="empresas">' + S.locais.map(function (e) {
-      return '<button type="button" class="card emp" data-abrir="' + esc(e.id) + '"><span class="eyebrow">' + esc(fmtCnpj(e.meta.cnpj)) + '</span><h3>' + esc(e.meta.nome || 'Sem nome') + '</h3>' +
-        '<span class="small">' + e.notas.length + ' notas · ' + (e.meta.publicado ? 'publicado em ' + new Date(e.meta.publicado).toLocaleDateString('pt-BR') : 'nunca publicado') + '</span>' +
-        (e.sujo ? '<span><span class="pill alerta">Alterações não publicadas</span></span>' : '<span><span class="pill ok">Publicado</span></span>') + '</button>';
-    }).join('') + '</div>';
-  } else {
-    h += '<div class="card"><div class="empty"><h2>Nenhuma empresa neste navegador</h2><p class="note">Importe os XMLs de uma empresa para começar, ou abra uma apuração já publicada para continuar de onde parou.</p></div></div>';
-  }
-  h += '<div class="office"><div class="card"><h2>Continuar uma apuração publicada</h2><p class="note">Abre o arquivo publicado no GitHub com a senha do cliente e traz o histórico de produtos e notas para este navegador.</p>' +
-    (S.arquivoPendente ? '<form id="fRetomar" class="row"><div class="field"><label for="senR">Senha do arquivo ' + esc(S.codigo || '') + '</label><input id="senR" type="password" required></div><button class="btn primary" type="submit">' + (S.ocupado ? 'Abrindo…' : 'Abrir arquivo') + '</button></form>' :
-    '<form id="fRetomar" class="row"><div class="field"><label for="codR">Código</label><input id="codR" required></div><div class="field"><label for="senR">Senha</label><input id="senR" type="password" required></div><button class="btn" type="submit">' + (S.ocupado ? 'Abrindo…' : 'Abrir') + '</button></form>') +
-    '<div class="small">Ou <label class="link" for="arqRetomar">abra o arquivo .json</label> salvo no computador.<input type="file" id="arqRetomar" accept=".json" hidden></div>' +
-    (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') + '</div>';
-  h += '<div class="card">' + vGithub() + '</div></div>';
+function vLogin() {
+  var criar = S.telaLogin === 'criar', esq = S.telaLogin === 'esqueci';
+  var h = nav() + '<div class="card gate"><span class="eyebrow">' + (criar ? 'Primeiro acesso' : esq ? 'Recuperar acesso' : 'Acesso') + '</span><h1>' + (criar ? 'Criar conta' : esq ? 'Esqueci a senha' : 'Entrar') + '</h1>';
+  h += '<p class="note">' + (criar ? 'Cadastre seu e-mail e uma senha. O escritório libera o acesso à sua empresa depois.' : esq ? 'Enviaremos um link para você definir uma nova senha.' : 'Apuração de ICMS, PIS e COFINS e auditoria das notas fiscais.') + '</p>';
+  h += '<form id="fLogin" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required value="' + esc(S.emailDigitado || '') + '"></div>';
+  if (!esq) h += '<div class="field"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="' + (criar ? 'new-password' : 'current-password') + '" minlength="8" required></div>';
+  if (S.erro) h += '<div class="banner">' + esc(S.erro) + '</div>';
+  if (S.aviso) h += '<div class="banner ok">' + esc(S.aviso) + '</div>';
+  h += '<button class="btn primary" type="submit"' + (S.ocupado ? ' disabled' : '') + '>' + I.lock + (S.ocupado ? 'Aguarde…' : criar ? 'Criar conta' : esq ? 'Enviar link' : 'Entrar') + '</button></form>';
+  h += '<div class="row small" style="justify-content:space-between">' + (S.telaLogin !== 'entrar' ? '<button class="link" type="button" data-login="entrar">Já tenho conta</button>' : '<button class="link" type="button" data-login="esqueci">Esqueci a senha</button><button class="link" type="button" data-login="criar">Criar conta</button>') + '</div>';
+  h += '<div class="small">Quer conhecer antes? <button class="link" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></div>';
   return h;
 }
-function vGithub() {
-  var g = S.gh || {};
-  return '<h2>Publicação no GitHub</h2><p class="note">Opcional. Com um token do GitHub, o botão Publicar envia o arquivo cifrado direto para a pasta <code>data/</code> do repositório. Sem token, o site baixa o arquivo e você sobe pelo próprio GitHub. O token fica só neste navegador.</p>' +
-    '<form id="fGh" class="row"><div class="field"><label for="ghOwner">Usuário ou organização</label><input id="ghOwner" value="' + esc(g.owner || '') + '" placeholder="meu-escritorio"></div>' +
-    '<div class="field"><label for="ghRepo">Repositório</label><input id="ghRepo" value="' + esc(g.repo || '') + '" placeholder="portal-fiscal"></div>' +
-    '<div class="field"><label for="ghBranch">Branch</label><input id="ghBranch" value="' + esc(g.branch || 'main') + '"></div>' +
-    '<div class="field" style="flex-basis:100%"><label for="ghToken">Token (fine-grained, só este repositório, permissão Contents: leitura e escrita)</label><input id="ghToken" type="password" value="' + esc(g.token || '') + '" autocomplete="off"></div>' +
-    '<button class="btn" type="submit">Salvar e testar</button>' + (g.token ? '<button class="btn danger" type="button" data-act="ghLimpar">Remover token</button>' : '') + '</form>';
+function vRecuperar() {
+  return nav() + '<div class="card gate"><span class="eyebrow">Recuperar acesso</span><h1>Nova senha</h1><p class="note">Defina a nova senha da sua conta.</p>' +
+    '<form id="fNovaSenha" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="senhaN">Nova senha</label><input id="senhaN" type="password" autocomplete="new-password" minlength="8" required></div>' +
+    (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') + '<button class="btn primary" type="submit">Salvar nova senha</button></form></div>';
 }
-
+function vListaCliente() {
+  var h = nav() + '<header class="top"><div><span class="eyebrow">Apuração e auditoria</span><h1>Suas empresas</h1></div></header>';
+  if (!S.empresas.length) return h + '<div class="card"><div class="empty"><h2>Acesso ainda não liberado</h2><p class="note">Sua conta foi criada, mas o escritório ainda não vinculou nenhuma empresa a ela. Avise o escritório com o e-mail ' + esc(S.usuario.email) + '.</p></div></div>';
+  return h + '<div class="empresas">' + S.empresas.map(function (e) { return '<button type="button" class="card emp" data-abrir="' + esc(e.cnpj) + '"><span class="eyebrow">' + esc(fmtCnpj(e.cnpj)) + '</span><h3>' + esc(e.razao_social || 'Empresa') + '</h3><span class="small">' + (e.publicado_em ? 'Atualizado em ' + new Date(e.publicado_em).toLocaleDateString('pt-BR') : 'Aguardando a primeira publicação') + '</span></button>'; }).join('') + '</div>';
+}
+function vEscritorio() {
+  var h = nav();
+  h += '<header class="top"><div><span class="eyebrow">Departamento contábil · Área do escritório</span><h1>Empresas</h1><div class="sub">Os dados ficam no banco do escritório. O cliente vê o que foi publicado.</div></div>' +
+    '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></header>';
+  if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
+  if (S.empresas.length) {
+    h += '<div class="empresas">' + S.empresas.map(function (e) {
+      var c = S.contagens[e.cnpj];
+      return '<button type="button" class="card emp" data-abrir="' + esc(e.cnpj) + '"><span class="eyebrow">' + esc(fmtCnpj(e.cnpj)) + '</span><h3>' + esc(e.razao_social || 'Sem nome') + '</h3>' +
+        '<span class="small">' + (c ? c.total + ' notas · ' : '') + (e.publicado_em ? 'publicado em ' + new Date(e.publicado_em).toLocaleDateString('pt-BR') : 'nunca publicado') + '</span>' +
+        (c ? (c.pendentes ? '<span><span class="pill alerta">' + c.pendentes + ' notas não publicadas</span></span>' : '<span><span class="pill ok">Publicado</span></span>') : '') + '</button>';
+    }).join('') + '</div>';
+  } else h += '<div class="card"><div class="empty"><h2>Nenhuma empresa cadastrada</h2><p class="note">Importe os XMLs de uma empresa para começar. O CNPJ é detectado pelas notas.</p></div></div>';
+  return h;
+}
 function vPainel() {
   var e = S.emp, m = e.meta;
-  var nome = m.nome || nomeDe(e.notas, m.cnpj) || fmtCnpj(m.cnpj);
-  var navR = S.readonly ? '<a class="btn ghost" href="#">Sair</a>' :
+  var navR = S.readonly ? (S.empresas.length > 1 ? '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Empresas</button>' : '') :
     '<div class="seg" role="group" aria-label="Modo"><button type="button" data-modo="cliente" aria-pressed="' + (S.modo === 'cliente') + '">Visão do cliente</button><button type="button" data-modo="escritorio" aria-pressed="' + (S.modo === 'escritorio') + '">Escritório</button></div>' +
-    '<a class="btn ghost" href="#escritorio">' + I.back + 'Empresas</a>';
+    '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Empresas</button>';
+  if (S.exemplo && !S.usuario) navR = '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Entrar</button>';
   var h = nav(navR);
   h += '<header class="top"><div><div class="eyebrow">' + (S.readonly ? 'Apuração e auditoria' : 'Departamento contábil · Apuração e auditoria') + '</div><h1>Visão geral</h1><div class="sub" id="subtitle"></div></div>' +
     '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>';
-  if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nenhum dado real.</span><a class="btn" href="#escritorio">Fechar exemplo</a></div>';
-  else if (!S.readonly && S.sujo) h += '<div class="banner"><span class="grow"><b>Alterações não publicadas.</b> O cliente ainda vê a versão anterior.</span><button class="btn primary" type="button" data-act="irPublicar">Revisar e publicar</button></div>';
+  var pend = pendentesPublicar();
+  if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nada aqui é gravado no banco.</span><button class="btn" type="button" data-act="voltar">Fechar exemplo</button></div>';
+  else if (!S.readonly && pend) h += '<div class="banner"><span class="grow"><b>' + pend + (pend === 1 ? ' nota não publicada.' : ' notas não publicadas.') + '</b> O cliente ainda não vê essas notas.</span><button class="btn primary" type="button" data-act="publicar"' + (S.ocupado ? ' disabled' : '') + '>' + (S.ocupado ? 'Publicando…' : 'Publicar para o cliente') + '</button></div>';
   if (S.readonly && m.publicado) h += '<div class="small">Atualizado pelo escritório em ' + new Date(m.publicado).toLocaleString('pt-BR') + ' · CNPJ ' + esc(fmtCnpj(m.cnpj)) + '</div>';
   h += '<section id="office" hidden></section><section id="main" style="display:flex;flex-direction:column;gap:18px;min-width:0"></section>';
   return h;
@@ -237,24 +258,32 @@ function renderOffice() {
   var e = S.emp, m = e.meta, imp = S.imp || {};
   var mono = ((m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO).join('\n');
   var h = '<div class="office">';
-  h += '<div class="card"><div><h2>Importar notas</h2><p class="note">Envie .zip ou XMLs de NF-e e NFC-e (emitidas e recebidas) e os eventos de cancelamento. As notas se somam às que já existem; uma nota repetida é substituída pela versão nova.</p></div>' +
+  h += '<div class="card"><div><h2>Importar notas</h2><p class="note">Envie .zip ou XMLs de NF-e e NFC-e (emitidas e recebidas) e os eventos de cancelamento. As notas vão para o banco e se somam às que já existem; uma nota repetida é substituída pela versão nova.</p></div>' +
     '<label class="drop" id="drop" for="files"><b>' + I.up + ' Arraste os arquivos aqui</b><span class="small">ou clique para escolher · .zip ou .xml</span></label><input id="files" type="file" accept=".zip,.xml" multiple hidden>';
   if (imp.lendo) h += '<div class="note">Lendo… ' + imp.arquivos + ' arquivos</div>';
+  if (imp.gravando) h += '<div class="note">Gravando no banco… ' + imp.gravadas + ' de ' + imp.total + ' notas</div>';
   if (imp.feito) h += '<div class="stats"><div class="stat"><div class="v num">' + imp.arquivos + '</div><div class="k">arquivos lidos</div></div><div class="stat"><div class="v num">' + imp.notas + '</div><div class="k">notas da empresa</div></div><div class="stat"><div class="v num">' + imp.canc + '</div><div class="k">canceladas</div></div><div class="stat"><div class="v num">' + (imp.terceiros + imp.erros) + '</div><div class="k">ignoradas</div></div></div>';
-  h += '<div class="row"><div class="field"><label for="cnpj">CNPJ do cliente</label><input id="cnpj" value="' + esc(fmtCnpj(m.cnpj)) + '" disabled></div><div class="field"><label for="nome">Razão social</label><input id="nome" value="' + esc(m.nome || '') + '"></div></div>';
+  h += '<div class="row"><div class="field"><label for="cnpj">CNPJ do cliente</label><input id="cnpj" value="' + esc(fmtCnpj(m.cnpj)) + '" disabled></div><div class="field"><label for="nome">Razão social</label><input id="nome" value="' + esc(m.nome || '') + '"' + (S.exemplo ? ' disabled' : '') + '></div></div>';
   h += '<details><summary>Produtos monofásicos e data de corte</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px"><p class="note">Prefixos de NCM tratados como monofásicos de PIS/COFINS (Lei 10.485/2002, Anexos I e II e pneus). Lista inicial: confira com o mix do cliente. Um por linha.</p>' +
     '<div class="field"><label for="mono">NCM (prefixos)</label><textarea id="mono" spellcheck="false">' + esc(mono) + '</textarea></div>' +
-    '<div class="row"><div class="field"><label for="corte">Início da tributação normal (fim da ST)</label><input id="corte" type="date" value="' + esc(m.corte || '2026-10-01') + '"></div><button class="btn" type="button" data-act="aplicarMono">Aplicar</button></div></div></details>';
-  if (!S.exemplo) h += S.confirmDel ? '<div class="confirm"><span>Apagar esta empresa deste navegador? O arquivo publicado no GitHub continua lá.</span><button class="btn danger" type="button" data-act="apagarSim">Apagar</button><button class="btn" type="button" data-act="apagarNao">Cancelar</button></div>'
-    : '<div><button class="btn danger" type="button" data-act="apagar">Apagar rascunho deste navegador</button></div>';
+    '<div class="row"><div class="field"><label for="corte">Início da tributação normal (fim da ST)</label><input id="corte" type="date" value="' + esc(m.corte || '2026-10-01') + '"></div><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div></div></details>';
+  if (!S.exemplo) h += S.confirmDel ? '<div class="confirm"><span>Apagar a empresa e todas as notas, produtos e acessos dela? Não dá para desfazer.</span><button class="btn danger" type="button" data-act="apagarSim">Apagar definitivamente</button><button class="btn" type="button" data-act="apagarNao">Cancelar</button></div>'
+    : '<div><button class="btn danger" type="button" data-act="apagar">Apagar empresa</button></div>';
   h += '</div>';
 
-  h += '<div class="card" id="pub"><div><h2>Publicar para o cliente</h2><p class="note">O arquivo é cifrado com a senha do cliente antes de sair deste navegador. Sem a senha, ninguém consegue ler o conteúdo no GitHub.</p></div>' +
-    '<div class="field"><label for="senhaP">Senha do cliente</label><div class="row" style="flex-wrap:nowrap"><input id="senhaP" value="' + esc(e.senha || '') + '" autocomplete="off" style="flex:1;min-width:0"><button class="btn" type="button" data-act="gerarSenha">Gerar</button></div></div>' +
-    '<div class="field"><label>Link do cliente (código ' + esc(e.id) + ')</label><div class="copy"><code>' + esc(linkCliente(e.id)) + '</code><button class="btn" type="button" data-act="copiarLink">Copiar</button></div></div>' +
-    '<div class="row"><button class="btn primary" type="button" data-act="publicar"' + (S.publicando || S.exemplo ? ' disabled' : '') + '>' + I.lock + (S.publicando ? 'Publicando…' : (S.gh && S.gh.token ? 'Publicar no GitHub' : 'Gerar arquivo cifrado')) + '</button>' +
+  var pend = pendentesPublicar();
+  h += '<div class="card" id="pub"><div><h2>Publicar para o cliente</h2><p class="note">O cliente só vê as notas publicadas. A classificação de produtos e os ajustes de monofásicos valem na hora.</p></div>' +
+    '<div class="row"><button class="btn primary" type="button" data-act="publicar"' + (S.ocupado || S.exemplo || !pend ? ' disabled' : '') + '>' + I.lock + (S.ocupado ? 'Publicando…' : pend ? 'Publicar ' + pend + (pend === 1 ? ' nota' : ' notas') : 'Tudo publicado') + '</button>' +
     '<span class="small">' + (m.publicado ? 'Última publicação: ' + new Date(m.publicado).toLocaleString('pt-BR') : 'Ainda não publicado') + '</span></div>';
-  if (!(S.gh && S.gh.token)) h += '<p class="note">Sem token configurado: o site baixa <code>' + esc(e.id) + '.json</code>. No GitHub, abra a pasta <code>data</code>, clique em Add file › Upload files e envie o arquivo. Configure o token na tela Empresas para publicar com um clique.</p>';
+  h += '<div><h3>Acessos do cliente</h3><p class="note" style="margin-top:4px">Quem entra com estes e-mails vê só esta empresa.</p></div>';
+  if (S.exemplo) h += '<p class="note">Indisponível no exemplo.</p>';
+  else {
+    if (S.acessos === null) h += '<p class="small">Carregando…</p>';
+    else if (!S.acessos.length) h += '<p class="small">Nenhum acesso cadastrado.</p>';
+    else h += '<div class="tscroll"><table><tbody>' + S.acessos.map(function (a) { return '<tr><td>' + esc(a.email) + '<div class="small">' + (a.confirmado ? (a.ultimo_acesso ? 'último acesso ' + new Date(a.ultimo_acesso).toLocaleDateString('pt-BR') : 'nunca entrou') : 'aguardando confirmar o e-mail') + '</div></td><td class="r"><button class="link" type="button" data-remover="' + esc(a.user_id) + '">Remover</button></td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '<form id="fAcesso" class="row"><div class="field"><label for="acEmail">E-mail do cliente</label><input id="acEmail" type="email" required autocomplete="off"></div><div class="field"><label for="acSenha">Senha inicial</label><input id="acSenha" type="text" minlength="8" required autocomplete="off"></div><button class="btn" type="submit">Liberar acesso</button></form>';
+    h += '<p class="note">Se o e-mail ainda não tem conta, ela é criada com essa senha e o cliente recebe um e-mail para confirmar. Se já tem conta, só o acesso a esta empresa é liberado. Envie a senha ao cliente por um canal diferente do e-mail.</p>';
+  }
   h += '</div></div>';
   el.innerHTML = h;
   bindDrop();
@@ -506,116 +535,82 @@ async function importarNova(files) {
     var acc = await lerArquivos(files);
     var cnpj = detectarCnpj(acc.notas);
     if (!cnpj) { S.imp = null; toast('Nenhuma NF-e válida nos arquivos.'); render(); return; }
-    var exist = S.locais.filter(function (e) { return e.meta.cnpj === cnpj; })[0];
-    var e = exist ? Object.assign({}, exist) : novaEmpresa(cnpj, nomeDe(acc.notas, cnpj));
-    abrirEmpresa(e, false);
-    integrar(acc, cnpj);
-  } catch (err) { S.imp = null; toast('Não foi possível ler os arquivos.'); render(); }
+    var e = await B.garantirEmpresa(cnpj, nomeDe(acc.notas, cnpj));
+    S.empresas = await B.empresas();
+    var d = await B.carregar(cnpj, true);
+    abrirEmpresa(montarEmpresa(e, d), false, false);
+    S.modo = 'escritorio';
+    await integrar(acc, cnpj);
+    carregarAcessos();
+  } catch (err) { S.imp = null; toast('Não foi possível importar: ' + erroTexto(err)); render(); }
 }
 async function importar(files) {
   if (!files || !files.length || !S.emp) return;
   S.imp = { lendo: true, arquivos: 0 }; renderOffice();
-  try { integrar(await lerArquivos(files), S.emp.meta.cnpj); }
-  catch (err) { S.imp = null; toast('Não foi possível ler os arquivos.'); renderOffice(); }
+  try { await integrar(await lerArquivos(files), S.emp.meta.cnpj); }
+  catch (err) { S.imp = null; toast('Não foi possível importar: ' + erroTexto(err)); render(); }
 }
-function integrar(acc, cnpj) {
-  var e = S.emp, porCh = {};
-  e.notas.forEach(function (n) { porCh[n.ch] = n; });
-  var daEmp = 0, terceiros = 0;
-  acc.notas.forEach(function (n) { if (n.eC === cnpj || n.dC === cnpj) { porCh[n.ch] = n; daEmp++; } else terceiros++; });
-  e.notas = Object.keys(porCh).map(function (k) { return porCh[k]; });
-  Object.assign(e.canc, acc.canc);
-  if (!e.meta.nome) e.meta.nome = nomeDe(acc.notas, cnpj);
-  S.imp = { feito: true, arquivos: acc.arquivos, notas: daEmp, canc: Object.keys(acc.canc).length, terceiros: terceiros, erros: acc.erros };
-  S.periodo = 'all'; mudou(); recalcular(); render();
-  toast(daEmp + ' notas da empresa importadas.');
-}
-function abrirEmpresa(e, readonly, exemplo) {
-  S.emp = e; S.readonly = !!readonly; S.exemplo = !!exemplo; S.sujo = !!e.sujo && !readonly;
-  S.view = 'painel'; S.periodo = 'all'; S.q = ''; S.imp = null; S.confirmDel = false;
-  S.modo = readonly || exemplo ? 'cliente' : (e.notas.length ? 'cliente' : 'escritorio');
-  if (location.hash && !readonly) history.replaceState(null, '', location.pathname + location.search);
-  recalcular(); render(); window.scrollTo(0, 0);
-}
-
-async function abrirPublicado(codigo, senha, comoEscritorio) {
-  S.ocupado = true; S.erro = ''; render();
-  try {
-    var r = await fetch('data/' + encodeURIComponent(codigo) + '.json', { cache: 'no-store' });
-    if (!r.ok) throw new Error(r.status === 404 ? 'codigo' : 'rede');
-    var d = await C.decifrar(await r.json(), senha);
-    S.ocupado = false;
-    var e = deArquivo(d, comoEscritorio ? senha : '');
-    if (comoEscritorio) { e.sujo = false; await C.local.gravar(Object.assign({ alterado: Date.now() }, e)); }
-    abrirEmpresa(e, !comoEscritorio);
-  } catch (err) {
-    S.ocupado = false;
-    S.erro = err.message === 'senha' ? 'Senha incorreta.' : err.message === 'codigo' ? 'Código não encontrado. Confira o código enviado pelo escritório.' : err.message === 'navegador' ? 'Este navegador não consegue abrir o arquivo. Use uma versão atual do Chrome, Edge, Firefox ou Safari.' : 'Não foi possível abrir a apuração agora. Tente de novo em instantes.';
-    render();
+async function integrar(acc, cnpj) {
+  var e = S.emp, daEmp = [], terceiros = 0;
+  acc.notas.forEach(function (n) { if (n.eC === cnpj || n.dC === cnpj) daEmp.push(n); else terceiros++; });
+  var porCh = {}; daEmp.forEach(function (n) { porCh[n.ch] = n; }); daEmp = Object.keys(porCh).map(function (k) { return porCh[k]; });
+  var canc = Object.keys(acc.canc);
+  if (!S.exemplo) {
+    S.imp = { gravando: true, gravadas: 0, total: daEmp.length }; render();
+    await B.salvarNotas(cnpj, daEmp, function (feitas, total) { S.imp = { gravando: true, gravadas: feitas, total: total }; renderOffice(); });
+    await B.salvarCancelamentos(cnpj, canc);
+    if (!e.meta.nome) { var nm = nomeDe(daEmp, cnpj); if (nm) { await B.salvarEmpresa(cnpj, { razao_social: nm }); e.meta.nome = nm; } }
   }
-}
-async function abrirArquivo(file, comoEscritorio, senha) {
-  try {
-    var pacote = JSON.parse(await file.text());
-    S.arquivoPendente = { pacote: pacote, esc: comoEscritorio };
-    if (!senha) { S.view = comoEscritorio ? 'escritorio' : 'cliente'; S.codigo = (file.name || '').replace(/\.json$/, ''); S.erro = ''; render(); toast('Digite a senha para abrir o arquivo.'); return; }
-  } catch (e) { toast('Arquivo inválido.'); }
-}
-async function usarArquivoPendente(senha) {
-  var ap = S.arquivoPendente; S.ocupado = true; render();
-  try {
-    var d = await C.decifrar(ap.pacote, senha);
-    S.arquivoPendente = null; S.ocupado = false;
-    var e = deArquivo(d, ap.esc ? senha : '');
-    if (ap.esc) { e.sujo = false; await C.local.gravar(Object.assign({ alterado: Date.now() }, e)); }
-    abrirEmpresa(e, !ap.esc);
-  } catch (err) { S.ocupado = false; S.erro = err.message === 'senha' ? 'Senha incorreta.' : 'Não foi possível abrir o arquivo.'; render(); }
+  var atual = {}; e.notas.forEach(function (n) { atual[n.ch] = n; });
+  daEmp.forEach(function (n) { atual[n.ch] = n; e.pub[n.ch] = false; });
+  e.notas = Object.keys(atual).map(function (k) { return atual[k]; });
+  canc.forEach(function (c) { e.canc[c] = 1; });
+  S.imp = { feito: true, arquivos: acc.arquivos, notas: daEmp.length, canc: canc.length, terceiros: terceiros, erros: acc.erros };
+  S.periodo = 'all'; recalcular(); render();
+  toast(daEmp.length + ' notas gravadas. Revise e publique para o cliente.');
 }
 
 async function publicar() {
-  var e = S.emp, senha = ($('senhaP').value || '').trim();
-  var nome = $('nome') ? $('nome').value.trim() : '';
-  if (nome) e.meta.nome = nome;
-  if (!window.crypto || !crypto.subtle) { toast('A criptografia só funciona com o site aberto em https (como no GitHub Pages).'); return; }
-  if (senha.length < 14) { toast('O arquivo fica público no GitHub, então a senha precisa ter pelo menos 14 caracteres. Use o botão Gerar.'); return; }
-  e.senha = senha; S.publicando = true; renderOffice();
+  if (!S.emp || S.exemplo) return;
+  S.ocupado = true; render();
   try {
-    var pacote = await C.cifrar(paraArquivo(e), senha);
-    var texto = JSON.stringify(pacote);
-    if (S.gh && S.gh.token) {
-      await C.publicarGitHub(S.gh, 'data/' + e.id + '.json', texto, 'Atualiza apuração ' + (e.meta.nome || e.meta.cnpj));
-      toast('Publicado no GitHub. O site atualiza em 1 a 2 minutos.');
-    } else {
-      await salvarArquivo(e.id + '.json', new Blob([texto], { type: 'application/json' }));
-      toast('Arquivo cifrado gerado. Envie-o para a pasta data do repositório.');
-    }
-    e.meta.publicado = Date.now(); S.sujo = false; salvarLocal();
-  } catch (err) {
-    toast(/github 401|github 403/.test(err.message) ? 'O GitHub recusou o token. Confira a permissão Contents: leitura e escrita.' : /github 404/.test(err.message) ? 'Repositório não encontrado. Confira usuário e nome.' : 'Não foi possível publicar (' + err.message + ').');
-  }
-  S.publicando = false; render();
+    var nome = $('nome') ? $('nome').value.trim() : '';
+    if (nome && nome !== S.emp.meta.nome) { await B.salvarEmpresa(S.emp.id, { razao_social: nome }); S.emp.meta.nome = nome; }
+    await B.publicar(S.emp.id);
+    for (var k in S.emp.pub) S.emp.pub[k] = true;
+    S.emp.meta.publicado = Date.now();
+    toast('Publicado. O cliente já vê esta versão.');
+  } catch (err) { toast('Não foi possível publicar: ' + erroTexto(err)); }
+  S.ocupado = false; render();
 }
 
-function classificar(pk, ncm, classe) {
-  var e = S.emp, agora = Date.now();
+async function classificar(pk, ncm, classe) {
+  var e = S.emp, agora = new Date().toISOString(), p = S.res.produtos[pk] || {};
+  var antes = { prod: JSON.parse(JSON.stringify(e.prodCad)), ncm: JSON.parse(JSON.stringify(e.ncmCad)) };
   if (S.porNcm && ncm) {
     var ant = e.ncmCad[ncm]; e.ncmCad[ncm] = { c: classe, em: agora };
     e.hist.push({ em: agora, alvo: 'ncm', ref: ncm, x: 'NCM ' + ncm, de: ant ? ant.c : null, para: classe });
     Object.keys(e.prodCad).forEach(function (k) { if (e.prodCad[k].ncm === ncm) delete e.prodCad[k]; });
   } else {
-    var p = S.res.produtos[pk] || {}, a = e.prodCad[pk];
-    e.prodCad[pk] = { c: classe, em: agora, x: p.x || '', ncm: ncm || '' };
-    e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : (p.origem === 'sugerido' ? 'revenda' : null), para: classe });
+    var a = e.prodCad[pk]; e.prodCad[pk] = { c: classe, em: agora, x: p.x || '', ncm: ncm || '' };
+    e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe });
   }
-  mudou(); recalcular(); renderMain(); renderVBanner();
+  recalcular(); renderMain();
+  if (S.exemplo) return;
+  try {
+    if (S.porNcm && ncm) await B.classificarNcm(e.id, ncm, classe);
+    else await B.classificarProduto(e.id, pk, ncm, (p.x || '') + ' · ' + (p.fn || ''), classe);
+  } catch (err) { e.prodCad = antes.prod; e.ncmCad = antes.ncm; e.hist.pop(); recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
 }
-function desfazerClasse(pk, origem, ncm) {
-  var e = S.emp, agora = Date.now();
+async function desfazerClasse(pk, origem, ncm) {
+  var e = S.emp, agora = new Date().toISOString();
   if (origem === 'ncm') { e.hist.push({ em: agora, alvo: 'ncm', ref: ncm, x: 'NCM ' + ncm, de: e.ncmCad[ncm] && e.ncmCad[ncm].c, para: null }); delete e.ncmCad[ncm]; }
   else { e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: (e.prodCad[pk] && e.prodCad[pk].x) || pk, de: e.prodCad[pk] && e.prodCad[pk].c, para: null }); delete e.prodCad[pk]; }
-  mudou(); recalcular(); renderMain(); renderVBanner();
+  recalcular(); renderMain();
+  if (S.exemplo) return;
+  try { if (origem === 'ncm') await B.removerNcm(e.id, ncm); else await B.removerProduto(e.id, pk); }
+  catch (err) { toast('Não foi possível desfazer: ' + erroTexto(err)); }
 }
-function renderVBanner() { if (S.view === 'painel' && !S.readonly) { var y = window.scrollY; render(); window.scrollTo(0, y); } }
 
 /* ---------- eventos ---------- */
 document.addEventListener('click', function (ev) {
@@ -630,38 +625,58 @@ document.addEventListener('click', function (ev) {
   if (d.fimp) { S.fImp = d.fimp; renderMain(); return; }
   if (d.fprod) { S.fProd = d.fprod; renderMain(); return; }
   if (d.modo) { S.modo = d.modo; render(); return; }
+  if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
   if (d.classe) { if (!S.readonly) classificar(d.pk, d.ncm, d.classe); return; }
   if (d.desfazer) { desfazerClasse(d.desfazer, d.origem, d.ncm); return; }
-  if (d.abrir) { var e = S.locais.filter(function (x) { return x.id === d.abrir; })[0]; if (e) abrirEmpresa(JSON.parse(JSON.stringify(e)), false); return; }
+  if (d.abrir) { abrirDoBanco(d.abrir, !(S.usuario && S.usuario.papel === 'escritorio')); return; }
+  if (d.remover) {
+    B.removerAcesso(S.emp.id, d.remover).then(function () { toast('Acesso removido.'); carregarAcessos(); }).catch(function (e) { toast(erroTexto(e)); });
+    return;
+  }
   var a = d.act;
   if (a === 'exemplo') carregarExemplo();
+  else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
+  else if (a === 'inicio' || a === 'voltar') { if (S.usuario) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
   else if (a === 'publicar') publicar();
-  else if (a === 'irPublicar') { S.modo = 'escritorio'; render(); var p = $('pub'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   else if (a === 'irProdutos') { S.tab = 'produtos'; S.fProd = 'pendente'; renderMain(); }
-  else if (a === 'gerarSenha') { $('senhaP').value = C.gerarSenha(); }
-  else if (a === 'copiarLink') { var t = linkCliente(S.emp.id); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Link copiado.'); }).catch(function () { toast('Copie o link manualmente.'); }); }
   else if (a === 'aplicarMono') {
-    S.emp.meta.mono = $('mono').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean);
-    S.emp.meta.corte = $('corte').value || '2026-10-01'; mudou(); recalcular(); render();
-    toast(S.emp.meta.mono.length ? 'Análise recalculada.' : 'Lista vazia: a análise usa a lista padrão de pneus e autopeças.');
+    var lista = $('mono').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean);
+    var corte = $('corte').value || '2026-10-01';
+    S.emp.meta.mono = lista; S.emp.meta.corte = corte; recalcular(); render();
+    var msg = lista.length ? 'Análise recalculada.' : 'Lista vazia: a análise usa a lista padrão de pneus e autopeças.';
+    if (S.exemplo) { toast(msg); return; }
+    B.salvarEmpresa(S.emp.id, { ncm_monofasico: lista, corte_st: corte }).then(function () { toast(msg + ' Salvo.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }
   else if (a === 'apagar') { S.confirmDel = true; renderOffice(); }
   else if (a === 'apagarNao') { S.confirmDel = false; renderOffice(); }
-  else if (a === 'apagarSim') { C.local.apagar(S.emp.id).then(function () { toast('Rascunho apagado deste navegador.'); location.hash = 'escritorio'; S.view = 'escritorio'; carregarLocais(); }); }
-  else if (a === 'ghLimpar') { S.gh = Object.assign({}, S.gh, { token: '' }); ls('pf.github', JSON.stringify(S.gh)); render(); toast('Token removido deste navegador.'); }
+  else if (a === 'apagarSim') { B.apagarEmpresa(S.emp.id).then(function () { toast('Empresa apagada.'); voltarEmpresas(); }).catch(function (e) { toast(erroTexto(e)); }); }
 });
-document.addEventListener('submit', function (ev) {
+document.addEventListener('submit', async function (ev) {
   ev.preventDefault();
   var f = ev.target;
-  if (f.id === 'fCodigo') abrirPublicado($('codigo').value.trim().toLowerCase(), $('senhaC').value);
-  else if (f.id === 'fSenha') { if (S.arquivoPendente) usarArquivoPendente($('senhaC').value); else abrirPublicado(S.codigo, $('senhaC').value); }
-  else if (f.id === 'fRetomar') { if (S.arquivoPendente) usarArquivoPendente($('senR').value); else abrirPublicado($('codR').value.trim().toLowerCase(), $('senR').value, true); }
-  else if (f.id === 'fGh') {
-    var g = { owner: $('ghOwner').value.trim(), repo: $('ghRepo').value.trim(), branch: $('ghBranch').value.trim() || 'main', token: $('ghToken').value.trim() };
-    S.gh = g; ls('pf.github', JSON.stringify(g));
-    if (!g.token) { toast('Configuração salva sem token.'); return; }
-    C.testarGitHub(g).then(function () { toast('Conexão com o GitHub confirmada.'); }).catch(function (e) { toast('Falhou: ' + e.message + '. Confira usuário, repositório e token.'); });
+  if (f.id === 'fLogin') {
+    var email = $('email').value.trim(), senha = $('senha') ? $('senha').value : '';
+    S.emailDigitado = email;
+    S.ocupado = true; S.erro = ''; S.aviso = ''; render();
+    try {
+      if (S.telaLogin === 'criar') {
+        var r = await B.criarConta(email, senha);
+        S.ocupado = false;
+        if (r.session) { await iniciar(); return; }
+        S.telaLogin = 'entrar'; S.aviso = 'Conta criada. Confirme pelo link enviado para ' + email + ' e depois entre.';
+      } else if (S.telaLogin === 'esqueci') {
+        await B.esqueciSenha(email); S.ocupado = false; S.telaLogin = 'entrar'; S.aviso = 'Se o e-mail estiver cadastrado, o link para nova senha chega em instantes.';
+      } else { await B.entrar(email, senha); S.ocupado = false; await iniciar(); return; }
+    } catch (e) { S.ocupado = false; S.erro = erroTexto(e); }
+    render();
+  } else if (f.id === 'fNovaSenha') {
+    try { await B.novaSenha($('senhaN').value); toast('Senha alterada.'); history.replaceState(null, '', location.pathname); S.view = 'carregando'; await iniciar(); }
+    catch (e) { S.erro = erroTexto(e); render(); }
+  } else if (f.id === 'fAcesso') {
+    var em = $('acEmail').value.trim(), sn = $('acSenha').value;
+    try { await B.criarAcesso(S.emp.id, em, sn); toast('Acesso liberado para ' + em + '.'); carregarAcessos(); }
+    catch (e) { toast('Não foi possível liberar: ' + erroTexto(e)); }
   }
 });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S.q = ev.target.value.trim(); renderMain(); } });
@@ -671,9 +686,10 @@ document.addEventListener('change', function (ev) {
   var lista = t.files ? Array.prototype.slice.call(t.files) : [];
   if (t.id === 'files') { importar(lista); t.value = ''; }
   else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }
-  else if (t.id === 'arqCliente') { if (lista[0]) abrirArquivo(lista[0], false); t.value = ''; }
-  else if (t.id === 'arqRetomar') { if (lista[0]) abrirArquivo(lista[0], true); t.value = ''; }
-  else if (t.id === 'nome' && S.emp) { S.emp.meta.nome = t.value.trim(); mudou(); }
+  else if (t.id === 'nome' && S.emp && !S.exemplo) {
+    var nm = t.value.trim(); S.emp.meta.nome = nm;
+    B.salvarEmpresa(S.emp.id, { razao_social: nm }).then(function () { toast('Razão social salva.'); renderHeaderSub(); }).catch(function (e) { toast(erroTexto(e)); });
+  }
 });
 function bindDrop() {
   var d = $('drop'); if (!d) return;
@@ -688,14 +704,18 @@ async function carregarExemplo() {
     if (window.EXEMPLO_B64) { var bin = atob(window.EXEMPLO_B64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); blob = new Blob([u]); }
     else { var r = await fetch(EXEMPLO_URL); if (!r.ok) throw new Error(); blob = await r.blob(); }
     var acc = await lerArquivos([new File([blob], 'exemplo.zip')]);
-    var e = novaEmpresa('12345678000190', 'Pneus e Peças Exemplo Ltda (fictícia)');
-    e.notas = acc.notas; e.canc = acc.canc; e.id = 'exemplo';
-    abrirEmpresa(e, false, true);
+    var e = { id: 'exemplo', meta: { cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', corte: '2026-10-01', mono: F.DEFAULT_MONO.slice(), publicado: null },
+      notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [] };
+    abrirEmpresa(e, !(S.usuario && S.usuario.papel === 'escritorio'), true);
   } catch (err) { toast('Não foi possível carregar o exemplo.'); }
 }
 
 /* ---------- início ---------- */
 var tab = ls('pf.tab'); if (tab) S.tab = tab;
-window.addEventListener('hashchange', rota);
-rota();
+if (/type=recovery/.test(location.hash)) S.view = 'recuperar';
+B.aoMudarSessao(function (evento) {
+  if (evento === 'PASSWORD_RECOVERY') { S.view = 'recuperar'; render(); }
+});
+render();
+iniciar();
 })();
