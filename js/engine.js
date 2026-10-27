@@ -191,7 +191,7 @@ var Fiscal = (function () {
   var PIS = 0.0165, COF = 0.076;
 
   function emptyTot() {
-    return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0,
+    return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0, compOut: 0,
       stE: 0, ibs: 0, cbs: 0, nS: 0, nE: 0, pisDest: 0, cofDest: 0 };
   }
   function addTot(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; }
@@ -270,8 +270,8 @@ var Fiscal = (function () {
         } else {
           var stAnterior = !pos && seg && tribST;
           if (stAnterior) { /* regime de ST: imposto encerrado, sem crédito */ }
-          else if (nat === 'uso') T.icmsUso += it.v;
-          else if (nat === 'ativo') T.ciap += it.v;
+          else if (nat === 'uso') { T.icmsUso += it.v; T.compOut += receita + it.vIPI; }
+          else if (nat === 'ativo') { T.ciap += it.v; T.compOut += receita + it.vIPI; }
           else T.icmsC += it.v;
           T.stE += it.vst;
         }
@@ -353,7 +353,7 @@ var Fiscal = (function () {
       });
       if (semDifal && !nt.dif) issue('alerta', null, 'DIFAL', 'Venda interestadual a não contribuinte sem o grupo de partilha do DIFAL.', 0);
 
-      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
+      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
 
       var resumo = { ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
         parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length,

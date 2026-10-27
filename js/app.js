@@ -158,7 +158,8 @@ function render() {
   else { app.innerHTML = vPainel(); renderOffice(); renderMain(); }
 }
 function nav(extra) {
-  return '<nav class="nav"><a class="brand" href="#"><span class="mk">' + I.mark + '</span>Portal Fiscal</a><div class="nav-r">' + (extra || '') + '</div></nav>';
+  var destino = (S.view === 'escritorio' || (S.view === 'painel' && !S.readonly)) ? '#escritorio' : '#';
+  return '<nav class="nav"><a class="brand" href="' + destino + '"><span class="mk">' + I.mark + '</span>Portal Fiscal</a><div class="nav-r">' + (extra || '') + '</div></nav>';
 }
 
 function vInicio() {
@@ -223,7 +224,7 @@ function vPainel() {
     '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>';
   if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nenhum dado real.</span><a class="btn" href="#escritorio">Fechar exemplo</a></div>';
   else if (!S.readonly && S.sujo) h += '<div class="banner"><span class="grow"><b>Alterações não publicadas.</b> O cliente ainda vê a versão anterior.</span><button class="btn primary" type="button" data-act="irPublicar">Revisar e publicar</button></div>';
-  if (S.readonly && m.publicado) h += '<div class="small">Atualizado pelo escritório em ' + new Date(m.publicado).toLocaleString('pt-BR') + ' · ' + esc(nome) + ' · CNPJ ' + esc(fmtCnpj(m.cnpj)) + '</div>';
+  if (S.readonly && m.publicado) h += '<div class="small">Atualizado pelo escritório em ' + new Date(m.publicado).toLocaleString('pt-BR') + ' · CNPJ ' + esc(fmtCnpj(m.cnpj)) + '</div>';
   h += '<section id="office" hidden></section><section id="main" style="display:flex;flex-direction:column;gap:18px;min-width:0"></section>';
   return h;
 }
@@ -307,6 +308,9 @@ function renderMain() {
   h += '</div>';
   h += '<div class="toolbar"><div class="seg" role="group" aria-label="Agrupar períodos"><button type="button" data-grupo="semana" aria-pressed="' + (S.grupo === 'semana') + '">Semanas</button><button type="button" data-grupo="mes" aria-pressed="' + (S.grupo === 'mes') + '">Meses</button></div><span class="small">A apuração oficial é mensal. Dia e semana servem para acompanhamento.</span></div>';
 
+  h += '<div class="mov card"><div><span class="small">Vendas</span><b class="num">' + m0(T.vendas) + '</b><span class="small">' + T.nS + ' notas de saída</span></div>' +
+    '<div><span class="small">Compras</span><b class="num">' + m0(T.compras + T.compOut) + '</b><span class="small">' + T.nE + ' notas de entrada' + (T.compOut ? ' · ' + m0(T.compOut) + ' de uso/ativo' : '') + '</span></div>' +
+    '<div><span class="small">ICMS-ST pago nas compras</span><b class="num">' + m0(T.stE) + '</b><span class="small">retido pelos fornecedores</span></div></div>';
   h += '<div class="kpis">';
   h += kpi('ICMS', I.doc, T.icmsD, T.icmsC, (T.icmsUso || T.ciap) ? '<dt>Uso e ativo (sem crédito)</dt><dd>' + m0(T.icmsUso + T.ciap) + '</dd>' : '');
   h += kpi('PIS', I.pct, T.pisD, T.pisC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.pisDest) + '</dd>');
@@ -351,7 +355,8 @@ function grafico(ds) {
   S._gs = gs;
   if (!gs.length) return '';
   var max = 0; gs.forEach(function (g) { max = Math.max(max, g.t.icmsD, g.t.icmsC); });
-  var sc = escala(max), W = 1000, H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
+  var larg = ($('main') && $('main').clientWidth) || 1000;
+  var sc = escala(max), W = Math.max(560, Math.round(larg - 38)), H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
   var gw = iw / gs.length, bw = Math.max(6, Math.min(26, gw * 0.3)), gap = 2;
   var y = function (v) { return Tp + ih - v / sc.max * ih; };
   var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="ICMS débito e crédito por ' + (S.periodo[0] === 'w' ? 'dia' : 'semana') + '">';
@@ -401,12 +406,12 @@ function linhasApuracao(ds) {
 function tabApuracao(ds, T) {
   var rows = linhasApuracao(ds).map(function (r) { return { lbl: r.lbl, t: F.somaDias(S.res.dias, r.dias) }; });
   var h = '<div class="toolbar"><div class="seg" role="group" aria-label="Detalhar por"><button type="button" data-det="dia" aria-pressed="' + (S.det === 'dia') + '">Dia</button><button type="button" data-det="semana" aria-pressed="' + (S.det === 'semana') + '">Semana</button><button type="button" data-det="mes" aria-pressed="' + (S.det === 'mes') + '">Mês</button></div><span class="small">Valores entre parênteses são saldo credor.</span></div>';
-  h += '<div class="tscroll"><table><thead><tr class="grp"><th></th><th></th><th colspan="3">ICMS</th><th colspan="3">PIS</th><th colspan="3">COFINS</th></tr><tr><th>Período</th><th class="r">Vendas</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody>';
+  h += '<div class="tscroll"><table><thead><tr class="grp"><th></th><th></th><th></th><th colspan="3">ICMS</th><th colspan="3">PIS</th><th colspan="3">COFINS</th></tr><tr><th>Período</th><th class="r">Vendas</th><th class="r">Compras</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody>';
   rows.forEach(function (r) {
     var t = r.t;
-    h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + t.nS + ' saídas · ' + t.nE + ' entradas</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
+    h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + t.nS + ' saídas · ' + t.nE + ' entradas</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.compras + t.compOut) + (t.compOut ? '<div class="small">uso/ativo ' + m0(t.compOut) + '</div>' : '') + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
   });
-  h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
+  h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
   h += '<p class="note">PIS e COFINS apurados pela regra (1,65% e 7,6% sobre a receita sem ICMS), não pelo valor destacado nas notas. Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo e ativo ficam fora do crédito direto (ativo segue o CIAP, 1/48 por mês).</p>';
   return h;
 }
@@ -638,7 +643,8 @@ document.addEventListener('click', function (ev) {
   else if (a === 'copiarLink') { var t = linkCliente(S.emp.id); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Link copiado.'); }).catch(function () { toast('Copie o link manualmente.'); }); }
   else if (a === 'aplicarMono') {
     S.emp.meta.mono = $('mono').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean);
-    S.emp.meta.corte = $('corte').value || '2026-10-01'; mudou(); recalcular(); render(); toast('Análise recalculada.');
+    S.emp.meta.corte = $('corte').value || '2026-10-01'; mudou(); recalcular(); render();
+    toast(S.emp.meta.mono.length ? 'Análise recalculada.' : 'Lista vazia: a análise usa a lista padrão de pneus e autopeças.');
   }
   else if (a === 'apagar') { S.confirmDel = true; renderOffice(); }
   else if (a === 'apagarNao') { S.confirmDel = false; renderOffice(); }
@@ -662,17 +668,18 @@ document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S
 document.addEventListener('change', function (ev) {
   var t = ev.target;
   if (t.id === 'porNcm') { S.porNcm = t.checked; return; }
-  if (t.id === 'files') { importar(t.files); t.value = ''; }
-  else if (t.id === 'arqNova') { importarNova(t.files); t.value = ''; }
-  else if (t.id === 'arqCliente') { abrirArquivo(t.files[0], false); t.value = ''; }
-  else if (t.id === 'arqRetomar') { abrirArquivo(t.files[0], true); t.value = ''; }
+  var lista = t.files ? Array.prototype.slice.call(t.files) : [];
+  if (t.id === 'files') { importar(lista); t.value = ''; }
+  else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }
+  else if (t.id === 'arqCliente') { if (lista[0]) abrirArquivo(lista[0], false); t.value = ''; }
+  else if (t.id === 'arqRetomar') { if (lista[0]) abrirArquivo(lista[0], true); t.value = ''; }
   else if (t.id === 'nome' && S.emp) { S.emp.meta.nome = t.value.trim(); mudou(); }
 });
 function bindDrop() {
   var d = $('drop'); if (!d) return;
   d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('over'); });
   d.addEventListener('dragleave', function () { d.classList.remove('over'); });
-  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); importar(e.dataTransfer.files); });
+  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); importar(Array.prototype.slice.call(e.dataTransfer.files)); });
 }
 
 async function carregarExemplo() {
