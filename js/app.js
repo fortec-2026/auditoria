@@ -14,7 +14,7 @@ var S = {
   res: null, per: null, acessos: null,
   periodo: 'all', grupo: 'semana', tab: 'apuracao', det: 'semana',
   q: '', fQuem: 'todos', fSev: 'todos', fImp: 'todos', fProd: 'todos', porNcm: false,
-  imp: null, confirmDel: false, ocupado: false, erro: '', aviso: '', telaLogin: 'entrar'
+  imp: null, confirmDel: false, ocupado: false, erro: '', aviso: '', telaLogin: 'entrar', equipe: null, confirmEquipe: null
 };
 /* ---------- utilidades ---------- */
 function $(id) { return document.getElementById(id); }
@@ -143,10 +143,28 @@ async function iniciar() {
     if (!p) { S.usuario = null; S.view = S.view === 'recuperar' ? 'recuperar' : 'login'; render(); return; }
     S.usuario = p;
     S.empresas = await B.empresas();
-    if (p.papel === 'escritorio') { S.view = 'escritorio'; render(); contarTudo(); }
+    if (p.papel === 'escritorio') { S.view = 'escritorio'; render(); contarTudo(); carregarEquipe(); }
     else if (S.empresas.length === 1) await abrirDoBanco(S.empresas[0].cnpj, true);
     else { S.view = 'cliente'; render(); }
   } catch (e) { S.view = 'login'; S.erro = erroTexto(e); render(); }
+}
+async function carregarEquipe() {
+  try { S.equipe = await B.equipe(); } catch (e) { S.equipe = []; }
+  if (S.view === 'escritorio') render();
+}
+function vEquipe() {
+  var h = '<div class="card" style="padding:18px;display:flex;flex-direction:column;gap:14px"><div><h2>Equipe do escritório</h2><p class="note">Quem está aqui vê e altera todas as empresas: importa notas, classifica, publica e libera o acesso dos clientes.</p></div>';
+  if (S.equipe === null) h += '<p class="small">Carregando…</p>';
+  else h += '<div class="tscroll"><table><tbody>' + S.equipe.map(function (u) {
+    var eu = S.usuario && u.user_id === S.usuario.id;
+    var acao = eu ? '<span class="small">você</span>' : (S.confirmEquipe === u.user_id
+      ? '<span class="confirm"><span>Remover ' + esc(u.email) + ' da equipe?</span><button class="btn danger" type="button" data-rmeq="' + esc(u.user_id) + '">Remover</button><button class="btn" type="button" data-act="cancelaEq">Cancelar</button></span>'
+      : '<button class="link" type="button" data-pedeeq="' + esc(u.user_id) + '">Remover da equipe</button>');
+    return '<tr><td>' + esc(u.email) + '<div class="small">' + (u.ultimo_acesso ? 'último acesso ' + new Date(u.ultimo_acesso).toLocaleDateString('pt-BR') : 'nunca entrou') + '</div></td><td class="r">' + acao + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+  h += '<form id="fEquipe" class="row"><div class="field"><label for="eqEmail">E-mail</label><input id="eqEmail" type="email" required autocomplete="off"></div><div class="field"><label for="eqSenha">Senha inicial</label><input id="eqSenha" type="text" minlength="8" required autocomplete="off"></div><button class="btn" type="submit">Adicionar à equipe</button></form>';
+  h += '<p class="note">A conta é criada já pronta para entrar com essa senha. Se o e-mail já tiver conta, ela passa a ser do escritório e a senha não muda. Peça para trocar a senha em "Esqueci a senha" no primeiro acesso.</p></div>';
+  return h;
 }
 async function contarTudo() {
   for (var i = 0; i < S.empresas.length; i++) {
@@ -234,6 +252,7 @@ function vEscritorio() {
         (c ? (c.pendentes ? '<span><span class="pill alerta">' + c.pendentes + ' notas não publicadas</span></span>' : '<span><span class="pill ok">Publicado</span></span>') : '') + '</button>';
     }).join('') + '</div>';
   } else h += '<div class="card"><div class="empty"><h2>Nenhuma empresa cadastrada</h2><p class="note">Importe os XMLs de uma empresa para começar. O CNPJ é detectado pelas notas.</p></div></div>';
+  h += vEquipe();
   return h;
 }
 function vPainel() {
@@ -679,6 +698,8 @@ document.addEventListener('click', function (ev) {
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
   if (d.classe) { if (!S.readonly) classificar(d.pk, d.ncm, d.classe); return; }
   if (d.cserv) { if (!S.readonly) classificarServ(d.pk, d.cserv); return; }
+  if (d.pedeeq) { S.confirmEquipe = d.pedeeq; render(); return; }
+  if (d.rmeq) { B.removerEquipe(d.rmeq).then(function () { S.confirmEquipe = null; toast('Removido da equipe.'); carregarEquipe(); }).catch(function (e) { toast(erroTexto(e)); }); return; }
   if (d.desfazer) { desfazerClasse(d.desfazer, d.origem, d.ncm); return; }
   if (d.abrir) { abrirDoBanco(d.abrir, !(S.usuario && S.usuario.papel === 'escritorio')); return; }
   if (d.remover) {
@@ -690,6 +711,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
+  else if (a === 'cancelaEq') { S.confirmEquipe = null; render(); }
   else if (a === 'publicar') publicar();
   else if (a === 'irProdutos') { S.tab = 'produtos'; S.fProd = 'pendente'; renderMain(); }
   else if (a === 'aplicarMono') {
@@ -725,6 +747,10 @@ document.addEventListener('submit', async function (ev) {
   } else if (f.id === 'fNovaSenha') {
     try { await B.novaSenha($('senhaN').value); toast('Senha alterada.'); history.replaceState(null, '', location.pathname); S.view = 'carregando'; await iniciar(); }
     catch (e) { S.erro = erroTexto(e); render(); }
+  } else if (f.id === 'fEquipe') {
+    var eqE = $('eqEmail').value.trim(), eqS = $('eqSenha').value;
+    try { var re = await B.adicionarEquipe(eqE, eqS); toast((re && re.criado ? 'Conta criada: ' : 'Adicionado à equipe: ') + eqE + '.'); carregarEquipe(); }
+    catch (e) { toast('Não foi possível adicionar: ' + erroTexto(e)); }
   } else if (f.id === 'fAcesso') {
     var em = $('acEmail').value.trim(), sn = $('acSenha').value;
     try { var ra = await B.criarAcesso(S.emp.id, em, sn); toast((ra && ra.criado ? 'Conta criada e acesso liberado para ' : 'Acesso liberado para ') + em + '.'); carregarAcessos(); }

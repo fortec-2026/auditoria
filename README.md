@@ -32,6 +32,8 @@ O cadastro público fica desligado por segurança: só o escritório cria contas
 update public.perfis set papel = 'escritorio' where email = 'seu-email@escritorio.com.br';
 ```
 
+Depois da primeira conta, a equipe do escritório (sócios e colaboradores) é cadastrada no próprio portal, na tela **Empresas › Equipe do escritório**. A mesma tela permite remover alguém da equipe.
+
 As contas dos clientes são criadas pelo próprio portal, em **Escritório › Acessos do cliente**, pela função `criar-acesso` do Supabase. A função confere se quem pede é do escritório antes de criar.
 
 ## Configuração do Supabase (Authentication › URL Configuration)

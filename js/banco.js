@@ -97,11 +97,25 @@ var Banco = (function () {
     }
     return r.data;
   }
+  /* ---------- equipe do escritório ---------- */
+  async function equipe() { return ok(await sb.rpc('equipe_escritorio')); }
+  async function adicionarEquipe(email, senha) {
+    var r = await sb.functions.invoke('criar-acesso', { body: { email: email, senha: senha, papel: 'escritorio' } });
+    if (r.error) {
+      var msg = r.error.message;
+      try { var j = await r.error.context.json(); if (j && j.erro) msg = j.erro; } catch (e) {}
+      throw new Error(msg);
+    }
+    return r.data;
+  }
+  async function removerEquipe(userId) { return ok(await sb.rpc('remover_da_equipe', { p_user: userId })); }
+
   async function removerAcesso(cnpj, userId) { return ok(await sb.from('empresa_usuarios').delete().eq('empresa_cnpj', cnpj).eq('user_id', userId)); }
 
   return { sessao: sessao, entrar: entrar, criarConta: criarConta, sair: sair, esqueciSenha: esqueciSenha, novaSenha: novaSenha, aoMudarSessao: aoMudarSessao, perfil: perfil,
     empresas: empresas, contarNotas: contarNotas, garantirEmpresa: garantirEmpresa, salvarEmpresa: salvarEmpresa, apagarEmpresa: apagarEmpresa,
     carregar: carregar, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
-    acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso };
+    acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
+    equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe };
 })();
