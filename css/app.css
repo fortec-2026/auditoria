@@ -217,3 +217,19 @@ table.itens tr.tem-alerta td{background:var(--warn-bg)}
 }
 .toolbar .grow{flex:1;min-width:200px}
 table.cmp tr.tot td{border-bottom:2px solid var(--line);background:var(--surface-2)}
+
+/* Abas na vertical em telas largas */
+@media (min-width:1300px){
+  .wrap:has(.painel-abas){max-width:1520px}
+  .painel-abas{display:grid;grid-template-columns:184px minmax(0,1fr);align-items:start}
+  .painel-abas .tabs{flex-direction:column;gap:2px;padding:12px 10px;border-bottom:0;border-right:1px solid var(--line);position:sticky;top:12px;overflow:visible;align-self:start}
+  .painel-abas .tabs button{justify-content:space-between;border-bottom:0;border-radius:8px;padding:10px 10px;text-align:left;width:100%}
+  .painel-abas .tabs button:hover{background:var(--surface-2);color:var(--ink)}
+  .painel-abas .tabs button[aria-selected="true"]{background:var(--surface-2);color:var(--ink);box-shadow:inset 3px 0 0 var(--s1)}
+  .painel-abas .pbody{min-width:0}
+}
+@media (min-width:1300px) and (max-width:1499px){
+  .painel-abas .pbody{padding:14px 14px 16px}
+  .painel-abas th, .painel-abas td{padding-left:7px;padding-right:7px}
+}
+@media print{ .painel-abas{display:block} .painel-abas .tabs{border-right:0;position:static} }
