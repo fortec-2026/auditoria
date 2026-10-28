@@ -200,7 +200,19 @@ details summary{cursor:pointer;font-weight:600}
 table.itens tr.tem-erro td{background:var(--err-bg)}
 table.itens tr.tem-alerta td{background:var(--warn-bg)}
 @media print{
-  body > .wrap, #toast, .no-print{display:none!important}
+  body:not(.imprimindo) > .wrap, #toast, .no-print{display:none!important}
+  body.imprimindo{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.imprimindo .nav, body.imprimindo .search, body.imprimindo .banner, body.imprimindo #office, body.imprimindo .periods, body.imprimindo .toolbar, body.imprimindo .legal, body.imprimindo details,
+  body.imprimindo .tabs [aria-selected="false"], body.imprimindo .pbody .seg button[aria-pressed="false"], body.imprimindo [data-ac], body.imprimindo [data-desfazer], body.imprimindo [data-act]{display:none!important}
+  body.imprimindo .wrap{max-width:none;padding:0}
+  body.imprimindo .card{box-shadow:none;break-inside:auto}
+  body.imprimindo .tscroll{overflow:visible}
+  body.imprimindo table{font-size:9.5px}
+  body.imprimindo tr{break-inside:avoid}
+  body.imprimindo .kpis, body.imprimindo .mov, body.imprimindo .chart-card{break-inside:avoid}
+  body.imprimindo .chart svg{min-width:0}
+  @page{size:A4 landscape;margin:10mm}
   .ver{position:static;background:none;padding:0;overflow:visible}
   .ver .doc{box-shadow:none;padding:0;max-width:none}
 }
+.toolbar .grow{flex:1;min-width:200px}

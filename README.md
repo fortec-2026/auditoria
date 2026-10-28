@@ -67,6 +67,13 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
 
+## Excel e impressão
+
+No painel, ao lado de Semanas/Meses, ficam os botões **Baixar Excel** e **Imprimir**. Os dois respeitam o período selecionado.
+
+- **Excel:** um arquivo .xlsx com as abas Resumo, Apuração por mês, por semana e por dia, Notas, Itens das notas, Pendências (com situação e anotação), Produtos, Serviços tomados e Fretes. Valores e datas saem como números, com filtro e cabeçalho fixo.
+- **Imprimir:** imprime a visão geral e a aba aberta, sem limite de linhas. Para salvar em PDF, escolha "Salvar como PDF" na janela de impressão.
+
 ## Ver a nota
 
 Clique no número de uma nota (abas Notas, Pendências e Serviços/fretes) para abrir o espelho do documento: emitente, destinatário, itens com NCM, CFOP, CST e tributos, itens com problema destacados, totais, transporte, cobrança e informações complementares. A tela também permite baixar o XML original e imprimir.
@@ -126,6 +133,7 @@ Os valores são apurados a partir dos XMLs e não substituem a escrituração (S
 index.html              página
 css/app.css             visual
 js/engine.js            leitura dos XMLs, apuração e auditoria
+js/planilha.js          geração do arquivo Excel (.xlsx)
 js/banco.js             acesso ao Supabase (login, dados, acessos)
 js/app.js               telas
 vendor/jszip.min.js     leitura de .zip
