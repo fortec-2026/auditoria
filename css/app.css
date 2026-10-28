@@ -216,3 +216,4 @@ table.itens tr.tem-alerta td{background:var(--warn-bg)}
   .ver .doc{box-shadow:none;padding:0;max-width:none}
 }
 .toolbar .grow{flex:1;min-width:200px}
+table.cmp tr.tot td{border-bottom:2px solid var(--line);background:var(--surface-2)}

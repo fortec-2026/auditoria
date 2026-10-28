@@ -353,8 +353,8 @@ var Fiscal = (function () {
       return resumo;
     }
     function novoIssue(nt, quem, parteNome, issues) {
-      return function (sev, codigo, msg, impacto) {
-        issues.push({ sev: sev, quem: quem, cod: codigo, msg: msg, ch: nt.ch, n: nt.n, dt: nt.dt, parte: parteNome, item: null, x: '', ncm: '', imp: r2(impacto || 0), doc: nt.tipoDoc });
+      return function (sev, codigo, msg, impacto, aj) {
+        issues.push({ sev: sev, quem: quem, cod: codigo, msg: msg, ch: nt.ch, n: nt.n, dt: nt.dt, parte: parteNome, item: null, x: '', ncm: '', imp: r2(impacto || 0), doc: nt.tipoDoc, aj: aj || null });
       };
     }
 
@@ -386,14 +386,15 @@ var Fiscal = (function () {
         if (credita) { credPC = base * (PIS + COF); T.pisC += base * PIS; T.cofC += base * COF; T.pcFrete += base * (PIS + COF); }
         T.ibs += nt.t.vIBS; T.cbs += nt.t.vCBS;
         // auditoria do CT-e
+        var credCte = credICMS > 0;
         if (c.bc > 0 && c.p > 0 && Math.abs(r2(c.bc * c.p / 100) - c.v) > 0.05)
-          issue('erro', 'CTE_CALC', 'ICMS do CT-e (' + money(c.v) + ') não confere com base × alíquota (' + money(r2(c.bc * c.p / 100)) + ').', Math.abs(r2(c.bc * c.p / 100) - c.v));
+          issue('erro', 'CTE_CALC', 'ICMS do CT-e (' + money(c.v) + ') não confere com base × alíquota (' + money(r2(c.bc * c.p / 100)) + ').', Math.abs(r2(c.bc * c.p / 100) - c.v), credCte ? { c: { icmsC: r2(c.bc * c.p / 100) - c.v } } : null);
         if (!interna && c.p > 0) {
           var esp = (SUL_SUDESTE_EXC_ES.indexOf(c.ufIni) >= 0 && SUL_SUDESTE_EXC_ES.indexOf(c.ufFim) < 0) ? 7 : 12;
-          if (c.p !== esp) issue('erro', 'CTE_ALIQ', 'Alíquota de ' + c.p + '% no frete de ' + c.ufIni + ' para ' + c.ufFim + ': esperado ' + esp + '%.', Math.abs(c.bc * (c.p - esp) / 100));
+          if (c.p !== esp) issue('erro', 'CTE_ALIQ', 'Alíquota de ' + c.p + '% no frete de ' + c.ufIni + ' para ' + c.ufFim + ': esperado ' + esp + '%.', Math.abs(c.bc * (c.p - esp) / 100), credCte ? { c: { icmsC: c.bc * (esp - c.p) / 100 } } : null);
         }
         if (interna && c.ufIni === 'SP' && c.p > 0 && c.p !== 12)
-          issue('alerta', 'CTE_SP', 'Frete interno em SP com alíquota de ' + c.p + '% (prestação interna de transporte em SP: 12%). Conferir.', Math.abs(c.bc * (c.p - 12) / 100));
+          issue('alerta', 'CTE_SP', 'Frete interno em SP com alíquota de ' + c.p + '% (prestação interna de transporte em SP: 12%). Conferir.', Math.abs(c.bc * (c.p - 12) / 100), credCte ? { c: { icmsC: c.bc * (12 - c.p) / 100 } } : null);
         if (c.cst === '60') issue('info', 'CTE_ST', 'CT-e com ICMS retido por substituição tributária (CST 60): o tomador responde pelo recolhimento.', c.vstRet);
       } else {
         dir = 'X'; T.nCX = 1;
@@ -424,9 +425,9 @@ var Fiscal = (function () {
         if (s.bcISS > 0 && s.aliqISS > 0 && Math.abs(r2(s.bcISS * s.aliqISS / 100) - s.vISS) > 0.05)
           issue('erro', 'ISS_CALC', 'ISS (' + money(s.vISS) + ') não confere com base × alíquota (' + money(r2(s.bcISS * s.aliqISS / 100)) + ').', Math.abs(r2(s.bcISS * s.aliqISS / 100) - s.vISS));
         if (['04', '05', '06', '07', '08', '09'].indexOf(s.cstPC) >= 0)
-          issue('alerta', 'NFSE_CST', 'CST ' + s.cstPC + ' de PIS/COFINS em serviço prestado. No Lucro Real a receita de serviço é tributada (CST 01).', base * (PIS + COF));
+          issue('alerta', 'NFSE_CST', 'CST ' + s.cstPC + ' de PIS/COFINS em serviço prestado. No Lucro Real a receita de serviço é tributada (CST 01).', base * (PIS + COF), { a: { pisD: -base * PIS, cofD: -base * COF } });
         else if ((s.vPis > 0 || s.vCof > 0) && (Math.abs(s.vPis - base * PIS) > 0.05 || Math.abs(s.vCof - base * COF) > 0.05))
-          issue('alerta', 'NFSE_PIS', 'PIS/COFINS destacado (' + money(s.vPis) + ' e ' + money(s.vCof) + ') difere de 1,65% e 7,6% da base (' + money(r2(base * PIS)) + ' e ' + money(r2(base * COF)) + ').', Math.abs(s.vPis + s.vCof - base * (PIS + COF)));
+          issue('alerta', 'NFSE_PIS', 'PIS/COFINS destacado (' + money(s.vPis) + ' e ' + money(s.vCof) + ') difere de 1,65% e 7,6% da base (' + money(r2(base * PIS)) + ' e ' + money(r2(base * COF)) + ').', Math.abs(s.vPis + s.vCof - base * (PIS + COF)), { a: { pisD: s.vPis - base * PIS, cofD: s.vCof - base * COF } });
       } else {
         dir = 'E'; T.nST = 1; p = { c: nt.eC, n: nt.eN, uf: nt.eUF };
         issue = novoIssue(nt, 'fornecedor', nt.eN, issues);
@@ -465,9 +466,9 @@ var Fiscal = (function () {
 
       var T = emptyTot();
       var issues = [];
-      function issue(sev, it, codigo, msg, impacto) {
+      function issue(sev, it, codigo, msg, impacto, aj) {
         issues.push({ sev: sev, quem: quem, cod: codigo, msg: msg, ch: nt.ch, n: nt.n, dt: nt.dt, parte: parte.n,
-          item: it ? it.k : null, x: it ? it.x : '', ncm: it ? it.ncm : '', imp: r2(impacto || 0) });
+          item: it ? it.k : null, x: it ? it.x : '', ncm: it ? it.ncm : '', imp: r2(impacto || 0), aj: aj || null });
       }
       if (dir === 'S') T.nS = 1; else T.nE = 1;
       T.ibs = nt.t.vIBS; T.cbs = nt.t.vCBS;
@@ -503,6 +504,8 @@ var Fiscal = (function () {
         var receita = it.vp - it.vd + it.vf;
         var calcIcms = r2(it.bc * it.p / 100);
         var tribST = ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(it.cst) >= 0;
+        var credIcms = dir === 'E' && !(!pos && seg && tribST) && ['uso', 'ativo', 'insumo'].indexOf(nat) < 0;
+        var ajC = function (campo, v) { if (campo === 'icmsC' && !credIcms) return null; var o = {}; o[campo] = v; return { c: o }; };
 
         /* ICMS */
         if (dir === 'S') {
@@ -538,35 +541,35 @@ var Fiscal = (function () {
 
         /* ---- Auditoria ---- */
         if (it.bc > 0 && it.p > 0 && Math.abs(calcIcms - it.v) > 0.05) {
-          issue('erro', it, 'ICMS_CALC', 'ICMS destacado (' + money(it.v) + ') não confere com base × alíquota (' + money(calcIcms) + ').', Math.abs(calcIcms - it.v));
+          issue('erro', it, 'ICMS_CALC', 'ICMS destacado (' + money(it.v) + ') não confere com base × alíquota (' + money(calcIcms) + ').', Math.abs(calcIcms - it.v), ajC(dir === 'S' ? 'icmsD' : 'icmsC', calcIcms - it.v));
         }
 
         if (dir === 'S' && proprio) {
           if (pos && seg && interna && !tribST && /^5(401|403|405)$/.test(it.cf) && (it.cst === '00' || it.cst === '20') && it.v > 0) {
             issue('alerta', it, 'CFOP_ST', 'ICMS correto (' + it.p + '% destacado), mas o CFOP ' + it.cf + ' é de ST. Corrigir para 5.102 por CC-e; não muda o imposto.', 0);
           } else if (pos && seg && interna && (tribST || /^5(401|403|405)$/.test(it.cf))) {
-            issue('erro', it, 'ST_SAIDA', 'Saída interna ainda emitida como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deve destacar ICMS próprio a ' + aliqInt + '%.', receita * aliqInt / 100 - it.v);
+            issue('erro', it, 'ST_SAIDA', 'Saída interna ainda emitida como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deve destacar ICMS próprio a ' + aliqInt + '%.', receita * aliqInt / 100 - it.v, ajC('icmsD', receita * aliqInt / 100 - it.v));
           } else if (pos && seg && interna && (it.cst === '00' || it.cst === '20') && it.p && it.p !== aliqInt) {
-            issue('alerta', it, 'ALIQ_INT', 'Alíquota interna de ' + it.p + '% (geral de SP: ' + aliqInt + '%). Conferir se há fundamento.', Math.max(0, it.bc * (aliqInt - it.p) / 100));
+            issue('alerta', it, 'ALIQ_INT', 'Alíquota interna de ' + it.p + '% (geral de SP: ' + aliqInt + '%). Conferir se há fundamento.', Math.max(0, it.bc * (aliqInt - it.p) / 100), ajC('icmsD', it.bc * (aliqInt - it.p) / 100));
           } else if (pos && seg && interna && ['40', '41', '50', '51', '90'].indexOf(it.cst) >= 0 && nat === 'venda') {
-            issue('alerta', it, 'SEM_TRIB', 'Venda sem destaque de ICMS (CST ' + it.cst + '). Conferir fundamento.', receita * aliqInt / 100);
+            issue('alerta', it, 'SEM_TRIB', 'Venda sem destaque de ICMS (CST ' + it.cst + '). Conferir fundamento.', receita * aliqInt / 100, ajC('icmsD', receita * aliqInt / 100));
           }
           if (!interna && nt.mod === '55' && it.p > 0 && nat === 'venda') {
             var esp = aliqInterestadual(it.o, nt.dUF);
-            if (it.p !== esp) issue('erro', it, 'ALIQ_INTER', 'Alíquota interestadual de ' + it.p + '% para ' + nt.dUF + ' (origem ' + it.o + '): esperado ' + esp + '%.', Math.abs(it.bc * (it.p - esp) / 100));
+            if (it.p !== esp) issue('erro', it, 'ALIQ_INTER', 'Alíquota interestadual de ' + it.p + '% para ' + nt.dUF + ' (origem ' + it.o + '): esperado ' + esp + '%.', Math.abs(it.bc * (it.p - esp) / 100), ajC('icmsD', it.bc * (esp - it.p) / 100));
           }
           if (!interna && it.vst > 0) {
             issue('info', it, 'ST_INTER', 'ICMS-ST retido para ' + nt.dUF + ' (' + money(it.vst) + '). Conferir se o protocolo com essa UF continua vigente.', 0);
           }
           if (!interna && nt.dIE === '9' && nat === 'venda' && it.v > 0) semDifal = true;
           if (nat === 'venda' && mono && (it.vP > 0 || it.vC > 0 || it.cP === '01' || it.cP === '02')) {
-            issue('erro', it, 'MONO_TRIB', 'PIS/COFINS destacado em produto monofásico (NCM ' + it.ncm + '). Na revenda a alíquota é zero (CST 04): possível recolhimento indevido.', it.vP + it.vC);
+            issue('erro', it, 'MONO_TRIB', 'PIS/COFINS destacado em produto monofásico (NCM ' + it.ncm + '). Na revenda a alíquota é zero (CST 04): possível recolhimento indevido.', it.vP + it.vC, { a: { pisD: it.vP, cofD: it.vC } });
           } else if (nat === 'venda' && !mono && (it.cP === '04' || it.cP === '06')) {
-            issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF));
+            issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF), { a: { pisD: -Math.max(0, receita - it.v) * PIS, cofD: -Math.max(0, receita - it.v) * COF } });
           } else if (nat === 'venda' && !mono && it.cP === '01' && it.vP > 0) {
             var bSem = receita - it.v, bCom = receita;
             if (Math.abs(it.vP - bSem * PIS) > 0.05 && Math.abs(it.vP - bCom * PIS) <= 0.05 && it.v > 0) {
-              issue('info', it, 'TEMA69', 'PIS/COFINS calculado com o ICMS na base. A exclusão do ICMS (Tema 69 do STF) reduz o valor devido.', it.v * (PIS + COF));
+              issue('info', it, 'TEMA69', 'PIS/COFINS calculado com o ICMS na base. A exclusão do ICMS (Tema 69 do STF) reduz o valor devido.', it.v * (PIS + COF), { a: { pisD: it.v * PIS, cofD: it.v * COF } });
             }
           }
         }
@@ -576,22 +579,22 @@ var Fiscal = (function () {
             if (it.vst > 0 || ['10', '30', '70'].indexOf(it.cst) >= 0) {
               issue('erro', it, 'ST_FORN', 'Fornecedor reteve ICMS-ST (' + money(it.vst) + ') após a exclusão do regime em 01/10/2026. Solicitar correção.', it.vst);
             } else if (it.cst === '60' || it.cst === '500') {
-              issue('erro', it, 'ST60_FORN', 'Fornecedor emitiu como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') sem destacar ICMS próprio. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100);
+              issue('erro', it, 'ST60_FORN', 'Fornecedor emitiu como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') sem destacar ICMS próprio. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100, ajC('icmsC', receita * aliqInt / 100));
             } else if ((it.cst === '00' || it.cst === '20') && !(it.v > 0)) {
-              issue('erro', it, 'ICMS_ZERO_FORN', 'CST ' + it.cst + ' (tributado) sem ICMS destacado, CFOP ' + it.cf + '. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100);
+              issue('erro', it, 'ICMS_ZERO_FORN', 'CST ' + it.cst + ' (tributado) sem ICMS destacado, CFOP ' + it.cf + '. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100, ajC('icmsC', receita * aliqInt / 100));
             } else if ((it.cst === '00' || it.cst === '20') && CFOP_ST.test(it.cf) && it.p === aliqInt) {
               issue('alerta', it, 'CFOP_FORN', 'Tributação correta (ICMS ' + it.p + '% destacado, crédito aproveitável); só o CFOP ' + it.cf + ' é de ST. Pedir ao fornecedor CC-e para o CFOP 5.102 e a correção do cadastro.', 0);
             } else if ((it.cst === '00' || it.cst === '20') && it.p && it.p !== aliqInt) {
-              issue('alerta', it, 'ALIQ_FORN', 'Fornecedor aplicou ' + it.p + '% em operação interna (geral de SP: ' + aliqInt + '%).', Math.abs(it.bc * (aliqInt - it.p) / 100));
+              issue('alerta', it, 'ALIQ_FORN', 'Fornecedor aplicou ' + it.p + '% em operação interna (geral de SP: ' + aliqInt + '%).', Math.abs(it.bc * (aliqInt - it.p) / 100), ajC('icmsC', it.bc * (aliqInt - it.p) / 100));
             }
           }
           if (!interna && nt.mod === '55' && it.p > 0) {
             var espE = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;
-            if (it.p !== espE) issue('erro', it, 'ALIQ_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' aplicou ' + it.p + '% (esperado ' + espE + '% para SP, origem ' + it.o + ').', Math.abs(it.bc * (it.p - espE) / 100));
+            if (it.p !== espE) issue('erro', it, 'ALIQ_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' aplicou ' + it.p + '% (esperado ' + espE + '% para SP, origem ' + it.o + ').', Math.abs(it.bc * (it.p - espE) / 100), ajC('icmsC', it.bc * (espE - it.p) / 100));
           }
           if (!interna && pos && seg && it.vst === 0 && (it.cst === '60' || it.cst === '500' || ((it.cst === '00' || it.cst === '20' || CFOP_ST.test(it.cf)) && !(it.v > 0)))) {
             var espI = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;
-            issue('erro', it, 'ST_INTER60_FORN', 'Fornecedor de ' + nt.eUF + ' emitiu sem ICMS (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deveria destacar a alíquota interestadual de ' + espI + '%; sem destaque não há crédito.', receita * espI / 100);
+            issue('erro', it, 'ST_INTER60_FORN', 'Fornecedor de ' + nt.eUF + ' emitiu sem ICMS (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deveria destacar a alíquota interestadual de ' + espI + '%; sem destaque não há crédito.', receita * espI / 100, ajC('icmsC', receita * espI / 100));
           } else if (!interna && pos && seg && it.v > 0 && /^640[1-5]$/.test(it.cf)) {
             issue('alerta', it, 'CFOP_FORN', 'Tributação correta (ICMS ' + it.p + '% destacado, crédito aproveitável); só o CFOP ' + it.cf + ' é de ST. Pedir ao fornecedor CC-e para o CFOP 6.102.', 0);
           }

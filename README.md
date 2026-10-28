@@ -67,6 +67,10 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
 
+## Antes × depois
+
+A aba **Antes × depois** compara duas apurações do período: como as notas foram emitidas e como fica depois de corrigir as pendências. Dá para corrigir só os erros ou erros e alertas. Pendências "Conferida, sem ação" ficam como estão. Uma tabela mostra quanto cada tipo de ocorrência muda o ICMS, o PIS e a COFINS. Pendências que não mudam valores (CFOP, classificação, ST retida pelo fornecedor, duplicidade) são contadas à parte. O Excel traz a mesma comparação na aba "Antes x depois".
+
 ## Excel e impressão
 
 No painel, ao lado de Semanas/Meses, ficam os botões **Baixar Excel** e **Imprimir**. Os dois respeitam o período selecionado.

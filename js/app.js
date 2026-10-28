@@ -381,10 +381,11 @@ function renderMain() {
 
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
-  var tabs = [['apuracao', 'Apuração', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
+  var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
     ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['reforma', 'IBS/CBS 2026', '']];
   h += '<div class="card"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
   if (S.tab === 'apuracao') h += tabApuracao(ds, T);
+  else if (S.tab === 'comparativo') h += tabComparativo(ds, T);
   else if (S.tab === 'pendencias') h += tabPendencias(pendTodas);
   else if (S.tab === 'notas') h += tabNotas(notasF);
   else if (S.tab === 'produtos') h += tabProdutos();
@@ -482,6 +483,56 @@ function tabApuracao(ds, T) {
   });
   h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut + T.compIns) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
   h += '<p class="note">PIS e COFINS apurados pela regra (1,65% e 7,6% sobre a receita sem ICMS), não pelo valor destacado nas notas. Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
+  return h;
+}
+
+/* ---------- comparativo: como as notas foram emitidas × após corrigir as pendências ---------- */
+var CAMPOS_AJ = ['icmsD', 'icmsC', 'pisD', 'pisC', 'cofD', 'cofC'];
+function comparativo(ds, T, comAlertas) {
+  var atual = {}, corr = {}, porCod = {}, semEfeito = 0, foraConta = 0;
+  CAMPOS_AJ.forEach(function (k) { atual[k] = T[k]; corr[k] = T[k]; });
+  S.res.pend.forEach(function (p) {
+    if (ds.indexOf(p.dt) < 0) return;
+    var aj = p.aj;
+    if (!aj) { if (p.sev !== 'info') semEfeito++; return; }
+    var A = aj.a || {}, C = aj.c || {};
+    var aplica = (p.sev === 'erro' || comAlertas) && !(acompDe(p.ch) && acompDe(p.ch).s === 'aceita');
+    CAMPOS_AJ.forEach(function (k) { atual[k] += A[k] || 0; corr[k] += aplica ? (C[k] || 0) : (A[k] || 0); });
+    if (!aplica) { foraConta++; return; }
+    var g = porCod[p.cod] || (porCod[p.cod] = { cod: p.cod, n: 0, icms: 0, pis: 0, cof: 0, sev: p.sev });
+    g.n++;
+    g.icms += ((C.icmsD || 0) - (A.icmsD || 0)) - ((C.icmsC || 0) - (A.icmsC || 0));
+    g.pis += ((C.pisD || 0) - (A.pisD || 0)) - ((C.pisC || 0) - (A.pisC || 0));
+    g.cof += ((C.cofD || 0) - (A.cofD || 0)) - ((C.cofC || 0) - (A.cofC || 0));
+  });
+  var lin = function (o) { return { icmsD: o.icmsD, icmsC: o.icmsC, icms: o.icmsD - o.icmsC, pisD: o.pisD, pisC: o.pisC, pis: o.pisD - o.pisC, cofD: o.cofD, cofC: o.cofC, cof: o.cofD - o.cofC }; };
+  var grupos = Object.values(porCod).sort(function (a, b) { return Math.abs(b.icms + b.pis + b.cof) - Math.abs(a.icms + a.pis + a.cof); });
+  return { atual: lin(atual), corr: lin(corr), grupos: grupos, semEfeito: semEfeito, foraConta: foraConta };
+}
+var LINHAS_CMP = [['icmsD', 'ICMS · débito'], ['icmsC', 'ICMS · crédito'], ['icms', 'ICMS · saldo', 1], ['pisD', 'PIS · débito'], ['pisC', 'PIS · crédito'], ['pis', 'PIS · saldo', 1], ['cofD', 'COFINS · débito'], ['cofC', 'COFINS · crédito'], ['cof', 'COFINS · saldo', 1]];
+function difCell(v) { return '<td class="r num' + (Math.abs(v) < 0.005 ? ' small' : '') + '">' + (Math.abs(v) < 0.005 ? '–' : (v > 0 ? '+' : '') + m0(v)) + '</td>'; }
+function tabComparativo(ds, T) {
+  var c = comparativo(ds, T, S.cmpAlertas);
+  var h = '<p class="note">Compara duas apurações do mesmo período: <b>como as notas foram emitidas</b> e <b>como fica depois de corrigir as pendências</b> (CC-e, nota complementar ou substituta do fornecedor ou do cliente). Pendências marcadas como "Conferida, sem ação" ficam como estão.</p>';
+  h += '<div class="toolbar"><div class="chips" role="group" aria-label="O que corrigir">' + [[false, 'Corrigir só os erros'], [true, 'Corrigir erros e alertas']].map(function (o) { return '<button type="button" class="chip" data-cmpal="' + o[0] + '" aria-pressed="' + (!!S.cmpAlertas === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div><span class="small">Saldo entre parênteses é credor. Diferença positiva aumenta o imposto a recolher.</span></div>';
+  h += '<div class="tscroll"><table class="cmp"><thead><tr><th></th><th class="r">Como as notas foram emitidas</th><th class="r">Após as correções</th><th class="r">Diferença</th></tr></thead><tbody>';
+  LINHAS_CMP.forEach(function (l) {
+    var a = c.atual[l[0]], b = c.corr[l[0]];
+    if (l[2]) h += '<tr class="tot"><td><b>' + l[1] + '</b></td>' + saldoCell(a) + saldoCell(b) + difCell(b - a) + '</tr>';
+    else h += '<tr><td>' + l[1] + '</td><td class="r num">' + m0(a) + '</td><td class="r num">' + m0(b) + '</td>' + difCell(b - a) + '</tr>';
+  });
+  var ta = c.atual.icms + c.atual.pis + c.atual.cof, tb = c.corr.icms + c.corr.pis + c.corr.cof;
+  h += '</tbody><tfoot><tr><td>ICMS + PIS + COFINS</td>' + saldoCell(ta) + saldoCell(tb) + difCell(tb - ta) + '</tr></tfoot></table></div>';
+  if (c.grupos.length) {
+    h += '<div><h3>De onde vem a diferença</h3></div><div class="tscroll"><table><thead><tr><th>Ocorrência</th><th class="r">Pendências</th><th class="r">ICMS</th><th class="r">PIS</th><th class="r">COFINS</th></tr></thead><tbody>';
+    c.grupos.forEach(function (g) { h += '<tr><td><span class="pill ' + g.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[g.sev] + '</span> ' + esc(COD_TIT[g.cod] || g.cod) + '</td><td class="r num">' + g.n + '</td>' + difCell(g.icms) + difCell(g.pis) + difCell(g.cof) + '</tr>'; });
+    h += '</tbody></table></div>';
+  } else h += '<div class="empty"><span class="pill ok">Sem diferença</span><p class="note">Nenhuma pendência do período altera os valores apurados.</p></div>';
+  var obs = [];
+  if (c.foraConta) obs.push(c.foraConta + (c.foraConta === 1 ? ' pendência ficou' : ' pendências ficaram') + ' como está' + (S.cmpAlertas ? ' (conferidas, sem ação)' : ' (alertas, avisos ou conferidas, sem ação)'));
+  if (c.semEfeito) obs.push(c.semEfeito + (c.semEfeito === 1 ? ' pendência não muda' : ' pendências não mudam') + ' o valor dos impostos: CFOP, produto sem classificação, ST retida pelo fornecedor, nota duplicada e semelhantes. Elas aparecem na aba Pendências');
+  if (obs.length) h += '<p class="note">' + obs.join('. ') + '.</p>';
+  h += '<p class="note">Crédito de ICMS de nota de fornecedor só pode ser aproveitado depois que o fornecedor corrigir a nota (complementar ou substituta). Na aba Apuração, o ICMS está como as notas foram emitidas e o PIS/COFINS já segue a regra (1,65% e 7,6% sobre a receita sem ICMS, monofásicos sem débito). Aqui, a primeira coluna mostra o PIS/COFINS que resultaria de seguir o destaque das notas com erro.</p>';
   return h;
 }
 
@@ -779,6 +830,18 @@ async function baixarExcel() {
     abas.push({ nome: 'Apuração por semana', titulo: tit, cols: colsAp, rows: porSem, total: tot });
     abas.push({ nome: 'Apuração por dia', titulo: tit, cols: [{ t: 'Data', w: 12, f: 'data' }].concat(colsAp.slice(1)), rows: porDia, total: tot });
 
+    // Comparativo
+    var cmpL = function (al) {
+      var c = comparativo(ds, T, al), rows = LINHAS_CMP.map(function (l) { return [l[1], c.atual[l[0]], c.corr[l[0]], c.corr[l[0]] - c.atual[l[0]]]; });
+      var ta = c.atual.icms + c.atual.pis + c.atual.cof, tb = c.corr.icms + c.corr.pis + c.corr.cof;
+      rows.push(['ICMS + PIS + COFINS (saldo)', ta, tb, tb - ta]);
+      return { c: c, rows: rows };
+    };
+    var c1 = cmpL(false), c2 = cmpL(true);
+    var linhasCmp = [['Corrigindo só os erros', '', '', '']].concat(c1.rows, [['', '', '', ''], ['Corrigindo erros e alertas', '', '', '']], c2.rows, [['', '', '', ''], ['De onde vem a diferença (erros e alertas)', 'ICMS', 'PIS', 'COFINS']],
+      c2.c.grupos.map(function (g) { return [(COD_TIT[g.cod] || g.cod) + ' (' + g.n + ')', g.icms, g.pis, g.cof]; }));
+    abas.push({ nome: 'Antes x depois', titulo: tit, filtro: false, cols: [{ t: 'Item', w: 44 }, { t: 'Como as notas foram emitidas', w: 22, f: 'din' }, { t: 'Após as correções', w: 20, f: 'din' }, { t: 'Diferença', w: 16, f: 'din' }], rows: linhasCmp });
+
     // Notas
     var notas = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0; }).slice().sort(function (a, b) { return a.dt < b.dt ? -1 : a.dt > b.dt ? 1 : 0; });
     var tipoDoc = function (n) { return n.tipo === 'cte' ? 'CT-e' : n.tipo === 'nfse' ? 'NFS-e' : n.mod === '65' ? 'NFC-e' : 'NF-e'; };
@@ -972,6 +1035,7 @@ document.addEventListener('click', function (ev) {
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
+  if (d.cmpal) { S.cmpAlertas = d.cmpal === 'true'; renderMain(); return; }
   if (d.ac) { S.editAc = d.ac; renderMain(); var fe = $('fAcomp'); if (fe) fe.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
