@@ -59,11 +59,12 @@ var Banco = (function () {
     ]);
     return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4], acomp: r[5] };
   }
-  async function salvarNotas(cnpj, notas, aoProgresso) {
-    var LOTE = 250;
+  // pub: mapa chave -> publicada; reimportar o mesmo documento não tira do ar o que já foi publicado
+  async function salvarNotas(cnpj, notas, aoProgresso, pub) {
+    var LOTE = 250; pub = pub || {};
     for (var i = 0; i < notas.length; i += LOTE) {
       var linhas = notas.slice(i, i + LOTE).map(function (n) {
-        return { chave: n.ch, empresa_cnpj: cnpj, data_emissao: n.dt, modelo: n.mod || '55', publicada: false, dados: n };
+        return { chave: n.ch, empresa_cnpj: cnpj, data_emissao: n.dt, modelo: n.mod || '55', publicada: !!pub[n.ch], dados: n };
       });
       ok(await sb.from('notas').upsert(linhas, { onConflict: 'chave' }));
       if (aoProgresso) aoProgresso(Math.min(i + LOTE, notas.length), notas.length);
@@ -98,6 +99,19 @@ var Banco = (function () {
     }
     return r.data;
   }
+  /* ---------- XML original ---------- */
+  async function salvarXmls(cnpj, itens, aoProgresso) {
+    var LOTE = 150;
+    for (var i = 0; i < itens.length; i += LOTE) {
+      ok(await sb.from('notas_xml').upsert(itens.slice(i, i + LOTE).map(function (x) { return { chave: x.chave, empresa_cnpj: cnpj, xml_gz: x.gz }; }), { onConflict: 'chave' }));
+      if (aoProgresso) aoProgresso(Math.min(i + LOTE, itens.length), itens.length);
+    }
+  }
+  async function xmlDe(chave) {
+    var r = ok(await sb.from('notas_xml').select('xml_gz').eq('chave', chave).maybeSingle());
+    return r ? r.xml_gz : null;
+  }
+
   /* ---------- acompanhamento das notas ---------- */
   async function salvarAcompanhamento(cnpj, chave, status, texto) {
     return ok(await sb.from('acompanhamento').upsert({ empresa_cnpj: cnpj, chave: chave, status: status, texto: texto || '' }, { onConflict: 'empresa_cnpj,chave' }));
@@ -125,5 +139,6 @@ var Banco = (function () {
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
     acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
     equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe,
-    salvarAcompanhamento: salvarAcompanhamento, removerAcompanhamento: removerAcompanhamento };
+    salvarAcompanhamento: salvarAcompanhamento, removerAcompanhamento: removerAcompanhamento,
+    salvarXmls: salvarXmls, xmlDe: xmlDe };
 })();

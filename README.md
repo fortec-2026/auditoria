@@ -52,6 +52,7 @@ Em **Redirect URLs**, adicione o endereço do site, por exemplo `https://fortec-
 | `empresa_usuarios` | Quais e-mails veem quais empresas. |
 | `perfis` | Papel de cada usuário: escritório ou cliente. |
 | `publicacoes` | Registro de cada publicação. |
+| `notas_xml` | XML original de cada documento, compactado. O cliente só lê o das notas publicadas. |
 
 A estrutura do banco está registrada nas migrations do projeto no Supabase (`portal_fiscal_estrutura` e `portal_fiscal_permissoes_funcoes`).
 
@@ -65,6 +66,12 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 | NFS-e tomada (padrão nacional) | Crédito de PIS/COFINS só para o serviço classificado como insumo da prestação de serviço. Mostra o ISS e as retenções federais que a empresa reteve e deve recolher. |
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
+
+## Ver a nota
+
+Clique no número de uma nota (abas Notas, Pendências e Serviços/fretes) para abrir o espelho do documento: emitente, destinatário, itens com NCM, CFOP, CST e tributos, itens com problema destacados, totais, transporte, cobrança e informações complementares. A tela também permite baixar o XML original e imprimir.
+
+O XML original é guardado a cada importação. Notas importadas antes dessa função abrem só com os dados apurados; para completar, reimporte o arquivo. Reimportar não tira do ar as notas já publicadas.
 
 ## Acompanhamento das notas
 

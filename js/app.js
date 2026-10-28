@@ -63,12 +63,12 @@ function processarTexto(t, acc) {
   var doc = new DOMParser().parseFromString(t, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) { acc.erros++; return; }
   var r = F.parseDoc(doc);
-  if (r.tipo === 'nfe' && r.nota.ch) acc.notas.push(r.nota);
+  if (r.tipo === 'nfe' && r.nota.ch) { acc.notas.push(r.nota); acc.xml[r.nota.ch] = t; }
   else if (r.tipo === 'evento') { if (r.tpEvento === '110111' && r.chave) acc.canc[r.chave] = 1; acc.eventos++; }
   else acc.outros++;
 }
 async function lerArquivos(files) {
-  var acc = { notas: [], canc: {}, erros: 0, eventos: 0, outros: 0, arquivos: 0 };
+  var acc = { notas: [], canc: {}, xml: {}, erros: 0, eventos: 0, outros: 0, arquivos: 0 };
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (/\.zip$/i.test(f.name)) {
@@ -285,7 +285,7 @@ function renderOffice() {
   h += '<div class="card"><div><h2>Importar notas</h2><p class="note">Envie .zip ou XMLs de NF-e, NFC-e, CT-e e NFS-e (emitidas e recebidas) e os eventos de cancelamento. As notas vão para o banco e se somam às que já existem; uma nota repetida é substituída pela versão nova.</p></div>' +
     '<label class="drop" id="drop" for="files"><b>' + I.up + ' Arraste os arquivos aqui</b><span class="small">ou clique para escolher · .zip ou .xml</span></label><input id="files" type="file" accept=".zip,.xml" multiple hidden>';
   if (imp.lendo) h += '<div class="note">Lendo… ' + imp.arquivos + ' arquivos</div>';
-  if (imp.gravando) h += '<div class="note">Gravando no banco… ' + imp.gravadas + ' de ' + imp.total + ' notas</div>';
+  if (imp.gravando) h += '<div class="note">' + (imp.xml ? 'Guardando os XMLs originais… ' : 'Gravando no banco… ') + imp.gravadas + ' de ' + imp.total + '</div>';
   if (imp.feito) h += '<div class="stats"><div class="stat"><div class="v num">' + imp.arquivos + '</div><div class="k">arquivos lidos</div></div><div class="stat"><div class="v num">' + imp.notas + '</div><div class="k">notas da empresa</div></div><div class="stat"><div class="v num">' + imp.canc + '</div><div class="k">canceladas</div></div><div class="stat"><div class="v num">' + (imp.terceiros + imp.erros) + '</div><div class="k">ignoradas</div></div></div>';
   h += '<div class="row"><div class="field"><label for="cnpj">CNPJ do cliente</label><input id="cnpj" value="' + esc(fmtCnpj(m.cnpj)) + '" disabled></div><div class="field"><label for="nome">Razão social</label><input id="nome" value="' + esc(m.nome || '') + '"' + (S.exemplo ? ' disabled' : '') + '></div></div>';
   h += '<details><summary>Listas de NCM: monofásicos e saída da ST</summary><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">' +
@@ -411,12 +411,12 @@ function escala(max) {
 function curto(v) { return v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi' : v >= 1e3 ? (v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil' : v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
 function grafico(ds) {
   var gs = gruposGrafico(ds).map(function (g) { g.t = F.somaDias(S.res.dias, g.dias); return g; });
-  S._gs = gs;
+  S._gs = gs; S._gds = ds;
   if (!gs.length) return '';
   var max = 0; gs.forEach(function (g) { max = Math.max(max, g.t.icmsD, g.t.icmsC); });
-  var larg = ($('main') && $('main').clientWidth) || 1000;
-  var sc = escala(max), W = Math.max(560, Math.round(larg - 38)), H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
-  var gw = iw / gs.length, bw = Math.max(6, Math.min(26, gw * 0.3)), gap = 2;
+  var larg = ($('chart') && $('chart').clientWidth) || (($('main') && $('main').clientWidth) || 1000) - 38;
+  var sc = escala(max), W = Math.max(560, Math.round(larg)), H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
+  var gw = iw / gs.length, bw = Math.max(6, Math.min(44, gw * 0.26)), gap = 3;
   var y = function (v) { return Tp + ih - v / sc.max * ih; };
   var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="ICMS débito e crédito por ' + (S.periodo[0] === 'w' ? 'dia' : 'semana') + '">';
   for (var v = 0; v <= sc.max + 1e-9; v += sc.passo) s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="axis" x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + curto(v) + '</text>';
@@ -437,6 +437,16 @@ function grafico(ds) {
     '<div class="legend"><span><i style="background:var(--s1)"></i>Débito</span><span><i style="background:var(--s2)"></i>Crédito</span></div></div>' +
     '<div class="chart" id="chart">' + s + '<div class="tip" id="tip" hidden></div></div></div>';
 }
+// ao mudar a largura da janela, redesenha o gráfico na nova largura (senão o texto encolhe ou estica)
+var _rz;
+window.addEventListener('resize', function () {
+  clearTimeout(_rz);
+  _rz = setTimeout(function () {
+    var box = $('chart'); if (!box || !S._gds) return;
+    var card = box.closest('.chart-card'), tmp = document.createElement('div');
+    tmp.innerHTML = grafico(S._gds); card.replaceWith(tmp.firstChild); bindChart();
+  }, 150);
+});
 function bindChart() {
   var box = $('chart'); if (!box) return;
   var tip = $('tip');
@@ -517,7 +527,7 @@ function tabPendencias(pend) {
   if (!f.length) return h + '<div class="empty"><span class="pill ok">Nenhuma pendência</span><p class="note">Nada encontrado para este período e filtro.</p></div>';
   h += '<div class="tscroll"><table><thead><tr><th>Gravidade</th><th>Imposto</th><th>Nota</th><th>Emitente / destinatário</th><th>Item</th><th>O que corrigir</th><th class="r">Impacto est.</th><th>Acompanhamento</th></tr></thead><tbody>';
   f.slice(0, 500).forEach(function (p) {
-    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap">Nº ' + esc(p.n) + '<div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' && !S.readonly ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
+    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' && !S.readonly ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   if (f.length > 500) h += '<p class="note">Mostrando 500 de ' + f.length + '. Use a busca ou os filtros.</p>';
@@ -533,7 +543,7 @@ function tabNotas(notas) {
   h += '<div class="tscroll"><table><thead><tr><th>Tipo</th><th>Data</th><th>Nota</th><th>Emitente / destinatário</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">PIS/COFINS</th><th>Auditoria</th><th>Acompanhamento</th></tr></thead><tbody>';
   notas.slice(0, 400).forEach(function (n) {
     var t = n.T, icms = n.dir === 'S' ? t.icmsD : t.icmsC, pc = n.dir === 'S' ? t.pisD + t.cofD : t.pisC + t.cofC;
-    h += '<tr><td><span class="pill ' + (n.dir === 'X' ? 'E' : n.dir) + '">' + (n.dir === 'S' ? 'Saída' : n.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><div class="small">' + (n.tipo === 'cte' ? 'CT-e' + (n.extra && !n.extra.tomadora ? ' · ' + esc(n.extra.papel) : '') : n.tipo === 'nfse' ? 'NFS-e · cód. ' + esc(n.extra.cod) : (n.mod === '65' ? 'NFC-e' : 'NF-e') + (n.interna ? ' · interna' : ' · interestadual')) + '</div></td><td class="num">' + brFull(n.dt) + '</td><td class="num">' + esc(n.n) + '<div class="small mono" title="' + esc(n.ch) + '">' + esc(n.ch.slice(0, 4) + '…' + n.ch.slice(-8)) + '</div></td><td>' + esc(n.parte.n || 'Consumidor final') + '<div class="small">' + esc(fmtCnpj(n.parte.c)) + (n.parte.uf ? ' · ' + esc(n.parte.uf) : '') + '</div></td><td class="r num">' + m0(n.vNF) + '</td><td class="r num">' + m0(icms) + '<div class="small">' + (n.dir === 'S' ? 'débito' : n.dir === 'X' ? 'sem crédito' : 'crédito') + '</div></td><td class="r num">' + m0(pc) + '</td><td>' + (n.pior && n.pior !== 'info' ? (resolvida(n.ch) ? '<span class="pill ok">' + n.nIss + (n.nIss === 1 ? ' ponto resolvido' : ' pontos resolvidos') + '</span>' : '<span class="pill ' + n.pior + '">' + n.nIss + ' ' + (n.nIss === 1 ? 'ponto' : 'pontos') + '</span>') : '<span class="pill ok">Correta</span>') + (n.info ? '<div class="small" style="max-width:34ch;margin-top:4px">' + esc(n.info.charAt(0).toUpperCase() + n.info.slice(1)) + '</div>' : '') + '</td><td>' + celAcomp(n.ch, n.pior === 'erro' || n.pior === 'alerta') + '</td></tr>';
+    h += '<tr><td><span class="pill ' + (n.dir === 'X' ? 'E' : n.dir) + '">' + (n.dir === 'S' ? 'Saída' : n.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><div class="small">' + (n.tipo === 'cte' ? 'CT-e' + (n.extra && !n.extra.tomadora ? ' · ' + esc(n.extra.papel) : '') : n.tipo === 'nfse' ? 'NFS-e · cód. ' + esc(n.extra.cod) : (n.mod === '65' ? 'NFC-e' : 'NF-e') + (n.interna ? ' · interna' : ' · interestadual')) + '</div></td><td class="num">' + brFull(n.dt) + '</td><td class="num"><button type="button" class="link" data-ver="' + esc(n.ch) + '" title="Ver a nota">' + esc(n.n) + '</button><div class="small mono" title="' + esc(n.ch) + '">' + esc(n.ch.slice(0, 4) + '…' + n.ch.slice(-8)) + '</div></td><td>' + esc(n.parte.n || 'Consumidor final') + '<div class="small">' + esc(fmtCnpj(n.parte.c)) + (n.parte.uf ? ' · ' + esc(n.parte.uf) : '') + '</div></td><td class="r num">' + m0(n.vNF) + '</td><td class="r num">' + m0(icms) + '<div class="small">' + (n.dir === 'S' ? 'débito' : n.dir === 'X' ? 'sem crédito' : 'crédito') + '</div></td><td class="r num">' + m0(pc) + '</td><td>' + (n.pior && n.pior !== 'info' ? (resolvida(n.ch) ? '<span class="pill ok">' + n.nIss + (n.nIss === 1 ? ' ponto resolvido' : ' pontos resolvidos') + '</span>' : '<span class="pill ' + n.pior + '">' + n.nIss + ' ' + (n.nIss === 1 ? 'ponto' : 'pontos') + '</span>') : '<span class="pill ok">Correta</span>') + (n.info ? '<div class="small" style="max-width:34ch;margin-top:4px">' + esc(n.info.charAt(0).toUpperCase() + n.info.slice(1)) + '</div>' : '') + '</td><td>' + celAcomp(n.ch, n.pior === 'erro' || n.pior === 'alerta') + '</td></tr>';
   });
   h += '</tbody></table></div>';
   if (notas.length > 400) h += '<p class="note">Mostrando 400 de ' + notas.length + '. Use a busca.</p>';
@@ -598,7 +608,7 @@ function tabServicos(ds, T) {
   else {
     h += '<div class="tscroll"><table><thead><tr><th>Data</th><th>CT-e</th><th>Transportadora</th><th>Papel da empresa</th><th class="r">Valor</th><th class="r">Crédito ICMS</th><th class="r">Crédito PIS/COFINS</th></tr></thead><tbody>';
     fr.slice(0, 400).forEach(function (f) {
-      h += '<tr><td class="num">' + brFull(f.dt) + '</td><td class="num">' + esc(f.n) + '<div class="small">' + esc(f.rota) + '</div></td><td>' + esc(f.transp) + '</td><td>' + (f.tomadora ? '<span class="pill ok">Tomadora</span><div class="small">' + esc(f.papel) + '</div>' : '<span class="pill E">Não tomadora</span><div class="small">' + esc(f.papel) + ' · paga: ' + esc(f.toma) + '</div>') + '</td><td class="r num">' + m0(f.v) + '</td><td class="r num">' + m0(f.credICMS) + '</td><td class="r num">' + m0(f.credPC) + '</td></tr>';
+      h += '<tr><td class="num">' + brFull(f.dt) + '</td><td class="num"><button type="button" class="link" data-ver="' + esc(f.ch) + '">' + esc(f.n) + '</button><div class="small">' + esc(f.rota) + '</div></td><td>' + esc(f.transp) + '</td><td>' + (f.tomadora ? '<span class="pill ok">Tomadora</span><div class="small">' + esc(f.papel) + '</div>' : '<span class="pill E">Não tomadora</span><div class="small">' + esc(f.papel) + ' · paga: ' + esc(f.toma) + '</div>') + '</td><td class="r num">' + m0(f.v) + '</td><td class="r num">' + m0(f.credICMS) + '</td><td class="r num">' + m0(f.credPC) + '</td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -663,12 +673,17 @@ async function integrar(acc, cnpj) {
   var canc = Object.keys(acc.canc);
   if (!S.exemplo) {
     S.imp = { gravando: true, gravadas: 0, total: daEmp.length }; render();
-    await B.salvarNotas(cnpj, daEmp, function (feitas, total) { S.imp = { gravando: true, gravadas: feitas, total: total }; renderOffice(); });
+    await B.salvarNotas(cnpj, daEmp, function (feitas, total) { S.imp = { gravando: true, gravadas: feitas, total: total }; renderOffice(); }, e.pub);
     await B.salvarCancelamentos(cnpj, canc);
+    var xs = [];
+    for (var ix = 0; ix < daEmp.length; ix++) { var tx = acc.xml[daEmp[ix].ch]; if (tx) xs.push({ chave: daEmp[ix].ch, gz: await compactar(tx) }); }
+    S.imp = { gravando: true, gravadas: 0, total: xs.length, xml: true }; renderOffice();
+    await B.salvarXmls(cnpj, xs, function (feitas, total) { S.imp = { gravando: true, gravadas: feitas, total: total, xml: true }; renderOffice(); });
     if (!e.meta.nome) { var nm = nomeDe(daEmp, cnpj); if (nm) { await B.salvarEmpresa(cnpj, { razao_social: nm }); e.meta.nome = nm; } }
   }
   var atual = {}; e.notas.forEach(function (n) { atual[n.ch] = n; });
-  daEmp.forEach(function (n) { atual[n.ch] = n; e.pub[n.ch] = false; });
+  e.xmls = e.xmls || {};
+  daEmp.forEach(function (n) { atual[n.ch] = n; if (!e.pub[n.ch]) e.pub[n.ch] = false; if (acc.xml[n.ch]) e.xmls[n.ch] = acc.xml[n.ch]; });
   e.notas = Object.keys(atual).map(function (k) { return atual[k]; });
   canc.forEach(function (c) { e.canc[c] = 1; });
   S.imp = { feito: true, arquivos: acc.arquivos, notas: daEmp.length, canc: canc.length, terceiros: terceiros, erros: acc.erros };
@@ -718,6 +733,141 @@ async function desfazerClasse(pk, origem, ncm) {
   catch (err) { toast('Não foi possível desfazer: ' + erroTexto(err)); }
 }
 
+/* ---------- visualização da nota ---------- */
+async function compactar(texto) {
+  var bytes = new TextEncoder().encode(texto);
+  if (typeof CompressionStream !== 'undefined') {
+    var gzb = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+    return 'gz:' + b64(gzb);
+  }
+  return 'raw:' + b64(bytes);
+}
+async function descompactar(v) {
+  var tipo = v.slice(0, v.indexOf(':')), u = unb64(v.slice(v.indexOf(':') + 1));
+  if (tipo === 'gz') u = new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  return new TextDecoder().decode(u);
+}
+function b64(u) { var s = '', CH = 0x8000; for (var i = 0; i < u.length; i += CH) s += String.fromCharCode.apply(null, u.subarray(i, i + CH)); return btoa(s); }
+function unb64(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+
+function notaPorChave(ch) {
+  if (!S.emp._idx || S.emp._idxN !== S.emp.notas.length) { S.emp._idx = {}; S.emp.notas.forEach(function (n) { S.emp._idx[n.ch] = n; }); S.emp._idxN = S.emp.notas.length; }
+  return S.emp._idx[ch];
+}
+async function abrirNota(ch) {
+  S.ver = { ch: ch, xml: null, carregando: true, semXml: false };
+  document.body.style.overflow = 'hidden'; renderVer();
+  try {
+    var tx = S.emp.xmls && S.emp.xmls[ch];
+    if (!tx && !S.exemplo) { var v = await B.xmlDe(ch); if (v) tx = await descompactar(v); }
+    if (S.ver && S.ver.ch === ch) { S.ver.xmlTexto = tx || null; S.ver.xml = tx ? new DOMParser().parseFromString(tx, 'application/xml') : null; S.ver.semXml = !tx; }
+  } catch (e) { if (S.ver) S.ver.semXml = true; }
+  if (S.ver && S.ver.ch === ch) { S.ver.carregando = false; renderVer(); }
+}
+function fecharNota() { S.ver = null; document.body.style.overflow = ''; var el = $('ver'); if (el) el.remove(); }
+function baixarXml() {
+  if (!S.ver || !S.ver.xmlTexto) return;
+  salvarArquivo(S.ver.ch + '.xml', new Blob([S.ver.xmlTexto], { type: 'application/xml' }));
+}
+function xt(el, tag) { if (!el) return ''; var l = el.getElementsByTagName(tag); return l.length ? String(l[0].textContent || '').trim() : ''; }
+function xel(el, tag) { if (!el) return null; var l = el.getElementsByTagName(tag); return l.length ? l[0] : null; }
+function endereco(el) {
+  if (!el) return '';
+  var p = [xt(el, 'xLgr') + (xt(el, 'nro') ? ', ' + xt(el, 'nro') : ''), xt(el, 'xCpl'), xt(el, 'xBairro'), (xt(el, 'xMun') ? xt(el, 'xMun') + (xt(el, 'UF') ? '/' + xt(el, 'UF') : '') : ''), xt(el, 'CEP') ? 'CEP ' + xt(el, 'CEP').replace(/^(\d{5})(\d{3})$/, '$1-$2') : ''];
+  return p.filter(Boolean).join(' · ');
+}
+var TPAG = { '01': 'Dinheiro', '02': 'Cheque', '03': 'Cartão de crédito', '04': 'Cartão de débito', '05': 'Crédito loja', '10': 'Vale-alimentação', '11': 'Vale-refeição', '12': 'Vale-presente', '13': 'Vale-combustível', '15': 'Boleto', '16': 'Depósito', '17': 'PIX', '18': 'Transferência', '19': 'Fidelidade', '90': 'Sem pagamento', '99': 'Outros' };
+var MODFRETE = { '0': 'Por conta do emitente (CIF)', '1': 'Por conta do destinatário (FOB)', '2': 'Por conta de terceiros', '3': 'Transporte próprio do remetente', '4': 'Transporte próprio do destinatário', '9': 'Sem frete' };
+function bloco(titulo, linhas) {
+  linhas = linhas.filter(function (l) { return l && l[1]; });
+  if (!linhas.length) return '';
+  return '<div class="bloco"><div class="eyebrow">' + titulo + '</div>' + linhas.map(function (l) { return '<div><span class="small">' + l[0] + '</span><div>' + l[1] + '</div></div>'; }).join('') + '</div>';
+}
+function vNota() {
+  var v = S.ver, n = notaPorChave(v.ch);
+  if (!n) return '<div class="doc"><p>Nota não encontrada.</p><button class="btn" type="button" data-act="fecharNota">Fechar</button></div>';
+  var r = S.res.notas.filter(function (x) { return x.ch === v.ch; })[0] || {};
+  var pend = S.res.pend.filter(function (p) { return p.ch === v.ch; });
+  var x = v.xml, tipo = n.tipoDoc === 'cte' ? 'CT-e' : n.tipoDoc === 'nfse' ? 'NFS-e' : n.mod === '65' ? 'NFC-e' : 'NF-e';
+  var h = '<div class="doc"><div class="ver-top no-print"><div class="row" style="gap:8px">' +
+    (v.xmlTexto ? '<button class="btn" type="button" data-act="baixarXml">' + I.up.replace('M12 16V4M7 9l5-5 5 5', 'M12 4v12M7 11l5 5 5-5') + 'Baixar XML</button>' : '') +
+    '<button class="btn" type="button" data-act="imprimirNota">Imprimir</button>' + (!S.readonly && !S.exemplo ? '<button class="btn" type="button" data-act="anotarNota">Anotar</button>' : '') +
+    '</div><button class="btn ghost" type="button" data-act="fecharNota" aria-label="Fechar">Fechar ✕</button></div>';
+  h += '<div class="ver-head"><div><span class="eyebrow">' + tipo + ' · ' + (r.dir === 'S' ? 'Saída' : r.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><h2 style="font-size:26px">Nº ' + esc(n.n) + (n.s ? ' <span class="small">série ' + esc(n.s) + '</span>' : '') + '</h2>' +
+    '<div class="small mono" style="overflow-wrap:anywhere">' + esc(n.ch.replace(/(\d{4})(?=\d)/g, '$1 ')) + '</div></div>' +
+    '<div class="r"><div class="small">Emissão</div><b>' + brFull(n.dt) + '</b>' + (x && xt(x, 'nProt') ? '<div class="small">Protocolo ' + esc(xt(x, 'nProt')) + '</div>' : '') +
+    '<div style="margin-top:6px">' + (r.pior && r.pior !== 'info' ? '<span class="pill ' + (resolvida(v.ch) ? 'ok' : r.pior) + '">' + pend.filter(function (p) { return p.sev !== 'info'; }).length + (resolvida(v.ch) ? ' resolvido(s)' : ' ponto(s) da auditoria') + '</span>' : '<span class="pill ok">Correta</span>') + '</div></div></div>';
+  if (r.info) h += '<div class="banner ok"><span class="grow">' + esc(r.info.charAt(0).toUpperCase() + r.info.slice(1)) + '</span></div>';
+  var ac = acompDe(v.ch);
+  if (ac) h += '<div class="banner info"><span class="grow"><b>' + SIT[ac.s] + '.</b> ' + esc(ac.t || '') + ' <span class="small">(' + new Date(ac.em).toLocaleDateString('pt-BR') + ')</span></span></div>';
+
+  if (n.tipoDoc === 'cte') h += vCte(n, x);
+  else if (n.tipoDoc === 'nfse') h += vNfse(n, x);
+  else h += vNfe(n, x, pend);
+
+  var notaToda = pend.filter(function (p) { return !p.item; });
+  if (pend.length && n.tipoDoc) notaToda = pend;
+  if (notaToda.length) h += '<div><h3>Auditoria</h3>' + notaToda.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</div>';
+  if (v.carregando) h += '<p class="small">Carregando o XML original…</p>';
+  else if (v.semXml) h += '<p class="note">O XML original desta nota não está guardado (ela foi importada antes desta versão do portal). Reimporte o arquivo para ver endereços, transporte, cobrança e informações complementares e para baixar o XML.</p>';
+  h += '</div>';
+  return h;
+}
+function vNfe(n, x, pend) {
+  var ide = x && xel(x, 'ide'), emit = x && xel(x, 'emit'), dest = x && xel(x, 'dest'), tot = x && xel(x, 'ICMSTot'), transp = x && xel(x, 'transp');
+  var h = '<div class="blocos">' +
+    bloco('Emitente', [['Razão social', esc(n.eN)], ['CNPJ', esc(fmtCnpj(n.eC))], ['IE', esc(xt(emit, 'IE'))], ['Endereço', esc(endereco(xel(emit, 'enderEmit')))]]) +
+    bloco('Destinatário', [['Razão social', esc(n.dN || 'Consumidor final')], ['CNPJ/CPF', esc(fmtCnpj(n.dC))], ['IE', esc(xt(dest, 'IE'))], ['Endereço', esc(endereco(xel(dest, 'enderDest')))]]) +
+    bloco('Operação', [['Natureza', esc(n.nat || xt(ide, 'natOp'))], ['Tipo na nota', n.tp === '0' ? 'Entrada' : 'Saída'], ['Destino', n.idDest === '1' ? 'Interna' : n.idDest === '2' ? 'Interestadual' : n.idDest === '3' ? 'Exterior' : ''], ['Finalidade', { '1': 'Normal', '2': 'Complementar', '3': 'Ajuste', '4': 'Devolução' }[n.fin] || '']]) +
+    '</div>';
+  h += '<div><h3>Itens</h3><div class="tscroll"><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>NCM / CEST</th><th>CFOP</th><th>CST</th><th class="r">Valor</th><th class="r">Base ICMS</th><th class="r">ICMS</th><th class="r">ST</th><th>PIS/COFINS</th></tr></thead><tbody>';
+  n.it.forEach(function (it) {
+    var ps = pend.filter(function (p) { return p.item === it.k; }), pior = ps.some(function (p) { return p.sev === 'erro'; }) ? 'erro' : ps.some(function (p) { return p.sev === 'alerta'; }) ? 'alerta' : '';
+    h += '<tr class="' + (pior ? 'tem-' + pior : '') + '"><td class="num">' + it.k + '</td><td>' + esc(it.x) + '<div class="small">Cód. ' + esc(it.cp || '–') + '</div></td><td class="mono">' + esc(it.ncm) + (it.ex ? ' ex ' + esc(it.ex) : '') + (it.cest ? '<div class="small">' + esc(it.cest) + '</div>' : '') + '</td><td class="num">' + esc(it.cf) + '</td><td class="num">' + esc(it.o + it.cst) + '</td><td class="r num">' + m0(it.vp - it.vd) + '</td><td class="r num">' + m0(it.bc) + '</td><td class="r num">' + m0(it.v) + (it.p ? '<div class="small">' + it.p + '%</div>' : '') + '</td><td class="r num">' + (it.vst ? m0(it.vst) : it.stR ? '<span class="small">ret. ' + m0(it.stR) + '</span>' : '–') + '</td><td class="num">CST ' + esc(it.cP || '–') + (it.vP || it.vC ? '<div class="small">' + m0(it.vP) + ' / ' + m0(it.vC) + '</div>' : '') + '</td></tr>';
+    if (ps.length) h += '<tr class="tem-' + pior + '"><td></td><td colspan="9">' + ps.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  var t = n.t || {};
+  h += '<div class="blocos">' + bloco('Totais', [['Produtos', m0(t.vProd)], ['ICMS', m0(t.vICMS)], ['ICMS-ST', t.vST ? m0(t.vST) : ''], ['IPI', t.vIPI ? m0(t.vIPI) : ''], ['PIS / COFINS', m0(t.vPIS) + ' / ' + m0(t.vCOF)], ['IBS / CBS', (t.vIBS || t.vCBS) ? m0(t.vIBS) + ' / ' + m0(t.vCBS) : ''], ['Valor da nota', '<b>' + m0(t.vNF) + '</b>']]);
+  if (x) {
+    var tr = xel(transp, 'transporta'), vol = xel(transp, 'vol');
+    h += bloco('Transporte', [['Frete', esc(MODFRETE[xt(transp, 'modFrete')] || '')], ['Transportadora', esc(xt(tr, 'xNome'))], ['CNPJ', esc(fmtCnpj(xt(tr, 'CNPJ')))], ['Volumes', vol ? esc((xt(vol, 'qVol') || '') + (xt(vol, 'esp') ? ' ' + xt(vol, 'esp') : '') + (xt(vol, 'pesoB') ? ' · ' + xt(vol, 'pesoB') + ' kg' : '')) : '']]);
+    var dups = x.getElementsByTagName('dup'), pags = x.getElementsByTagName('detPag');
+    var cob = []; for (var i = 0; i < dups.length && i < 12; i++) cob.push(['Parcela ' + esc(xt(dups[i], 'nDup')), brFull(xt(dups[i], 'dVenc')) + ' · ' + m0(+xt(dups[i], 'vDup'))]);
+    for (var j = 0; j < pags.length && j < 6; j++) cob.push(['Pagamento', esc(TPAG[xt(pags[j], 'tPag')] || xt(pags[j], 'tPag')) + ' · ' + m0(+xt(pags[j], 'vPag'))]);
+    h += bloco('Cobrança e pagamento', cob);
+  }
+  h += '</div>';
+  if (x && (xt(x, 'infCpl') || xt(x, 'infAdFisco'))) h += '<div class="bloco"><div class="eyebrow">Informações complementares</div><div class="small" style="white-space:pre-wrap">' + esc(xt(x, 'infAdFisco') + (xt(x, 'infAdFisco') ? '\n' : '') + xt(x, 'infCpl')) + '</div></div>';
+  return h;
+}
+function vCte(n, x) {
+  var c = n.cte, pt = function (p) { return p && p.c ? esc(p.n) + '<div class="small">' + esc(fmtCnpj(p.c)) + (p.uf ? ' · ' + esc(p.uf) : '') + '</div>' : ''; };
+  var h = '<div class="blocos">' + bloco('Transportadora', [['Razão social', esc(n.eN)], ['CNPJ', esc(fmtCnpj(n.eC))]]) +
+    bloco('Partes', [['Tomador (paga o frete)', pt(c.toma)], ['Remetente', pt(c.rem)], ['Destinatário', pt(c.dest)], ['Expedidor', pt(c.exped)], ['Recebedor', pt(c.receb)]]) +
+    bloco('Prestação', [['Trajeto', esc((c.munIni || '') + '/' + c.ufIni + ' → ' + (c.munFim || '') + '/' + c.ufFim)], ['CFOP', esc(c.cfop)], ['Valor do frete', '<b>' + m0(c.vT) + '</b>'], ['ICMS', 'CST ' + esc(c.cst || '–') + ' · base ' + m0(c.bc) + ' · ' + c.p + '% · ' + m0(c.v)], ['Carga', x ? esc((xt(x, 'proPred') || '') + (xt(x, 'vCarga') ? ' · ' + m0(+xt(x, 'vCarga')) : '')) : '']]) + '</div>';
+  if (c.nfes && c.nfes.length) h += '<div class="bloco"><div class="eyebrow">Notas transportadas</div>' + c.nfes.map(function (k) { var nn = notaPorChave(k); return '<div class="small mono">' + (nn ? '<button type="button" class="link" data-ver="' + esc(k) + '">NF-e ' + esc(nn.n) + '</button> · ' : '') + esc(k) + '</div>'; }).join('') + '</div>';
+  return h;
+}
+function vNfse(n, x) {
+  var s = n.nfse;
+  var h = '<div class="blocos">' + bloco('Prestador', [['Razão social', esc(n.eN)], ['CNPJ', esc(fmtCnpj(n.eC))], ['Endereço', x ? esc(endereco(xel(xel(x, 'emit'), 'enderNac'))) : '']]) +
+    bloco('Tomador', [['Nome', esc(n.dN || '')], ['CNPJ/CPF', esc(fmtCnpj(n.dC))]]) +
+    bloco('Serviço', [['Código', esc(s.cTribNac)], ['Descrição', esc(s.xTrib)], ['Município de incidência', esc(s.munIncid)]]) +
+    bloco('Valores', [['Serviço', '<b>' + m0(s.vServ) + '</b>'], ['Desconto', s.vDesc ? m0(s.vDesc) : ''], ['ISS', m0(s.vISS) + ' (' + s.aliqISS + '%) · ' + (s.tpRetISS === '2' ? 'retido pelo tomador' : s.tpRetISS === '3' ? 'retido pelo intermediário' : 'não retido')], ['PIS / COFINS', 'CST ' + esc(s.cstPC || '–') + ' · ' + m0(s.vPis) + ' / ' + m0(s.vCof)], ['Retenções federais', (s.retIR || s.retCSLL || s.retCP) ? 'IR ' + m0(s.retIR) + ' · CSLL ' + m0(s.retCSLL) + ' · INSS ' + m0(s.retCP) : '']]) + '</div>';
+  var desc = x ? xt(x, 'xDescServ').replace(/\\n/g, '\n') : s.desc;
+  if (desc) h += '<div class="bloco"><div class="eyebrow">Discriminação do serviço</div><div class="small" style="white-space:pre-wrap">' + esc(desc) + '</div></div>';
+  return h;
+}
+function renderVer() {
+  var el = $('ver');
+  if (!S.ver) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'ver'; el.className = 'ver'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); }
+  el.innerHTML = vNota();
+}
+document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && S.ver) fecharNota(); });
+document.addEventListener('click', function (ev) { if (S.ver && ev.target && ev.target.id === 'ver') fecharNota(); });
+
 /* ---------- eventos ---------- */
 document.addEventListener('click', function (ev) {
   var b = ev.target.closest('button'); if (!b) return;
@@ -732,6 +882,7 @@ document.addEventListener('click', function (ev) {
   if (d.fprod) { S.fProd = d.fprod; renderMain(); return; }
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
+  if (d.ver) { abrirNota(d.ver); return; }
   if (d.ac) { S.editAc = d.ac; renderMain(); var fe = $('fAcomp'); if (fe) fe.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
@@ -750,6 +901,10 @@ document.addEventListener('click', function (ev) {
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
+  else if (a === 'fecharNota') fecharNota();
+  else if (a === 'baixarXml') baixarXml();
+  else if (a === 'imprimirNota') window.print();
+  else if (a === 'anotarNota') { var chN = S.ver.ch; fecharNota(); S.tab = 'notas'; S.editAc = chN; renderMain(); var fe2 = $('fAcomp'); if (fe2) fe2.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   else if (a === 'fecharAc') { S.editAc = null; renderMain(); }
   else if (a === 'limparAc') {
     var chL = S.editAc, antL = S.emp.acomp[chL];
@@ -834,7 +989,7 @@ async function carregarExemplo() {
     else { var r = await fetch(EXEMPLO_URL); if (!r.ok) throw new Error(); blob = await r.blob(); }
     var acc = await lerArquivos([new File([blob], 'exemplo.zip')]);
     var e = { id: 'exemplo', meta: { cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', corte: '2026-10-01', mono: F.DEFAULT_MONO.slice(), st: F.DEFAULT_ST.slice(), publicado: null },
-      notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {} };
+      notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
     abrirEmpresa(e, !(S.usuario && S.usuario.papel === 'escritorio'), true);
   } catch (err) { toast('Não foi possível carregar o exemplo.'); }
 }
