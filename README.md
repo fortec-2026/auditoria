@@ -72,7 +72,12 @@ Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
   - Alíquota interna de 18%. Na interestadual, 12% ou 7%, e 4% para mercadoria importada.
   - Entradas com ST antes do corte não geram crédito. Uso e consumo não gera crédito. Ativo segue o CIAP.
 - **PIS/COFINS não cumulativo:** 1,65% e 7,6%. O ICMS fica fora da base do débito (Tema 69/STF) e da base do crédito (Lei 14.592/2023).
-- **Monofásicos (Lei 10.485/2002):** sem débito na revenda e sem crédito na compra.
+- **Duas listas de NCM por empresa** (Escritório › Listas de NCM):
+  - **Monofásicos de PIS/COFINS (Lei 10.485/2002):** só afeta o PIS/COFINS. Sem débito na revenda e sem crédito na compra.
+    - `NCM`: monofásico.
+    - `NCM ex:03,05`: monofásico só nesses destaques Ex da TIPI (campo EXTIPI da nota).
+    - `NCM ?`: depende da destinação; o portal segue o CST da nota (02 ou 04) e avisa para conferir.
+  - **Saíram da ST em 01/10/2026:** só afeta o ICMS (pneus e autopeças, Portaria SRE 34/2026). Itens com CEST 01 ou 16 entram automaticamente.
 - **Classificação de produtos comprados:**
   - Revenda: crédito de ICMS e de PIS/COFINS, este último só se o produto não for monofásico.
   - Insumo de serviço (peça aplicada na prestação do serviço): crédito de PIS/COFINS (art. 3º, II, das Leis 10.637/2002 e 10.833/2003), sem crédito de ICMS.

@@ -4,20 +4,31 @@
 var Fiscal = (function () {
   'use strict';
 
+  /* Monofásicos de PIS/COFINS (Lei 10.485/2002, art. 5º e Anexos I e II), lista do escritório.
+     Formato de cada linha:  NCM (prefixo)            -> monofásico
+                             NCM ex:03,05             -> monofásico só nesses destaques Ex da TIPI
+                             NCM ?                    -> depende da destinação: o CST da nota decide */
   var DEFAULT_MONO = [
-    // Pneus e câmaras de ar (Lei 10.485/2002, art. 5º)
-    '4011', '4013',
-    // Autopeças — Anexos I e II da Lei 10.485/2002 (lista inicial; conferir e ajustar)
-    '4009', '40103', '40161010', '40169990', '45049000', '6813', '70071100', '70072100', '70091000',
-    '73201000', '83012000', '83021000', '83023000', '84073290', '84073390', '84073490', '840820',
-    '840991', '840999', '84131900', '841330', '84135010', '84136019', '84137010', '84138100',
-    '84141000', '84142000', '84143019', '84145990', '84148021', '84148022', '841520', '84212300',
-    '84212990', '84213100', '84213990', '84314100', '84314200', '84339090', '84812090', '84813000',
-    '84818092', '84819090', '8482', '8483', '8484', '850520', '850710', '8511', '851220',
-    '851240', '851290', '852721', '85361000', '85365090', '853910', '853921', '85443000',
-    '870600', '8707', '8708', '902610', '902620', '9029', '90318040', '9032892', '91040000', '94012000'
+    '4011', '4013', '40161010', '6813', '70071100', '70072100', '70091000', '83012000', '83023000',
+    '84073390', '84073490', '840820', '840991', '840999', '841330', '84148021', '84148022', '841520',
+    '84212300', '84213100', '84314100', '84314200', '84339090', '850520', '850710', '8511',
+    '851220', '851240', '851290', '852721', '853910', '85443000', '870600', '8707', '8708',
+    '90318040', '9032892', '91040000', '94012000',
+    '848310', '84832000', '848330', '848340', '848350', '8483601', '90292010', '90299010',
+    '40169990 ex:03,05', '73201000 ex:01', '85365090 ex:01',
+    '4009 ?', '84136019 ?', '84812090 ?', '84818092 ?'
   ];
-  var DEFAULT_SEGMENTO_EXTRA = ['4012', '8507'];
+  /* Saíram da ST em SP em 01/10/2026 (Portaria SRE 34/2026: pneumáticos e autopeças).
+     Usado só nas regras de ICMS. Itens com CEST 01 (autopeças) ou 16 (pneus) também entram. */
+  var DEFAULT_ST = [
+    '4011', '4012', '4013', '40091', '40092', '40093', '40094', '40103', '401610', '401693', '401699', '450490',
+    '6813', '700711', '700721', '700910', '732010', '732020', '830120', '830210', '830230',
+    '840731', '840732', '840733', '840734', '840820', '8409', '841319', '841330', '841350', '841360', '841370', '841381', '841391',
+    '841410', '841430', '841480', '841520', '842123', '842129', '842131', '842139', '843141', '843142', '843390',
+    '84812090', '84813000', '84818092', '84819090', '8482', '8483', '8484',
+    '850520', '850710', '8511', '8512', '852721', '853610', '853650', '853910', '853921', '853929', '854430',
+    '870600', '8707', '8708', '902610', '902620', '902690', '9029', '90318040', '903289', '9104', '940120'
+  ];
 
   var SUL_SUDESTE_EXC_ES = ['SP', 'RJ', 'MG', 'PR', 'SC', 'RS'];
   var IMPORTADO = ['1', '2', '3', '8'];
@@ -121,6 +132,7 @@ var Fiscal = (function () {
         x: txt(prod, 'xProd').slice(0, 70),
         ncm: txt(prod, 'NCM'),
         cest: txt(prod, 'CEST'),
+        ex: txt(prod, 'EXTIPI'),
         cf: txt(prod, 'CFOP'),
         o: icms ? txt(icms, 'orig') : '',
         cst: cst,
@@ -237,6 +249,29 @@ var Fiscal = (function () {
     return 'outrasS';
   }
 
+  // Regras de monofásico: retorna 'mono', 'cond' (depende da destinação) ou ''.
+  function parseMono(list) {
+    return (list || []).map(function (l) {
+      var t = String(l).trim(); if (!t) return null;
+      var pref = (t.match(/^[\d.]+/) || [''])[0].replace(/\D/g, ''); if (!pref) return null;
+      var exm = t.match(/ex\s*:?\s*([\d,\s]+)/i);
+      return { pref: pref, ex: exm ? exm[1].split(/[\s,]+/).filter(Boolean).map(function (x) { return ('0' + x).slice(-2); }) : null, cond: /\?|cond/i.test(t.slice(pref.length)) };
+    }).filter(Boolean).sort(function (a, b) { return b.pref.length - a.pref.length; });
+  }
+  function makeMono(list) {
+    var regras = parseMono(list);
+    return function (ncm, ex) {
+      var n = String(ncm || '').replace(/\D/g, '');
+      for (var i = 0; i < regras.length; i++) {
+        var r = regras[i];
+        if (n.indexOf(r.pref) !== 0) continue;
+        if (r.ex) return r.ex.indexOf(('0' + String(ex || '').replace(/\D/g, '')).slice(-2)) >= 0 && ex ? 'mono' : '';
+        return r.cond ? 'cond' : 'mono';
+      }
+      return '';
+    };
+  }
+
   function makeMatcher(list) {
     var arr = (list || []).map(function (s) { return String(s).replace(/\D/g, ''); }).filter(Boolean);
     return function (ncm) {
@@ -279,8 +314,15 @@ var Fiscal = (function () {
     var cnpj = String(cfg.cnpj || '').replace(/\D/g, '');
     var corte = cfg.corte || '2026-10-01';
     var aliqInt = cfg.aliqInterna || 18;
-    var isMono = makeMatcher(cfg.mono || DEFAULT_MONO);
-    var isSeg = makeMatcher((cfg.mono || DEFAULT_MONO).concat(cfg.segmento || DEFAULT_SEGMENTO_EXTRA));
+    var monoRegra = makeMono(cfg.mono && cfg.mono.length ? cfg.mono : DEFAULT_MONO);
+    // monofásico de fato: regra 'cond' usa o CST da nota (02 ou 04 = monofásico)
+    function monoDe(it) { var r = monoRegra(it.ncm, it.ex); return r === 'mono' || (r === 'cond' && (it.cP === '02' || it.cP === '04')); }
+    var stLista = makeMatcher(cfg.st && cfg.st.length ? cfg.st : DEFAULT_ST);
+    // NCMs que vieram com CEST de autopeças (01) ou pneus (16) em qualquer nota entram no segmento
+    var stAprendido = {};
+    notas.forEach(function (n) { (n.it || []).forEach(function (i) { if (/^(01|16)/.test(String(i.cest || '').replace(/\D/g, ''))) stAprendido[String(i.ncm)] = 1; }); });
+    function isSeg(ncm, cest) { return /^(01|16)/.test(String(cest || '').replace(/\D/g, '')) || stLista(ncm) || !!stAprendido[String(ncm)]; }
+    var condAvisado = {};
     var cancel = cfg.canceladas || {};
     var prodCad = cfg.produtos || {};          // { 'cnpjFornecedor|codigo': 'revenda'|'uso'|'ativo' }
     var ncmCad = cfg.ncmClasse || {};          // { '48025610': 'uso', ... } (prefixo de NCM)
@@ -326,7 +368,7 @@ var Fiscal = (function () {
         var base = Math.max(0, c.vT - c.v), credita = true;
         if (papel === 'destinatária') {
           var lig = c.nfes.map(function (k) { return porChave[k]; }).filter(Boolean);
-          if (lig.length && lig.every(function (n) { return n.it.length && n.it.every(function (i) { return isMono(i.ncm); }); })) {
+          if (lig.length && lig.every(function (n) { return n.it.length && n.it.every(function (i) { return monoDe(i); }); })) {
             credita = false;
             issue('info', 'CTE_MONO', 'Frete da compra de produtos monofásicos: o frete acompanha o custo da mercadoria e não gera crédito de PIS/COFINS.', 0);
           } else if (!lig.length) {
@@ -427,20 +469,24 @@ var Fiscal = (function () {
           if (dir === 'E') nat = nat === 'venda' ? 'compra' : nat === 'devCompra' ? 'devVenda' : nat === 'transfS' ? 'transfE' : 'outrasE';
           else nat = 'devCompra';
         }
-        var mono = isMono(it.ncm), seg = isSeg(it.ncm);
+        var monoR = monoRegra(it.ncm, it.ex), mono = monoDe(it), seg = isSeg(it.ncm, it.cest);
+        if (monoR === 'cond' && proprio && dir === 'S' && !condAvisado[it.ncm]) {
+          condAvisado[it.ncm] = 1;
+          issue('info', it, 'MONO_COND', 'NCM ' + it.ncm + ' é monofásico só conforme a destinação (Anexos I e II da Lei 10.485/2002). O portal seguiu o CST ' + (it.cP || '–') + ' da nota (' + (mono ? 'monofásico' : 'tributado') + '); confirme se a peça atende à descrição da lei.', 0);
+        }
         var prodPend = false;
         if (dir === 'E' && !proprio && nat === 'compra') {
           var pk = chaveProduto(nt.eC, it);
           var classe = prodCad[pk], origem = 'manual';
           if (!classe) { classe = classeNcm(it.ncm); origem = 'ncm'; }
-          if (!classe && seg) { classe = 'revenda'; origem = 'sugerido'; }
+          if (!classe && (seg || monoR)) { classe = 'revenda'; origem = 'sugerido'; }
           if (!classe) { classe = 'pendente'; origem = 'nenhum'; }
-          if (classe === 'revenda') seg = true;
+          if (classe === 'revenda') { /* revenda: o escopo de ST vem da lista de ST/CEST */ }
           else if (classe === 'uso') nat = 'uso';
           else if (classe === 'ativo') nat = 'ativo';
           else if (classe === 'insumo') nat = 'insumo';
           else prodPend = true;
-          var pr = res.produtos[pk] || (res.produtos[pk] = { k: pk, cp: it.cp, x: it.x, ncm: it.ncm, fc: nt.eC, fn: nt.eN, n: 0, v: 0, ult: '', classe: classe, origem: origem, mono: mono });
+          var pr = res.produtos[pk] || (res.produtos[pk] = { k: pk, cp: it.cp, x: it.x, ncm: it.ncm, fc: nt.eC, fn: nt.eN, n: 0, v: 0, ult: '', classe: classe, origem: origem, mono: mono, monoCond: monoR === 'cond', st: seg });
           pr.n++; pr.v += it.vp - it.vd; if (nt.dt > pr.ult) { pr.ult = nt.dt; pr.x = it.x; }
         }
         var receita = it.vp - it.vd + it.vf;
@@ -592,7 +638,7 @@ var Fiscal = (function () {
   }
 
   return { parseDoc: parseDoc, analisar: analisar, periodos: periodos, somaDias: somaDias, emptyTot: emptyTot,
-    natureza: natureza, DEFAULT_MONO: DEFAULT_MONO, DEFAULT_SEGMENTO_EXTRA: DEFAULT_SEGMENTO_EXTRA,
+    natureza: natureza, DEFAULT_MONO: DEFAULT_MONO, DEFAULT_ST: DEFAULT_ST, parseMono: parseMono,
     money: money, chaveProduto: chaveProduto, mondayOf: mondayOf, addDays: addDays, r2: r2 };
 })();
 if (typeof module !== 'undefined') module.exports = Fiscal;

@@ -34,7 +34,7 @@ var Banco = (function () {
   async function garantirEmpresa(cnpj, nome) {
     var e = ok(await sb.from('empresas').select('*').eq('cnpj', cnpj).maybeSingle());
     if (e) return e;
-    return ok(await sb.from('empresas').insert({ cnpj: cnpj, razao_social: nome || '', ncm_monofasico: Fiscal.DEFAULT_MONO }).select().single());
+    return ok(await sb.from('empresas').insert({ cnpj: cnpj, razao_social: nome || '', ncm_monofasico: Fiscal.DEFAULT_MONO, ncm_st: Fiscal.DEFAULT_ST }).select().single());
   }
   async function salvarEmpresa(cnpj, campos) { return ok(await sb.from('empresas').update(campos).eq('cnpj', cnpj).select().single()); }
   async function apagarEmpresa(cnpj) { return ok(await sb.from('empresas').delete().eq('cnpj', cnpj)); }
