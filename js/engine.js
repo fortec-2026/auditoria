@@ -47,15 +47,22 @@ var Fiscal = (function () {
   function parseDoc(doc) {
     var root = doc.documentElement;
     if (!root) return { tipo: 'desconhecido' };
+    var pedReg = first(root, 'infPedReg');
+    if (pedReg) {
+      var cancNfse = first(pedReg, 'e101101') || first(pedReg, 'e105102');
+      return { tipo: 'evento', chave: txt(pedReg, 'chNFSe'), tpEvento: cancNfse ? '110111' : 'outro', cStat: '' };
+    }
     var infEvento = first(root, 'infEvento');
-    if (infEvento && !first(root, 'infNFe')) {
+    if (infEvento && !first(root, 'infNFe') && !first(root, 'infCte')) {
       return {
         tipo: 'evento',
-        chave: txt(infEvento, 'chNFe'),
+        chave: txt(infEvento, 'chNFe') || txt(infEvento, 'chCTe'),
         tpEvento: txt(infEvento, 'tpEvento'),
         cStat: txt(first(root, 'retEvento') || root, 'cStat')
       };
     }
+    if (first(root, 'infCte')) return parseCte(root);
+    if (first(root, 'infNFSe')) return parseNfse(root);
     var inf = first(root, 'infNFe');
     if (!inf) return { tipo: 'desconhecido' };
     var ide = first(inf, 'ide'), emit = first(inf, 'emit'), dest = first(inf, 'dest');
@@ -136,6 +143,74 @@ var Fiscal = (function () {
     return { tipo: 'nfe', nota: nota };
   }
 
+  /* ---------- CT-e (modelo 57) ---------- */
+  function parte(el) {
+    if (!el) return { c: '', n: '', uf: '' };
+    var end = null;
+    for (var c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && /^ender/.test(c.localName || c.nodeName)) end = c;
+    return { c: txt(el, 'CNPJ') || txt(el, 'CPF'), n: txt(el, 'xNome').slice(0, 60), uf: end ? txt(end, 'UF') : '' };
+  }
+  function parseCte(root) {
+    var inf = first(root, 'infCte'), ide = first(inf, 'ide');
+    var ch = (inf.getAttribute('Id') || '').replace(/^CTe/, '');
+    var prot = first(root, 'infProt');
+    var emit = parte(childByName(inf, 'emit')), rem = parte(childByName(inf, 'rem')), exped = parte(childByName(inf, 'exped')),
+      receb = parte(childByName(inf, 'receb')), dest = parte(childByName(inf, 'dest'));
+    var toma = { c: '', n: '', uf: '' }, tomaCod = '';
+    var t3 = first(ide, 'toma3'), t4 = first(ide, 'toma4');
+    if (t4) { tomaCod = '4'; toma = parte(t4); }
+    else if (t3) { tomaCod = txt(t3, 'toma'); toma = [rem, exped, receb, dest][+tomaCod] || toma; }
+    var imp = childByName(inf, 'imp'), icms = firstElementChild(first(imp, 'ICMS'));
+    var nome = icms ? (icms.localName || icms.nodeName) : '';
+    var outra = nome === 'ICMSOutraUF';
+    var ibs = first(imp, 'IBSCBS');
+    var nfes = [], l = inf.getElementsByTagName('infNFe');
+    for (var i = 0; i < l.length; i++) { var k = txt(l[i], 'chave'); if (k) nfes.push(k); }
+    var vT = num(txt(first(inf, 'vPrest'), 'vTPrest'));
+    var env = [emit.c, rem.c, exped.c, receb.c, dest.c, toma.c].filter(Boolean);
+    var nota = {
+      tipoDoc: 'cte', ch: ch, mod: '57', n: txt(ide, 'nCT'), s: txt(ide, 'serie'), dt: (txt(ide, 'dhEmi') || '').slice(0, 10), tp: '',
+      eC: emit.c, eN: emit.n, eUF: emit.uf, dC: toma.c, dN: toma.n, dUF: toma.uf, st: prot ? txt(prot, 'cStat') : '', env: env,
+      cte: { cfop: txt(ide, 'CFOP'), ufIni: txt(ide, 'UFIni'), ufFim: txt(ide, 'UFFim'), munIni: txt(ide, 'xMunIni'), munFim: txt(ide, 'xMunFim'),
+        tomaCod: tomaCod, toma: toma, rem: rem, exped: exped, receb: receb, dest: dest,
+        vT: vT, cst: icms ? (txt(icms, 'CST') || (outra ? '90' : '')) : '',
+        bc: num(txt(icms, outra ? 'vBCOutraUF' : 'vBC')), p: num(txt(icms, outra ? 'pICMSOutraUF' : 'pICMS')), v: num(txt(icms, outra ? 'vICMSOutraUF' : 'vICMS')),
+        vstRet: num(txt(icms, 'vICMSSTRet')), sn: nome === 'ICMSSN', nfes: nfes },
+      t: { vNF: vT, vIBS: ibs ? num(txt(ibs, 'vIBS')) : 0, vCBS: ibs ? num(txt(ibs, 'vCBS')) : 0 },
+      it: []
+    };
+    return { tipo: 'nfe', nota: nota };
+  }
+
+  /* ---------- NFS-e padrão nacional ---------- */
+  function parseNfse(root) {
+    var inf = first(root, 'infNFSe');
+    var ch = (inf.getAttribute('Id') || '').replace(/^NFS/, '');
+    var emit = childByName(inf, 'emit'), vals = childByName(inf, 'valores');
+    var dps = first(inf, 'infDPS'), toma = first(dps, 'toma'), serv = first(dps, 'serv');
+    var dv = childByName(dps, 'valores'), tMun = first(dv, 'tribMun'), tFed = first(dv, 'tribFed'), pc = first(tFed, 'piscofins');
+    var ibs = childByName(inf, 'IBSCBS');
+    var vServ = num(txt(dv, 'vServ'));
+    var vDesc = num(txt(dv, 'vDescIncond'));
+    var tomaC = toma ? (txt(toma, 'CNPJ') || txt(toma, 'CPF')) : '';
+    var emitC = txt(emit, 'CNPJ') || txt(emit, 'CPF');
+    var xTrib = txt(inf, 'xTribNac').replace(/^[0-9.]+ - /, '');
+    var nota = {
+      tipoDoc: 'nfse', ch: ch, mod: 'NFSe', n: txt(inf, 'nNFSe'), s: txt(dps, 'serie'),
+      dt: txt(dps, 'dCompet') || (txt(dps, 'dhEmi') || '').slice(0, 10), tp: '',
+      eC: emitC, eN: txt(emit, 'xNome').slice(0, 60), eUF: txt(first(emit, 'enderNac'), 'UF'),
+      dC: tomaC, dN: toma ? txt(toma, 'xNome').slice(0, 60) : '', dUF: '', st: txt(inf, 'cStat'), env: [emitC, tomaC].filter(Boolean),
+      nfse: { cTribNac: txt(serv, 'cTribNac'), xTrib: xTrib.slice(0, 90), desc: txt(serv, 'xDescServ').replace(/\\n/g, ' ').replace(/\s+/g, ' ').slice(0, 120),
+        munIncid: txt(inf, 'xLocIncid'), vServ: vServ, vDesc: vDesc,
+        bcISS: num(txt(vals, 'vBC')), aliqISS: num(txt(vals, 'pAliqAplic')), vISS: num(txt(vals, 'vISSQN')), tpRetISS: txt(tMun, 'tpRetISSQN'),
+        cstPC: txt(pc, 'CST'), bcPC: num(txt(pc, 'vBCPisCofins')), vPis: num(txt(pc, 'vPis')), vCof: num(txt(pc, 'vCofins')), tpRetPC: txt(pc, 'tpRetPisCofins'),
+        retIR: num(txt(tFed, 'vRetIRRF')), retCSLL: num(txt(tFed, 'vRetCSLL')), retCP: num(txt(tFed, 'vRetCP')) },
+      t: { vNF: vServ, vIBS: ibs ? num(txt(ibs, 'vIBSTot')) : 0, vCBS: ibs ? num(txt(ibs, 'vCBS')) : 0 },
+      it: []
+    };
+    return { tipo: 'nfe', nota: nota };
+  }
+
   /* ---------- Classificação ---------- */
   function natureza(cfop) {
     var c = String(cfop || '');
@@ -192,7 +267,9 @@ var Fiscal = (function () {
 
   function emptyTot() {
     return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0, compOut: 0, compIns: 0,
-      stE: 0, ibs: 0, cbs: 0, nS: 0, nE: 0, pisDest: 0, cofDest: 0 };
+      stE: 0, ibs: 0, cbs: 0, nS: 0, nE: 0, pisDest: 0, cofDest: 0,
+      servPrest: 0, servTom: 0, servIns: 0, freteTom: 0, icmsFrete: 0, pcFrete: 0, pcServ: 0,
+      issDev: 0, issRetSof: 0, issRetTom: 0, retFedSof: 0, retFedTom: 0, nSP: 0, nST: 0, nCT: 0, nCX: 0 };
   }
   function addTot(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; }
 
@@ -210,12 +287,117 @@ var Fiscal = (function () {
     var ncmKeys = Object.keys(ncmCad).sort(function (a, b) { return b.length - a.length; });
     function classeNcm(ncm) { for (var i = 0; i < ncmKeys.length; i++) if (String(ncm).indexOf(ncmKeys[i]) === 0) return ncmCad[ncmKeys[i]]; return null; }
 
-    var res = { notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {} };
+    var res = { notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {}, servicos: {}, fretes: [] };
     var seen = {};
+    var porChave = {}; notas.forEach(function (n) { if (!n.tipoDoc) porChave[n.ch] = n; });
+
+    function fechar(nt, dir, proprio, interna, parte, T, issues, extra) {
+      for (var k in T) T[k] = r2(T[k]);
+      var resumo = { tipo: nt.tipoDoc || 'nfe', ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
+        parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length, extra: extra || null,
+        pior: issues.reduce(function (a, i) { return i.sev === 'erro' ? 'erro' : (a === 'erro' ? a : (i.sev === 'alerta' ? 'alerta' : a || 'info')); }, '') };
+      res.notas.push(resumo);
+      Array.prototype.push.apply(res.pend, issues);
+      if (!res.dias[nt.dt]) res.dias[nt.dt] = emptyTot();
+      addTot(res.dias[nt.dt], T);
+      return resumo;
+    }
+    function novoIssue(nt, quem, parteNome, issues) {
+      return function (sev, codigo, msg, impacto) {
+        issues.push({ sev: sev, quem: quem, cod: codigo, msg: msg, ch: nt.ch, n: nt.n, dt: nt.dt, parte: parteNome, item: null, x: '', ncm: '', imp: r2(impacto || 0), doc: nt.tipoDoc });
+      };
+    }
+
+    function analisarCte(nt) {
+      var c = nt.cte, T = emptyTot(), issues = [];
+      var papel = c.rem.c === cnpj ? 'remetente' : c.dest.c === cnpj ? 'destinatária' : c.exped.c === cnpj ? 'expedidora' : c.receb.c === cnpj ? 'recebedora' : nt.eC === cnpj ? 'transportadora' : '';
+      var tomadora = c.toma.c === cnpj;
+      var interna = c.ufIni === c.ufFim;
+      var p = { c: nt.eC, n: nt.eN, uf: nt.eUF };
+      var issue = novoIssue(nt, 'fornecedor', nt.eN, issues);
+      var credICMS = 0, credPC = 0, dir;
+      if (nt.eC === cnpj) {
+        // a própria empresa prestou o transporte
+        dir = 'S'; T.nSP = 1; T.servPrest += c.vT; T.icmsD += c.v;
+        var bD = Math.max(0, c.vT - c.v); T.pisD += bD * PIS; T.cofD += bD * COF;
+      } else if (tomadora) {
+        dir = 'E'; T.nCT = 1; T.freteTom += c.vT;
+        if (!c.sn && ['00', '20', '90'].indexOf(c.cst) >= 0 && c.v > 0) { credICMS = c.v; T.icmsC += c.v; T.icmsFrete += c.v; }
+        var base = Math.max(0, c.vT - c.v), credita = true;
+        if (papel === 'destinatária') {
+          var lig = c.nfes.map(function (k) { return porChave[k]; }).filter(Boolean);
+          if (lig.length && lig.every(function (n) { return n.it.length && n.it.every(function (i) { return isMono(i.ncm); }); })) {
+            credita = false;
+            issue('info', 'CTE_MONO', 'Frete da compra de produtos monofásicos: o frete acompanha o custo da mercadoria e não gera crédito de PIS/COFINS.', 0);
+          } else if (!lig.length) {
+            issue('info', 'CTE_SEM_NF', 'Frete de compra sem a nota da mercadoria no período. O crédito de PIS/COFINS foi considerado; confira se a mercadoria não é monofásica.', 0);
+          }
+        }
+        if (credita) { credPC = base * (PIS + COF); T.pisC += base * PIS; T.cofC += base * COF; T.pcFrete += base * (PIS + COF); }
+        T.ibs += nt.t.vIBS; T.cbs += nt.t.vCBS;
+        // auditoria do CT-e
+        if (c.bc > 0 && c.p > 0 && Math.abs(r2(c.bc * c.p / 100) - c.v) > 0.05)
+          issue('erro', 'CTE_CALC', 'ICMS do CT-e (' + money(c.v) + ') não confere com base × alíquota (' + money(r2(c.bc * c.p / 100)) + ').', Math.abs(r2(c.bc * c.p / 100) - c.v));
+        if (!interna && c.p > 0) {
+          var esp = (SUL_SUDESTE_EXC_ES.indexOf(c.ufIni) >= 0 && SUL_SUDESTE_EXC_ES.indexOf(c.ufFim) < 0) ? 7 : 12;
+          if (c.p !== esp) issue('erro', 'CTE_ALIQ', 'Alíquota de ' + c.p + '% no frete de ' + c.ufIni + ' para ' + c.ufFim + ': esperado ' + esp + '%.', Math.abs(c.bc * (c.p - esp) / 100));
+        }
+        if (interna && c.ufIni === 'SP' && c.p > 0 && c.p !== 12)
+          issue('alerta', 'CTE_SP', 'Frete interno em SP com alíquota de ' + c.p + '% (prestação interna de transporte em SP: 12%). Conferir.', Math.abs(c.bc * (c.p - 12) / 100));
+        if (c.cst === '60') issue('info', 'CTE_ST', 'CT-e com ICMS retido por substituição tributária (CST 60): o tomador responde pelo recolhimento.', c.vstRet);
+      } else {
+        dir = 'X'; T.nCX = 1;
+      }
+      var r = fechar(nt, dir, false, interna, p, T, issues, { papel: papel, tomadora: tomadora, toma: c.toma.n || c.toma.c });
+      res.fretes.push({ ch: nt.ch, n: nt.n, dt: nt.dt, transp: nt.eN, papel: papel, tomadora: tomadora, toma: c.toma.n || c.toma.c,
+        rota: c.ufIni + ' → ' + c.ufFim, v: c.vT, credICMS: r2(credICMS), credPC: r2(credPC), nIss: issues.length, pior: r.pior });
+    }
+
+    function analisarNfse(nt) {
+      var s = nt.nfse, T = emptyTot(), issues = [];
+      var prestada = nt.eC === cnpj, tomada = nt.dC === cnpj;
+      if (!prestada && !tomada) { res.ignoradas++; return; }
+      var liq = Math.max(0, s.vServ - s.vDesc);
+      var retFed = s.retIR + s.retCSLL + s.retCP + (s.tpRetPC === '1' ? s.vPis + s.vCof : 0);
+      var p, issue, dir;
+      if (prestada) {
+        dir = 'S'; T.nSP = 1; p = { c: nt.dC, n: nt.dN, uf: '' };
+        issue = novoIssue(nt, 'cliente', nt.dN || 'Consumidor', issues);
+        T.servPrest += liq;
+        var base = s.bcPC > 0 ? s.bcPC : liq;
+        T.pisD += base * PIS; T.cofD += base * COF; T.pisDest += s.vPis; T.cofDest += s.vCof;
+        if (s.tpRetISS === '1' || !s.tpRetISS) T.issDev += s.vISS; else T.issRetSof += s.vISS;
+        T.retFedSof += retFed;
+        if (s.aliqISS > 0 && (s.aliqISS < 2 || s.aliqISS > 5))
+          issue('alerta', 'ISS_ALIQ', 'Alíquota de ISS de ' + s.aliqISS + '%: a LC 116/2003 fixa o mínimo de 2% e o máximo de 5%.', 0);
+        if (s.bcISS > 0 && s.aliqISS > 0 && Math.abs(r2(s.bcISS * s.aliqISS / 100) - s.vISS) > 0.05)
+          issue('erro', 'ISS_CALC', 'ISS (' + money(s.vISS) + ') não confere com base × alíquota (' + money(r2(s.bcISS * s.aliqISS / 100)) + ').', Math.abs(r2(s.bcISS * s.aliqISS / 100) - s.vISS));
+        if (['04', '05', '06', '07', '08', '09'].indexOf(s.cstPC) >= 0)
+          issue('alerta', 'NFSE_CST', 'CST ' + s.cstPC + ' de PIS/COFINS em serviço prestado. No Lucro Real a receita de serviço é tributada (CST 01).', base * (PIS + COF));
+        else if ((s.vPis > 0 || s.vCof > 0) && (Math.abs(s.vPis - base * PIS) > 0.05 || Math.abs(s.vCof - base * COF) > 0.05))
+          issue('alerta', 'NFSE_PIS', 'PIS/COFINS destacado (' + money(s.vPis) + ' e ' + money(s.vCof) + ') difere de 1,65% e 7,6% da base (' + money(r2(base * PIS)) + ' e ' + money(r2(base * COF)) + ').', Math.abs(s.vPis + s.vCof - base * (PIS + COF)));
+      } else {
+        dir = 'E'; T.nST = 1; p = { c: nt.eC, n: nt.eN, uf: nt.eUF };
+        issue = novoIssue(nt, 'fornecedor', nt.eN, issues);
+        T.servTom += liq;
+        var key = 'SERV|' + nt.eC + '|' + s.cTribNac;
+        var classe = prodCad[key] || null;
+        var sv = res.servicos[key] || (res.servicos[key] = { k: key, cod: s.cTribNac, x: s.xTrib || s.desc, desc: s.desc, fc: nt.eC, fn: nt.eN, n: 0, v: 0, ult: '', classe: classe || 'pendente', origem: classe ? 'manual' : 'nenhum' });
+        sv.n++; sv.v += liq; if (nt.dt > sv.ult) { sv.ult = nt.dt; sv.desc = s.desc; }
+        if (classe === 'insumo') { T.servIns += liq; T.pisC += liq * PIS; T.cofC += liq * COF; T.pcServ += liq * (PIS + COF); }
+        else if (!classe) issue('info', 'SERV_PEND', 'Serviço tomado sem classificação (' + (s.xTrib || s.cTribNac) + '). Se for insumo da prestação de serviço, classifique na aba Serviços e fretes para creditar PIS/COFINS.', liq * (PIS + COF));
+        if (s.tpRetISS === '2') { T.issRetTom += s.vISS; issue('info', 'ISS_RET', 'ISS de ' + money(s.vISS) + ' retido pela empresa: recolher a guia ao município de ' + (s.munIncid || 'incidência') + '.', 0); }
+        T.retFedTom += retFed;
+      }
+      T.ibs += nt.t.vIBS; T.cbs += nt.t.vCBS;
+      fechar(nt, dir, prestada, true, p, T, issues, { cod: s.cTribNac, serv: s.xTrib, desc: s.desc, iss: s.vISS, issRet: s.tpRetISS === '2' });
+    }
 
     notas.forEach(function (nt) {
       if (seen[nt.ch]) return; seen[nt.ch] = 1;
       if (cancel[nt.ch] || nt.st === '101' || nt.st === '135' || nt.st === '151' || nt.st === '155') { res.canceladas++; return; }
+      if (nt.tipoDoc === 'cte') { if ((nt.env || []).indexOf(cnpj) < 0) { res.ignoradas++; return; } analisarCte(nt); return; }
+      if (nt.tipoDoc === 'nfse') { analisarNfse(nt); return; }
       var emitente = nt.eC === cnpj, destinatario = nt.dC === cnpj;
       if (!emitente && !destinatario) { res.ignoradas++; return; }
       var dir;
@@ -372,6 +554,8 @@ var Fiscal = (function () {
       addTot(res.dias[nt.dt], T);
     });
     res.notas.sort(function (a, b) { return a.dt < b.dt ? 1 : a.dt > b.dt ? -1 : 0; });
+    res.fretes.sort(function (a, b) { return a.dt < b.dt ? 1 : a.dt > b.dt ? -1 : 0; });
+    Object.keys(res.servicos).forEach(function (k) { res.servicos[k].v = r2(res.servicos[k].v); });
     return res;
   }
 

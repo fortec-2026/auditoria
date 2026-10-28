@@ -22,7 +22,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function br(d) { if (!d) return ''; var p = d.split('-'); return p[2] + '/' + p[1]; }
 function brFull(d) { if (!d) return ''; var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 function mesNome(m) { var p = m.split('-'); return MESES[+p[1] - 1] + '/' + p[0]; }
-function fmtCnpj(c) { c = String(c || '').replace(/\D/g, ''); return c.length === 14 ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : c; }
+function fmtCnpj(c) { c = String(c || '').replace(/\D/g, ''); return c.length === 14 ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : c.length === 11 ? c.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') : c; }
 function m0(v) { if (Math.abs(v) < 0.005) v = 0; return v < 0 ? '−' + M(-v) : M(v); }
 function toast(t) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { el.hidden = true; }, 3800); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
@@ -83,9 +83,11 @@ async function lerArquivos(files) {
   return acc;
 }
 function detectarCnpj(notas) {
-  var c = {}; notas.forEach(function (n) { [n.eC, n.dC].forEach(function (x) { if (x && x.length === 14) c[x] = (c[x] || 0) + 1; }); });
+  var c = {}; notas.forEach(function (n) { (n.env || [n.eC, n.dC]).forEach(function (x) { if (x && x.length === 14) c[x] = (c[x] || 0) + 1; }); });
   var best = null; Object.keys(c).forEach(function (k) { if (!best || c[k] > c[best]) best = k; }); return best;
 }
+function envolve(n, cnpj) { return (n.env || [n.eC, n.dC]).indexOf(cnpj) >= 0; }
+function docs(t) { return t.nS + t.nE + t.nSP + t.nST + t.nCT + t.nCX; }
 function nomeDe(notas, cnpj) { for (var i = 0; i < notas.length; i++) { if (notas[i].eC === cnpj) return notas[i].eN; if (notas[i].dC === cnpj) return notas[i].dN; } return ''; }
 
 /* ---------- espaço de trabalho ---------- */
@@ -259,7 +261,7 @@ function renderOffice() {
   var e = S.emp, m = e.meta, imp = S.imp || {};
   var mono = ((m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO).join('\n');
   var h = '<div class="office">';
-  h += '<div class="card"><div><h2>Importar notas</h2><p class="note">Envie .zip ou XMLs de NF-e e NFC-e (emitidas e recebidas) e os eventos de cancelamento. As notas vão para o banco e se somam às que já existem; uma nota repetida é substituída pela versão nova.</p></div>' +
+  h += '<div class="card"><div><h2>Importar notas</h2><p class="note">Envie .zip ou XMLs de NF-e, NFC-e, CT-e e NFS-e (emitidas e recebidas) e os eventos de cancelamento. As notas vão para o banco e se somam às que já existem; uma nota repetida é substituída pela versão nova.</p></div>' +
     '<label class="drop" id="drop" for="files"><b>' + I.up + ' Arraste os arquivos aqui</b><span class="small">ou clique para escolher · .zip ou .xml</span></label><input id="files" type="file" accept=".zip,.xml" multiple hidden>';
   if (imp.lendo) h += '<div class="note">Lendo… ' + imp.arquivos + ' arquivos</div>';
   if (imp.gravando) h += '<div class="note">Gravando no banco… ' + imp.gravadas + ' de ' + imp.total + ' notas</div>';
@@ -292,14 +294,14 @@ function renderOffice() {
 
 /* ---------- painel principal ---------- */
 function semanaCard(w) {
-  var t = F.somaDias(S.res.dias, w.dias), n = t.nS + t.nE;
+  var t = F.somaDias(S.res.dias, w.dias), n = docs(t);
   var pend = S.res.pend.filter(function (p) { return w.dias.indexOf(p.dt) >= 0 && p.sev !== 'info'; }).length;
-  return '<button type="button" class="pcard" data-per="w:' + w.ini + '" aria-pressed="' + (S.periodo === 'w:' + w.ini) + '"><span class="t">Semana ' + w.num + '</span><span class="d num">' + br(w.ini) + ' a ' + br(w.fim) + '</span><span class="m">' + n + ' notas' + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
+  return '<button type="button" class="pcard" data-per="w:' + w.ini + '" aria-pressed="' + (S.periodo === 'w:' + w.ini) + '"><span class="t">Semana ' + w.num + '</span><span class="d num">' + br(w.ini) + ' a ' + br(w.fim) + '</span><span class="m">' + n + ' docs' + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
 }
 function mesCard(m) {
   var t = F.somaDias(S.res.dias, m.dias);
   var pend = S.res.pend.filter(function (p) { return p.dt.slice(0, 7) === m.mes && p.sev !== 'info'; }).length;
-  return '<button type="button" class="pcard" data-per="m:' + m.mes + '" aria-pressed="' + (S.periodo === 'm:' + m.mes) + '"><span class="t" style="text-transform:capitalize">' + esc(mesNome(m.mes)) + '</span><span class="d">' + m.dias.length + ' dias com notas</span><span class="m">' + (t.nS + t.nE) + ' notas' + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
+  return '<button type="button" class="pcard" data-per="m:' + m.mes + '" aria-pressed="' + (S.periodo === 'm:' + m.mes) + '"><span class="t" style="text-transform:capitalize">' + esc(mesNome(m.mes)) + '</span><span class="d">' + m.dias.length + ' dias com notas</span><span class="m">' + docs(t) + ' docs' + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
 }
 function kpi(nome, icone, d, c, extra) {
   var saldo = F.r2(d - c);
@@ -327,7 +329,7 @@ function renderMain() {
   var pend = S.res.pend.filter(function (p) { return ds.indexOf(p.dt) >= 0; });
   var erros = pend.filter(function (p) { return p.sev === 'erro'; }), alertas = pend.filter(function (p) { return p.sev === 'alerta'; });
   var impacto = erros.concat(alertas).reduce(function (a, p) { return a + p.imp; }, 0);
-  var eI = erros.filter(function (p) { return impDe(p) !== 'pc'; }).length, eP = erros.filter(function (p) { return impDe(p) === 'pc'; }).length;
+  var eI = erros.filter(function (p) { return impDe(p) === 'icms' || impDe(p) === 'ambos'; }).length, eP = erros.filter(function (p) { return impDe(p) === 'pc'; }).length, eS = erros.filter(function (p) { return impDe(p) === 'iss'; }).length;
 
   var h = '<div class="periods" role="group" aria-label="Período">';
   h += '<div class="pgroup"><span class="eyebrow">Período</span><div class="pcards"><button type="button" class="pcard" data-per="all" aria-pressed="' + (S.periodo === 'all') + '"><span class="t">' + (S.grupo === 'semana' ? 'Todas as semanas' : 'Todos os meses') + '</span><span class="d">' + (S.grupo === 'semana' ? S.per.semanas.length + ' semanas' : S.per.meses.length + ' meses') + '</span><span class="m"><span class="dot"></span>' + S.res.notas.length + ' notas</span></button></div></div>';
@@ -339,14 +341,15 @@ function renderMain() {
   h += '<div class="toolbar"><div class="seg" role="group" aria-label="Agrupar períodos"><button type="button" data-grupo="semana" aria-pressed="' + (S.grupo === 'semana') + '">Semanas</button><button type="button" data-grupo="mes" aria-pressed="' + (S.grupo === 'mes') + '">Meses</button></div><span class="small">A apuração oficial é mensal. Dia e semana servem para acompanhamento.</span></div>';
 
   h += '<div class="mov card"><div><span class="small">Vendas</span><b class="num">' + m0(T.vendas) + '</b><span class="small">' + T.nS + ' notas de saída</span></div>' +
-    '<div><span class="small">Compras</span><b class="num">' + m0(T.compras + T.compOut + T.compIns) + '</b><span class="small">' + T.nE + ' notas de entrada' + (T.compIns ? ' · ' + m0(T.compIns) + ' de insumo de serviço' : '') + (T.compOut ? ' · ' + m0(T.compOut) + ' de uso/ativo' : '') + '</span></div>' +
-    '<div><span class="small">ICMS-ST pago nas compras</span><b class="num">' + m0(T.stE) + '</b><span class="small">retido pelos fornecedores</span></div></div>';
+    '<div><span class="small">Serviços prestados</span><b class="num">' + m0(T.servPrest) + '</b><span class="small">' + T.nSP + ' NFS-e · ISS a recolher ' + m0(T.issDev) + '</span></div>' +
+    '<div><span class="small">Compras</span><b class="num">' + m0(T.compras + T.compOut + T.compIns) + '</b><span class="small">' + T.nE + ' notas de entrada' + (T.stE ? ' · ST pago ' + m0(T.stE) : '') + (T.compIns ? ' · ' + m0(T.compIns) + ' de insumo' : '') + (T.compOut ? ' · ' + m0(T.compOut) + ' de uso/ativo' : '') + '</span></div>' +
+    '<div><span class="small">Serviços e fretes tomados</span><b class="num">' + m0(T.servTom + T.freteTom) + '</b><span class="small">' + T.nST + ' NFS-e · ' + T.nCT + ' CT-e' + (T.nCX ? ' · ' + T.nCX + ' CT-e sem ser tomadora' : '') + '</span></div></div>';
   h += '<div class="kpis">';
   h += kpi('ICMS', I.doc, T.icmsD, T.icmsC, (T.icmsUso || T.ciap) ? '<dt>Uso, insumo e ativo (sem crédito)</dt><dd>' + m0(T.icmsUso + T.ciap) + '</dd>' : '');
   h += kpi('PIS', I.pct, T.pisD, T.pisC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.pisDest) + '</dd>');
   h += kpi('COFINS', I.pct, T.cofD, T.cofC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.cofDest) + '</dd>');
   h += '<div class="card kpi' + (erros.length ? ' alert' : '') + '"><div class="lbl"><span class="badge">' + I.alert + '</span>Pendências</div><div><div class="big num">' + erros.length + '</div><div class="state">' + (erros.length === 1 ? 'erro' : 'erros') + ' · ' + alertas.length + ' ' + (alertas.length === 1 ? 'alerta' : 'alertas') + '</div></div>' +
-    '<dl class="num"><dt>Erros de ICMS</dt><dd' + (eI ? ' class="errtxt"' : '') + '>' + eI + '</dd><dt>Erros de PIS/COFINS</dt><dd' + (eP ? ' class="errtxt"' : '') + '>' + eP + '</dd><dt>Impacto estimado</dt><dd>' + m0(impacto) + '</dd></dl></div>';
+    '<dl class="num"><dt>Erros de ICMS</dt><dd' + (eI ? ' class="errtxt"' : '') + '>' + eI + '</dd><dt>Erros de PIS/COFINS</dt><dd' + (eP ? ' class="errtxt"' : '') + '>' + eP + '</dd>' + (eS ? '<dt>Erros de ISS</dt><dd class="errtxt">' + eS + '</dd>' : '') + '<dt>Impacto estimado</dt><dd>' + m0(impacto) + '</dd></dl></div>';
   h += '</div>';
 
   h += grafico(ds);
@@ -354,15 +357,16 @@ function renderMain() {
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
   var tabs = [['apuracao', 'Apuração', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
-    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['reforma', 'IBS/CBS 2026', '']];
+    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['reforma', 'IBS/CBS 2026', '']];
   h += '<div class="card"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
   if (S.tab === 'apuracao') h += tabApuracao(ds, T);
   else if (S.tab === 'pendencias') h += tabPendencias(pend);
   else if (S.tab === 'notas') h += tabNotas(notasF);
   else if (S.tab === 'produtos') h += tabProdutos();
+  else if (S.tab === 'servicos') h += tabServicos(ds, T);
   else h += tabReforma(ds, T);
   h += '</div></div>';
-  h += '<p class="legal">Base: ICMS/SP com tributação normal de pneus e autopeças a partir de 01/10/2026 (Portaria SRE 34/2026, que revogou os Anexos de pneumáticos e autopeças da Portaria CAT 68/2019); PIS/COFINS não cumulativo do Lucro Real (Leis 10.637/2002 e 10.833/2003), com ICMS excluído da base do débito (Tema 69/STF) e do crédito (Lei 14.592/2023); produtos monofásicos conforme a Lei 10.485/2002, sem débito na revenda e sem crédito na compra. Valores apurados a partir dos XMLs; não substituem a escrituração (SPED) nem a apuração oficial.</p>';
+  h += '<p class="legal">Documentos lidos: NF-e, NFC-e, CT-e e NFS-e do padrão nacional. Base: ICMS/SP com tributação normal de pneus e autopeças a partir de 01/10/2026 (Portaria SRE 34/2026, que revogou os Anexos de pneumáticos e autopeças da Portaria CAT 68/2019); PIS/COFINS não cumulativo do Lucro Real (Leis 10.637/2002 e 10.833/2003), com ICMS excluído da base do débito (Tema 69/STF) e do crédito (Lei 14.592/2023); produtos monofásicos conforme a Lei 10.485/2002, sem débito na revenda e sem crédito na compra. Valores apurados a partir dos XMLs; não substituem a escrituração (SPED) nem a apuração oficial.</p>';
   el.innerHTML = h;
   bindChart();
 }
@@ -439,16 +443,16 @@ function tabApuracao(ds, T) {
   h += '<div class="tscroll"><table><thead><tr class="grp"><th></th><th></th><th></th><th colspan="3">ICMS</th><th colspan="3">PIS</th><th colspan="3">COFINS</th></tr><tr><th>Período</th><th class="r">Vendas</th><th class="r">Compras</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody>';
   rows.forEach(function (r) {
     var t = r.t;
-    h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + t.nS + ' saídas · ' + t.nE + ' entradas</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.compras + t.compOut + t.compIns) + (t.compIns ? '<div class="small">insumo ' + m0(t.compIns) + '</div>' : '') + (t.compOut ? '<div class="small">uso/ativo ' + m0(t.compOut) + '</div>' : '') + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
+    h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + (t.nS + t.nSP) + ' saídas · ' + (t.nE + t.nST + t.nCT) + ' entradas</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.compras + t.compOut + t.compIns) + (t.compIns ? '<div class="small">insumo ' + m0(t.compIns) + '</div>' : '') + (t.compOut ? '<div class="small">uso/ativo ' + m0(t.compOut) + '</div>' : '') + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
   });
   h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut + T.compIns) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
   h += '<p class="note">PIS e COFINS apurados pela regra (1,65% e 7,6% sobre a receita sem ICMS), não pelo valor destacado nas notas. Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
   return h;
 }
 
-var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS em monofásico', MONO_CST: 'CST monofásico', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', PROD_PEND: 'Produto sem classificação', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL' };
-var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', PROD_PEND: 'ambos' };
-var IMP_LBL = { icms: 'ICMS', pc: 'PIS/COFINS', ambos: 'ICMS e PIS/COFINS' };
+var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS em monofásico', MONO_CST: 'CST monofásico', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', PROD_PEND: 'Produto sem classificação', CTE_CALC: 'Cálculo do ICMS do frete', CTE_ALIQ: 'Alíquota do frete', CTE_SP: 'Alíquota do frete em SP', CTE_ST: 'Frete com ST', CTE_MONO: 'Frete de monofásico', CTE_SEM_NF: 'Frete sem a nota da compra', ISS_ALIQ: 'Alíquota do ISS', ISS_CALC: 'Cálculo do ISS', NFSE_PIS: 'PIS/COFINS do serviço', NFSE_CST: 'CST do serviço', SERV_PEND: 'Serviço sem classificação', ISS_RET: 'ISS retido a recolher', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL' };
+var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', PROD_PEND: 'ambos', CTE_CALC: 'icms', CTE_ALIQ: 'icms', CTE_SP: 'icms', CTE_ST: 'icms', CTE_MONO: 'pc', CTE_SEM_NF: 'pc', ISS_ALIQ: 'iss', ISS_CALC: 'iss', NFSE_PIS: 'pc', NFSE_CST: 'pc', SERV_PEND: 'pc', ISS_RET: 'iss' };
+var IMP_LBL = { icms: 'ICMS', pc: 'PIS/COFINS', iss: 'ISS', ambos: 'ICMS e PIS/COFINS' };
 function impDe(p) { return COD_IMP[p.cod] || 'ambos'; }
 function impOk(p) { var i = impDe(p); return S.fImp === 'todos' || i === S.fImp || i === 'ambos'; }
 
@@ -456,7 +460,7 @@ function tabPendencias(pend) {
   var f = pend.filter(function (p) { return impOk(p) && (S.fQuem === 'todos' || p.quem === S.fQuem) && (S.fSev === 'todos' || p.sev === S.fSev) && bate(S.q, [p.n, p.ch, p.parte, p.ncm, p.x, p.msg, COD_TIT[p.cod]]); });
   var ord = { erro: 0, alerta: 1, info: 2 }; f.sort(function (a, b) { return ord[a.sev] - ord[b.sev] || (a.dt < b.dt ? 1 : -1); });
   var cI = function (k) { return pend.filter(function (p) { return p.sev !== 'info' && (k === 'todos' || impDe(p) === k); }).length; };
-  var h = '<div class="toolbar"><div class="chips" role="group" aria-label="Imposto">' + [['todos', 'Todos os impostos'], ['icms', 'ICMS'], ['pc', 'PIS/COFINS']].map(function (c) { return '<button type="button" class="chip" data-fimp="' + c[0] + '" aria-pressed="' + (S.fImp === c[0]) + '">' + c[1] + ' <span class="num">(' + cI(c[0]) + ')</span></button>'; }).join('') + '</div></div>';
+  var h = '<div class="toolbar"><div class="chips" role="group" aria-label="Imposto">' + [['todos', 'Todos os impostos'], ['icms', 'ICMS'], ['pc', 'PIS/COFINS'], ['iss', 'ISS']].map(function (c) { return '<button type="button" class="chip" data-fimp="' + c[0] + '" aria-pressed="' + (S.fImp === c[0]) + '">' + c[1] + ' <span class="num">(' + cI(c[0]) + ')</span></button>'; }).join('') + '</div></div>';
   h += '<div class="toolbar"><div class="chips" role="group" aria-label="Origem">' + [['todos', 'Todas'], ['cliente', 'Emitidas pelo cliente'], ['fornecedor', 'De fornecedores']].map(function (c) { return '<button type="button" class="chip" data-fquem="' + c[0] + '" aria-pressed="' + (S.fQuem === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div>';
   h += '<div class="chips" role="group" aria-label="Gravidade">' + [['todos', 'Todas'], ['erro', 'Erros'], ['alerta', 'Alertas'], ['info', 'Avisos']].map(function (c) { return '<button type="button" class="chip" data-fsev="' + c[0] + '" aria-pressed="' + (S.fSev === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div></div>';
   if (!f.length) return h + '<div class="empty"><span class="pill ok">Nenhuma pendência</span><p class="note">Nada encontrado para este período e filtro.</p></div>';
@@ -474,7 +478,7 @@ function tabNotas(notas) {
   var h = '<div class="tscroll"><table><thead><tr><th>Tipo</th><th>Data</th><th>Nota</th><th>Emitente / destinatário</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">PIS/COFINS</th><th>Auditoria</th></tr></thead><tbody>';
   notas.slice(0, 400).forEach(function (n) {
     var t = n.T, icms = n.dir === 'S' ? t.icmsD : t.icmsC, pc = n.dir === 'S' ? t.pisD + t.cofD : t.pisC + t.cofC;
-    h += '<tr><td><span class="pill ' + n.dir + '">' + (n.dir === 'S' ? 'Saída' : 'Entrada') + '</span><div class="small">' + (n.mod === '65' ? 'NFC-e' : 'NF-e') + (n.interna ? ' · interna' : ' · interestadual') + '</div></td><td class="num">' + brFull(n.dt) + '</td><td class="num">' + esc(n.n) + '<div class="small mono" title="' + esc(n.ch) + '">' + esc(n.ch.slice(0, 4) + '…' + n.ch.slice(-8)) + '</div></td><td>' + esc(n.parte.n || 'Consumidor final') + '<div class="small">' + esc(fmtCnpj(n.parte.c)) + (n.parte.uf ? ' · ' + esc(n.parte.uf) : '') + '</div></td><td class="r num">' + m0(n.vNF) + '</td><td class="r num">' + m0(icms) + '<div class="small">' + (n.dir === 'S' ? 'débito' : 'crédito') + '</div></td><td class="r num">' + m0(pc) + '</td><td>' + (n.pior ? '<span class="pill ' + n.pior + '">' + n.nIss + ' ' + (n.nIss === 1 ? 'ponto' : 'pontos') + '</span>' : '<span class="pill ok">OK</span>') + '</td></tr>';
+    h += '<tr><td><span class="pill ' + (n.dir === 'X' ? 'E' : n.dir) + '">' + (n.dir === 'S' ? 'Saída' : n.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><div class="small">' + (n.tipo === 'cte' ? 'CT-e' + (n.extra && !n.extra.tomadora ? ' · ' + esc(n.extra.papel) : '') : n.tipo === 'nfse' ? 'NFS-e · cód. ' + esc(n.extra.cod) : (n.mod === '65' ? 'NFC-e' : 'NF-e') + (n.interna ? ' · interna' : ' · interestadual')) + '</div></td><td class="num">' + brFull(n.dt) + '</td><td class="num">' + esc(n.n) + '<div class="small mono" title="' + esc(n.ch) + '">' + esc(n.ch.slice(0, 4) + '…' + n.ch.slice(-8)) + '</div></td><td>' + esc(n.parte.n || 'Consumidor final') + '<div class="small">' + esc(fmtCnpj(n.parte.c)) + (n.parte.uf ? ' · ' + esc(n.parte.uf) : '') + '</div></td><td class="r num">' + m0(n.vNF) + '</td><td class="r num">' + m0(icms) + '<div class="small">' + (n.dir === 'S' ? 'débito' : n.dir === 'X' ? 'sem crédito' : 'crédito') + '</div></td><td class="r num">' + m0(pc) + '</td><td>' + (n.pior ? '<span class="pill ' + n.pior + '">' + n.nIss + ' ' + (n.nIss === 1 ? 'ponto' : 'pontos') + '</span>' : '<span class="pill ok">OK</span>') + '</td></tr>';
   });
   h += '</tbody></table></div>';
   if (notas.length > 400) h += '<p class="note">Mostrando 400 de ' + notas.length + '. Use a busca.</p>';
@@ -510,10 +514,56 @@ function tabProdutos() {
   return h;
 }
 function nomeClasse(c) { return c ? ((CLASSES.filter(function (x) { return x[0] === c; })[0] || [])[1] || c) : '—'; }
+var CLASSES_SERV = [['insumo', 'Insumo de serviço'], ['uso', 'Sem crédito']];
+function tabServicos(ds, T) {
+  var h = '<div class="stats">' +
+    '<div class="stat"><div class="k">Serviços prestados</div><div class="v num">' + m0(T.servPrest) + '</div><div class="k">ISS a recolher ' + m0(T.issDev) + (T.issRetSof ? ' · retido pelos tomadores ' + m0(T.issRetSof) : '') + (T.retFedSof ? ' · retenções federais sofridas ' + m0(T.retFedSof) : '') + '</div></div>' +
+    '<div class="stat"><div class="k">Serviços tomados</div><div class="v num">' + m0(T.servTom) + '</div><div class="k">com crédito de PIS/COFINS ' + m0(T.servIns) + (T.issRetTom ? ' · ISS retido a recolher ' + m0(T.issRetTom) : '') + (T.retFedTom ? ' · retenções federais a recolher ' + m0(T.retFedTom) : '') + '</div></div>' +
+    '<div class="stat"><div class="k">Fretes tomados (CT-e)</div><div class="v num">' + m0(T.freteTom) + '</div><div class="k">crédito ICMS ' + m0(T.icmsFrete) + ' · PIS/COFINS ' + m0(T.pcFrete) + '</div></div>' +
+    '<div class="stat"><div class="k">CT-e sem ser tomadora</div><div class="v num">' + T.nCX + '</div><div class="k">frete pago por outro (ex.: marketplace); sem crédito</div></div></div>';
+
+  var serv = Object.values(S.res.servicos).filter(function (x) { return bate(S.q, [x.x, x.desc, x.fn, x.fc, x.cod]); });
+  serv.sort(function (a, b) { return (a.classe === 'pendente' ? 0 : 1) - (b.classe === 'pendente' ? 0 : 1) || b.v - a.v; });
+  h += '<div><h3>Serviços tomados</h3><p class="note" style="margin-top:4px">Classifique como insumo o serviço usado na prestação de serviço da empresa (art. 3º, II, das Leis 10.637/2002 e 10.833/2003): ele gera crédito de PIS/COFINS. Na revenda de mercadorias, o entendimento predominante da Receita é que serviços como tarifas de marketplace, planos de saúde e assessorias não são insumo. A classificação vale para o mesmo prestador e código de serviço nas próximas notas.</p></div>';
+  if (!serv.length) h += '<p class="small">Nenhuma NFS-e tomada no período.</p>';
+  else {
+    h += '<div class="tscroll"><table><thead><tr><th>Prestador</th><th>Serviço</th><th class="r">Valor</th><th>Classificação</th></tr></thead><tbody>';
+    serv.forEach(function (x) {
+      var ctrl = S.readonly ? (x.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : '<span class="pill ok">' + (x.classe === 'insumo' ? 'Insumo de serviço' : 'Sem crédito') + '</span>')
+        : '<div class="seg" role="group" aria-label="Classificar serviço">' + CLASSES_SERV.map(function (c) { return '<button type="button" data-cserv="' + c[0] + '" data-pk="' + esc(x.k) + '" aria-pressed="' + (x.classe === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div>' +
+          '<div style="margin-top:5px">' + (x.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : '<span class="small">Definido pelo escritório</span> <button type="button" class="link" data-desfazer="' + esc(x.k) + '" data-origem="manual" data-ncm="">Desfazer</button>') + '</div>';
+      h += '<tr><td>' + esc(x.fn) + '<div class="small">' + esc(fmtCnpj(x.fc)) + '</div></td><td class="msg">' + esc(x.x) + '<div class="small">Cód. ' + esc(x.cod) + (x.desc ? ' · ' + esc(x.desc.slice(0, 80)) : '') + '</div></td><td class="r num">' + m0(x.v) + '<div class="small">' + x.n + ' ' + (x.n === 1 ? 'nota' : 'notas') + '</div></td><td>' + ctrl + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  var fr = S.res.fretes.filter(function (f) { return ds.indexOf(f.dt) >= 0 && bate(S.q, [f.n, f.transp, f.toma, f.papel]); });
+  h += '<div><h3>Fretes (CT-e)</h3><p class="note" style="margin-top:4px">O crédito do frete é de quem paga, o tomador. Quando o tomador é outra empresa, como o Mercado Livre nas vendas com envio dele, o CT-e é apenas informativo.</p></div>';
+  if (!fr.length) h += '<p class="small">Nenhum CT-e no período.</p>';
+  else {
+    h += '<div class="tscroll"><table><thead><tr><th>Data</th><th>CT-e</th><th>Transportadora</th><th>Papel da empresa</th><th class="r">Valor</th><th class="r">Crédito ICMS</th><th class="r">Crédito PIS/COFINS</th></tr></thead><tbody>';
+    fr.slice(0, 400).forEach(function (f) {
+      h += '<tr><td class="num">' + brFull(f.dt) + '</td><td class="num">' + esc(f.n) + '<div class="small">' + esc(f.rota) + '</div></td><td>' + esc(f.transp) + '</td><td>' + (f.tomadora ? '<span class="pill ok">Tomadora</span><div class="small">' + esc(f.papel) + '</div>' : '<span class="pill E">Não tomadora</span><div class="small">' + esc(f.papel) + ' · paga: ' + esc(f.toma) + '</div>') + '</td><td class="r num">' + m0(f.v) + '</td><td class="r num">' + m0(f.credICMS) + '</td><td class="r num">' + m0(f.credPC) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  return h;
+}
+
+async function classificarServ(pk, classe) {
+  var e = S.emp, x = S.res.servicos[pk] || {}, agora = new Date().toISOString(), a = e.prodCad[pk];
+  e.prodCad[pk] = { c: classe, em: agora, x: x.x || '', ncm: '' };
+  e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: 'Serviço ' + (x.cod || '') + ' · ' + (x.fn || ''), de: a ? a.c : null, para: classe });
+  recalcular(); renderMain();
+  if (S.exemplo) return;
+  try { await B.classificarProduto(e.id, pk, '', 'Serviço ' + (x.cod || '') + ' · ' + (x.fn || ''), classe); }
+  catch (err) { if (a) e.prodCad[pk] = a; else delete e.prodCad[pk]; e.hist.pop(); recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
+}
+
 function tabReforma(ds, T) {
   var h = '<p class="note">Em 2026 a CBS (0,9%) e o IBS (0,1%) são destacados nas notas em caráter de teste. Os valores vêm do grupo IBS/CBS dos XMLs e são informativos: não alteram a apuração de ICMS, PIS e COFINS.</p>';
   h += '<div class="tscroll"><table><thead><tr><th>Mês</th><th class="r">CBS destacada</th><th class="r">IBS destacado</th><th class="r">Notas</th></tr></thead><tbody>';
-  S.per.meses.forEach(function (m) { var x = m.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (!x.length) return; var t = F.somaDias(S.res.dias, x); h += '<tr><td style="text-transform:capitalize">' + esc(mesNome(m.mes)) + '</td><td class="r num">' + m0(t.cbs) + '</td><td class="r num">' + m0(t.ibs) + '</td><td class="r num">' + (t.nS + t.nE) + '</td></tr>'; });
+  S.per.meses.forEach(function (m) { var x = m.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (!x.length) return; var t = F.somaDias(S.res.dias, x); h += '<tr><td style="text-transform:capitalize">' + esc(mesNome(m.mes)) + '</td><td class="r num">' + m0(t.cbs) + '</td><td class="r num">' + m0(t.ibs) + '</td><td class="r num">' + docs(t) + '</td></tr>'; });
   h += '</tbody></table></div>';
   var emit = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && n.dir === 'S' && n.proprio; }).length;
   if (!T.cbs && emit) h += '<div class="banner"><span class="grow">Nenhuma nota emitida no período traz o grupo IBS/CBS. Vale conferir a configuração do emissor.</span></div>';
@@ -553,7 +603,7 @@ async function importar(files) {
 }
 async function integrar(acc, cnpj) {
   var e = S.emp, daEmp = [], terceiros = 0;
-  acc.notas.forEach(function (n) { if (n.eC === cnpj || n.dC === cnpj) daEmp.push(n); else terceiros++; });
+  acc.notas.forEach(function (n) { if (envolve(n, cnpj)) daEmp.push(n); else terceiros++; });
   var porCh = {}; daEmp.forEach(function (n) { porCh[n.ch] = n; }); daEmp = Object.keys(porCh).map(function (k) { return porCh[k]; });
   var canc = Object.keys(acc.canc);
   if (!S.exemplo) {
@@ -568,7 +618,7 @@ async function integrar(acc, cnpj) {
   canc.forEach(function (c) { e.canc[c] = 1; });
   S.imp = { feito: true, arquivos: acc.arquivos, notas: daEmp.length, canc: canc.length, terceiros: terceiros, erros: acc.erros };
   S.periodo = 'all'; recalcular(); render();
-  toast(daEmp.length + ' notas gravadas. Revise e publique para o cliente.');
+  toast(daEmp.length + (daEmp.length === 1 ? ' documento gravado' : ' documentos gravados') + '. Revise e publique para o cliente.');
 }
 
 async function publicar() {
@@ -628,6 +678,7 @@ document.addEventListener('click', function (ev) {
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
   if (d.classe) { if (!S.readonly) classificar(d.pk, d.ncm, d.classe); return; }
+  if (d.cserv) { if (!S.readonly) classificarServ(d.pk, d.cserv); return; }
   if (d.desfazer) { desfazerClasse(d.desfazer, d.origem, d.ncm); return; }
   if (d.abrir) { abrirDoBanco(d.abrir, !(S.usuario && S.usuario.papel === 'escritorio')); return; }
   if (d.remover) {

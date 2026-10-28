@@ -53,6 +53,17 @@ Em **Redirect URLs**, adicione o endereço do site, por exemplo `https://fortec-
 
 A estrutura do banco está registrada nas migrations do projeto no Supabase (`portal_fiscal_estrutura` e `portal_fiscal_permissoes_funcoes`).
 
+## Documentos aceitos
+
+| Documento | Como entra na apuração |
+|---|---|
+| NF-e e NFC-e | ICMS, PIS/COFINS e auditoria por item. |
+| CT-e | Crédito de ICMS e de PIS/COFINS só quando a empresa é a tomadora do frete. No frete de compra de produtos monofásicos, não há crédito de PIS/COFINS. Quando quem paga é outro (por exemplo, o Mercado Livre), o CT-e é só informativo. A auditoria confere a alíquota interestadual (7% ou 12%), os 12% do frete interno em SP e o cálculo base × alíquota. |
+| NFS-e prestada (padrão nacional) | Débito de PIS/COFINS, ISS a recolher e retido, e retenções federais sofridas. A auditoria confere alíquota de ISS fora de 2% a 5%, o cálculo do ISS, o CST e os valores de PIS/COFINS. |
+| NFS-e tomada (padrão nacional) | Crédito de PIS/COFINS só para o serviço classificado como insumo da prestação de serviço. Mostra o ISS e as retenções federais que a empresa reteve e deve recolher. |
+
+Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
+
 ## Regras fiscais aplicadas
 
 - **ICMS/SP:** pneus e autopeças com tributação normal a partir de 01/10/2026 (Portaria SRE 34/2026).
