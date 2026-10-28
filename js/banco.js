@@ -54,9 +54,10 @@ var Banco = (function () {
       todos(function () { return sb.from('cancelamentos').select('chave').eq('empresa_cnpj', cnpj).order('chave'); }),
       todos(function () { return sb.from('produtos').select('chave_produto,ncm,descricao,classe,atualizado_em').eq('empresa_cnpj', cnpj).order('chave_produto'); }),
       todos(function () { return sb.from('ncm_regras').select('ncm_prefixo,classe,atualizado_em').eq('empresa_cnpj', cnpj).order('ncm_prefixo'); }),
-      comHistorico ? ok(await sb.from('classificacao_historico').select('*').eq('empresa_cnpj', cnpj).order('alterado_em', { ascending: false }).limit(300)) : []
+      comHistorico ? ok(await sb.from('classificacao_historico').select('*').eq('empresa_cnpj', cnpj).order('alterado_em', { ascending: false }).limit(300)) : [],
+      todos(function () { return sb.from('acompanhamento').select('chave,status,texto,atualizado_em').eq('empresa_cnpj', cnpj).order('chave'); })
     ]);
-    return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4] };
+    return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4], acomp: r[5] };
   }
   async function salvarNotas(cnpj, notas, aoProgresso) {
     var LOTE = 250;
@@ -97,6 +98,12 @@ var Banco = (function () {
     }
     return r.data;
   }
+  /* ---------- acompanhamento das notas ---------- */
+  async function salvarAcompanhamento(cnpj, chave, status, texto) {
+    return ok(await sb.from('acompanhamento').upsert({ empresa_cnpj: cnpj, chave: chave, status: status, texto: texto || '' }, { onConflict: 'empresa_cnpj,chave' }));
+  }
+  async function removerAcompanhamento(cnpj, chave) { return ok(await sb.from('acompanhamento').delete().eq('empresa_cnpj', cnpj).eq('chave', chave)); }
+
   /* ---------- equipe do escritório ---------- */
   async function equipe() { return ok(await sb.rpc('equipe_escritorio')); }
   async function adicionarEquipe(email, senha) {
@@ -117,5 +124,6 @@ var Banco = (function () {
     carregar: carregar, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
     acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
-    equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe };
+    equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe,
+    salvarAcompanhamento: salvarAcompanhamento, removerAcompanhamento: removerAcompanhamento };
 })();

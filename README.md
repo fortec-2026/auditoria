@@ -66,6 +66,19 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
 
+## Acompanhamento das notas
+
+Cada nota pode receber uma **situação** e uma **anotação**, nas abas Notas e Pendências. O cliente vê as duas, mas só o escritório altera.
+
+| Situação | Uso |
+|---|---|
+| Em aberto | Pendência ainda sem ação. |
+| Emitente avisado | O fornecedor ou o cliente já foi contatado. |
+| Corrigida | Veio CC-e ou nota substituta. |
+| Conferida, sem ação | Revisada e aceita como está. |
+
+As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens de erros e alertas. Toda alteração fica gravada no histórico (`acompanhamento_historico`). Notas sem pendência aparecem como **Correta**, com um resumo do tratamento: crédito de ICMS, monofásico, ST anterior ao corte etc.
+
 ## Regras fiscais aplicadas
 
 - **ICMS/SP:** pneus e autopeças com tributação normal a partir de 01/10/2026 (Portaria SRE 34/2026).
@@ -85,6 +98,10 @@ Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
   - Ativo: ICMS pelo CIAP.
 - **Auditoria:**
   - Saída ainda emitida como ST após o corte.
+  - CFOP de ST (5.403, 5.405, 6.404…) com ICMS normal destacado: só pedir CC-e, o crédito é aproveitável.
+  - Nota de fornecedor tributada (CST 00) sem ICMS destacado.
+  - Compra interestadual depois de 01/10 sem ICMS (CST 60 ou CFOP de ST): deveria ter 12% (ou 4% para importados).
+  - Possível nota duplicada: mesmo fornecedor, data, itens e valores.
   - Fornecedor que reteve ST ou emitiu com CST 60.
   - Alíquotas internas e interestaduais.
   - Cálculo base × alíquota.

@@ -323,6 +323,14 @@ var Fiscal = (function () {
     notas.forEach(function (n) { (n.it || []).forEach(function (i) { if (/^(01|16)/.test(String(i.cest || '').replace(/\D/g, ''))) stAprendido[String(i.ncm)] = 1; }); });
     function isSeg(ncm, cest) { return /^(01|16)/.test(String(cest || '').replace(/\D/g, '')) || stLista(ncm) || !!stAprendido[String(ncm)]; }
     var condAvisado = {};
+    var CFOP_ST = /^[56]40[1-5]$/;
+    // notas de entrada com mesmo fornecedor, data e itens (código + valor) = possível duplicidade
+    var assinaturas = {};
+    function assinatura(n) { return n.eC + '|' + n.dt + '|' + (n.it || []).map(function (i) { return i.cp + ':' + r2(i.vp - i.vd); }).sort().join(','); }
+    notas.forEach(function (n) {
+      if (n.tipoDoc || n.dC !== cnpj || n.eC === cnpj || (cfg.canceladas || {})[n.ch] || ['101', '135', '151', '155'].indexOf(n.st) >= 0) return;
+      var k = assinatura(n); (assinaturas[k] = assinaturas[k] || []).push(n);
+    });
     var cancel = cfg.canceladas || {};
     var prodCad = cfg.produtos || {};          // { 'cnpjFornecedor|codigo': 'revenda'|'uso'|'ativo' }
     var ncmCad = cfg.ncmClasse || {};          // { '48025610': 'uso', ... } (prefixo de NCM)
@@ -335,7 +343,7 @@ var Fiscal = (function () {
 
     function fechar(nt, dir, proprio, interna, parte, T, issues, extra) {
       for (var k in T) T[k] = r2(T[k]);
-      var resumo = { tipo: nt.tipoDoc || 'nfe', ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
+      var resumo = { info: (extra && extra.info) || '', tipo: nt.tipoDoc || 'nfe', ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
         parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length, extra: extra || null,
         pior: issues.reduce(function (a, i) { return i.sev === 'erro' ? 'erro' : (a === 'erro' ? a : (i.sev === 'alerta' ? 'alerta' : a || 'info')); }, '') };
       res.notas.push(resumo);
@@ -390,7 +398,8 @@ var Fiscal = (function () {
       } else {
         dir = 'X'; T.nCX = 1;
       }
-      var r = fechar(nt, dir, false, interna, p, T, issues, { papel: papel, tomadora: tomadora, toma: c.toma.n || c.toma.c });
+      var infoC = tomadora ? 'frete tomado: crédito de ICMS ' + money(credICMS) + ' · PIS/COFINS ' + money(r2(credPC)) : dir === 'S' ? 'transporte prestado' : 'frete pago por ' + (c.toma.n || c.toma.c) + ': sem crédito';
+      var r = fechar(nt, dir, false, interna, p, T, issues, { papel: papel, tomadora: tomadora, toma: c.toma.n || c.toma.c, info: infoC });
       res.fretes.push({ ch: nt.ch, n: nt.n, dt: nt.dt, transp: nt.eN, papel: papel, tomadora: tomadora, toma: c.toma.n || c.toma.c,
         rota: c.ufIni + ' → ' + c.ufFim, v: c.vT, credICMS: r2(credICMS), credPC: r2(credPC), nIss: issues.length, pior: r.pior });
     }
@@ -432,7 +441,9 @@ var Fiscal = (function () {
         T.retFedTom += retFed;
       }
       T.ibs += nt.t.vIBS; T.cbs += nt.t.vCBS;
-      fechar(nt, dir, prestada, true, p, T, issues, { cod: s.cTribNac, serv: s.xTrib, desc: s.desc, iss: s.vISS, issRet: s.tpRetISS === '2' });
+      var infoS = prestada ? 'ISS ' + money(s.vISS) + (s.tpRetISS === '2' ? ' (retido pelo tomador)' : ' a recolher') + ' · PIS/COFINS ' + money(r2(T.pisD + T.cofD))
+        : (T.pcServ > 0 ? 'insumo de serviço: crédito de PIS/COFINS ' + money(r2(T.pcServ)) : (prodCad['SERV|' + nt.eC + '|' + s.cTribNac] ? 'sem crédito de PIS/COFINS' : 'serviço sem classificação'));
+      fechar(nt, dir, prestada, true, p, T, issues, { cod: s.cTribNac, serv: s.xTrib, desc: s.desc, iss: s.vISS, issRet: s.tpRetISS === '2', info: infoS });
     }
 
     notas.forEach(function (nt) {
@@ -531,7 +542,9 @@ var Fiscal = (function () {
         }
 
         if (dir === 'S' && proprio) {
-          if (pos && seg && interna && (tribST || /^5(401|403|405)$/.test(it.cf))) {
+          if (pos && seg && interna && !tribST && /^5(401|403|405)$/.test(it.cf) && (it.cst === '00' || it.cst === '20') && it.v > 0) {
+            issue('alerta', it, 'CFOP_ST', 'ICMS correto (' + it.p + '% destacado), mas o CFOP ' + it.cf + ' é de ST. Corrigir para 5.102 por CC-e; não muda o imposto.', 0);
+          } else if (pos && seg && interna && (tribST || /^5(401|403|405)$/.test(it.cf))) {
             issue('erro', it, 'ST_SAIDA', 'Saída interna ainda emitida como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deve destacar ICMS próprio a ' + aliqInt + '%.', receita * aliqInt / 100 - it.v);
           } else if (pos && seg && interna && (it.cst === '00' || it.cst === '20') && it.p && it.p !== aliqInt) {
             issue('alerta', it, 'ALIQ_INT', 'Alíquota interna de ' + it.p + '% (geral de SP: ' + aliqInt + '%). Conferir se há fundamento.', Math.max(0, it.bc * (aliqInt - it.p) / 100));
@@ -563,7 +576,11 @@ var Fiscal = (function () {
             if (it.vst > 0 || ['10', '30', '70'].indexOf(it.cst) >= 0) {
               issue('erro', it, 'ST_FORN', 'Fornecedor reteve ICMS-ST (' + money(it.vst) + ') após a exclusão do regime em 01/10/2026. Solicitar correção.', it.vst);
             } else if (it.cst === '60' || it.cst === '500') {
-              issue('erro', it, 'ST60_FORN', 'Fornecedor emitiu como ST (CST ' + it.cst + ') sem destacar ICMS próprio. Sem destaque não há crédito.', receita * aliqInt / 100);
+              issue('erro', it, 'ST60_FORN', 'Fornecedor emitiu como ST (CST ' + it.cst + ', CFOP ' + it.cf + ') sem destacar ICMS próprio. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100);
+            } else if ((it.cst === '00' || it.cst === '20') && !(it.v > 0)) {
+              issue('erro', it, 'ICMS_ZERO_FORN', 'CST ' + it.cst + ' (tributado) sem ICMS destacado, CFOP ' + it.cf + '. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100);
+            } else if ((it.cst === '00' || it.cst === '20') && CFOP_ST.test(it.cf) && it.p === aliqInt) {
+              issue('alerta', it, 'CFOP_FORN', 'Tributação correta (ICMS ' + it.p + '% destacado, crédito aproveitável); só o CFOP ' + it.cf + ' é de ST. Pedir ao fornecedor CC-e para o CFOP 5.102 e a correção do cadastro.', 0);
             } else if ((it.cst === '00' || it.cst === '20') && it.p && it.p !== aliqInt) {
               issue('alerta', it, 'ALIQ_FORN', 'Fornecedor aplicou ' + it.p + '% em operação interna (geral de SP: ' + aliqInt + '%).', Math.abs(it.bc * (aliqInt - it.p) / 100));
             }
@@ -571,6 +588,12 @@ var Fiscal = (function () {
           if (!interna && nt.mod === '55' && it.p > 0) {
             var espE = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;
             if (it.p !== espE) issue('erro', it, 'ALIQ_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' aplicou ' + it.p + '% (esperado ' + espE + '% para SP, origem ' + it.o + ').', Math.abs(it.bc * (it.p - espE) / 100));
+          }
+          if (!interna && pos && seg && it.vst === 0 && (it.cst === '60' || it.cst === '500' || ((it.cst === '00' || it.cst === '20' || CFOP_ST.test(it.cf)) && !(it.v > 0)))) {
+            var espI = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;
+            issue('erro', it, 'ST_INTER60_FORN', 'Fornecedor de ' + nt.eUF + ' emitiu sem ICMS (CST ' + it.cst + ', CFOP ' + it.cf + ') após 01/10/2026. Deveria destacar a alíquota interestadual de ' + espI + '%; sem destaque não há crédito.', receita * espI / 100);
+          } else if (!interna && pos && seg && it.v > 0 && /^640[1-5]$/.test(it.cf)) {
+            issue('alerta', it, 'CFOP_FORN', 'Tributação correta (ICMS ' + it.p + '% destacado, crédito aproveitável); só o CFOP ' + it.cf + ' é de ST. Pedir ao fornecedor CC-e para o CFOP 6.102.', 0);
           }
           if (!interna && pos && seg && it.vst > 0) {
             issue('alerta', it, 'ST_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' reteve ICMS-ST (' + money(it.vst) + ') para SP após 01/10/2026. Conferir o protocolo.', it.vst);
@@ -587,11 +610,28 @@ var Fiscal = (function () {
           }
         }
       });
+      if (dir === 'E' && !proprio) {
+        var dups = (assinaturas[assinatura(nt)] || []).filter(function (o) { return o.ch !== nt.ch; });
+        if (dups.length) issue('alerta', null, 'DUP_NF', 'Mesmos itens, valores e data da nota ' + dups.map(function (o) { return 'nº ' + o.n; }).join(', ') + ' do mesmo fornecedor: possível nota substituída. Confirme se uma delas foi cancelada; se as duas forem escrituradas, há duplicidade.', 0);
+      }
       if (semDifal && !nt.dif) issue('alerta', null, 'DIFAL', 'Venda interestadual a não contribuinte sem o grupo de partilha do DIFAL.', 0);
 
       ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'compIns', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
 
-      var resumo = { ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
+      var fatos = [], todosMono = nt.it.length && nt.it.every(function (i) { return monoDe(i); });
+      var stAntes = !pos && nt.it.some(function (i) { return isSeg(i.ncm, i.cest) && ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(i.cst) >= 0; });
+      if (dir === 'E') {
+        if (T.icmsC > 0) fatos.push('crédito de ICMS ' + money(T.icmsC));
+        else if (stAntes) fatos.push('ST antes de 01/10: imposto já recolhido, sem crédito de ICMS');
+        else if (T.icmsUso + T.ciap > 0) fatos.push('uso, insumo ou ativo: sem crédito direto de ICMS');
+        if (T.pisC + T.cofC > 0) fatos.push('crédito de PIS/COFINS ' + money(T.pisC + T.cofC));
+        else if (todosMono) fatos.push('monofásico: sem crédito de PIS/COFINS');
+      } else {
+        if (T.icmsD > 0) fatos.push('ICMS ' + money(T.icmsD) + ' destacado');
+        if (todosMono && T.vendas > 0) fatos.push('monofásico: PIS/COFINS zero');
+        else if (T.pisD + T.cofD > 0) fatos.push('PIS/COFINS ' + money(T.pisD + T.cofD));
+      }
+      var resumo = { info: fatos.join(' · '), ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
         parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length,
         pior: issues.reduce(function (a, i) { return i.sev === 'erro' ? 'erro' : (a === 'erro' ? a : (i.sev === 'alerta' ? 'alerta' : a || 'info')); }, '') };
       res.notas.push(resumo);
