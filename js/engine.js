@@ -305,7 +305,8 @@ var Fiscal = (function () {
     return { icmsD: 0, icmsC: 0, icmsUso: 0, ciap: 0, pisD: 0, pisC: 0, cofD: 0, cofC: 0, vendas: 0, compras: 0, compOut: 0, compIns: 0,
       stE: 0, ibs: 0, cbs: 0, nS: 0, nE: 0, pisDest: 0, cofDest: 0,
       servPrest: 0, servTom: 0, servIns: 0, freteTom: 0, icmsFrete: 0, pcFrete: 0, pcServ: 0,
-      issDev: 0, issRetSof: 0, issRetTom: 0, retFedSof: 0, retFedTom: 0, nSP: 0, nST: 0, nCT: 0, nCX: 0 };
+      issDev: 0, issRetSof: 0, issRetTom: 0, retFedSof: 0, retFedTom: 0, nSP: 0, nST: 0, nCT: 0, nCX: 0,
+      rMono: 0, rZero: 0, rSTpc: 0, rSTicms: 0 };
   }
   function addTot(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; }
 
@@ -315,14 +316,32 @@ var Fiscal = (function () {
     var cnpj = String(cfg.cnpj || '').replace(/\D/g, '');
     var corte = cfg.corte || '2026-10-01';
     var aliqInt = cfg.aliqInterna || 18;
+    var segmento = cfg.segmento || 'autopecas', regime = cfg.regime || 'real', varejo = segmento !== 'autopecas';
+    // PIS/COFINS: não cumulativo no Lucro Real, cumulativo no Presumido; no Simples vai no DAS
+    var PIS = regime === 'presumido' ? 0.0065 : 0.0165, COF = regime === 'presumido' ? 0.03 : 0.076;
     var monoRegra = makeMono(cfg.mono && cfg.mono.length ? cfg.mono : DEFAULT_MONO);
-    // monofásico de fato: regra 'cond' usa o CST da nota (02 ou 04 = monofásico)
-    function monoDe(it) { var r = monoRegra(it.ncm, it.ex); return r === 'mono' || (r === 'cond' && (it.cP === '02' || it.cP === '04')); }
+    var classif = cfg.classificar || null, clsCache = {};
+    function cls(it) { if (!classif) return null; var k = it.ncm + '|' + (it.cest || ''); return clsCache[k] || (clsCache[k] = classif({ ncm: it.ncm, cest: it.cest, destino: 'cf', uf: 'SP', regime: regime })); }
+    // tratamento de PIS/COFINS do item: lista da empresa e, fora de autopeças, as regras gerais (monofásico, ST, alíquota zero)
+    // regra condicionada segue o CST da nota (02, 04, 05 ou 06)
+    function pcTrat(it) {
+      var r = monoRegra(it.ncm, it.ex);
+      if (r === 'mono' || (r === 'cond' && (it.cP === '02' || it.cP === '04'))) return 'mono';
+      if (varejo) { var c = cls(it); if (c && !c.erro && c.pc.trat !== 'normal' && (!c.pc.cond || ['02', '04', '05', '06'].indexOf(it.cP) >= 0)) return c.pc.trat; }
+      return 'normal';
+    }
+    function monoDe(it) { return pcTrat(it) !== 'normal'; }
+    var NOME_PC = { mono: 'monofásico', zero: 'com alíquota zero', st: 'com ST de PIS/COFINS' };
+    function ajusteRegime(T) {
+      if (regime === 'presumido') { T.pisC = 0; T.cofC = 0; T.pcFrete = 0; T.pcServ = 0; }
+      if (regime === 'simples') { T.pisD = 0; T.cofD = 0; T.pisC = 0; T.cofC = 0; T.icmsC = 0; T.icmsFrete = 0; T.pcFrete = 0; T.pcServ = 0; }
+    }
+    var CST_GRUPO = function (c) { c = String(c || ''); if (c.length === 3) return { '101': 'trib', '102': 'trib', '103': 'isento', '300': 'isento', '400': 'isento', '500': 'st', '900': 'trib', '201': 'st', '202': 'st', '203': 'st' }[c] || c; return { '00': 'trib', '20': 'red', '40': 'isento', '41': 'isento', '50': 'isento', '60': 'st', '10': 'st', '70': 'st', '30': 'st', '51': 'trib', '90': 'trib' }[c] || c; };
     var stLista = makeMatcher(cfg.st && cfg.st.length ? cfg.st : DEFAULT_ST);
     // NCMs que vieram com CEST de autopeças (01) ou pneus (16) em qualquer nota entram no segmento
     var stAprendido = {};
     notas.forEach(function (n) { (n.it || []).forEach(function (i) { if (/^(01|16)/.test(String(i.cest || '').replace(/\D/g, ''))) stAprendido[String(i.ncm)] = 1; }); });
-    function isSeg(ncm, cest) { return /^(01|16)/.test(String(cest || '').replace(/\D/g, '')) || stLista(ncm) || !!stAprendido[String(ncm)]; }
+    function isSeg(ncm, cest) { if (varejo) return false; return /^(01|16)/.test(String(cest || '').replace(/\D/g, '')) || stLista(ncm) || !!stAprendido[String(ncm)]; }
     var condAvisado = {};
     var CFOP_ST = /^[56]40[1-5]$/;
     // notas de entrada com mesmo fornecedor, data e itens (código + valor) = possível duplicidade
@@ -343,6 +362,7 @@ var Fiscal = (function () {
     var porChave = {}; notas.forEach(function (n) { if (!n.tipoDoc) porChave[n.ch] = n; });
 
     function fechar(nt, dir, proprio, interna, parte, T, issues, extra) {
+      ajusteRegime(T);
       for (var k in T) T[k] = r2(T[k]);
       var resumo = { info: (extra && extra.info) || '', tipo: nt.tipoDoc || 'nfe', ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,
         parte: parte, vNF: nt.t.vNF, T: T, nIss: issues.length, extra: extra || null,
@@ -492,7 +512,7 @@ var Fiscal = (function () {
           var pk = chaveProduto(nt.eC, it);
           var classe = prodCad[pk], origem = 'manual';
           if (!classe) { classe = classeNcm(it.ncm); origem = 'ncm'; }
-          if (!classe && (seg || monoR)) { classe = 'revenda'; origem = 'sugerido'; }
+          if (!classe && (seg || monoR || varejo)) { classe = 'revenda'; origem = 'sugerido'; }
           if (!classe) { classe = 'pendente'; origem = 'nenhum'; }
           if (classe === 'revenda') { /* revenda: o escopo de ST vem da lista de ST/CEST */ }
           else if (classe === 'uso') nat = 'uso';
@@ -512,7 +532,7 @@ var Fiscal = (function () {
         if (dir === 'S') {
           T.icmsD += it.v;
         } else {
-          var stAnterior = !pos && seg && tribST;
+          var stAnterior = (!pos && seg && tribST) || (varejo && tribST);
           if (stAnterior) { /* regime de ST: imposto encerrado, sem crédito */ }
           else if (nat === 'uso') { T.icmsUso += it.v; T.compOut += receita + it.vIPI; }
           else if (nat === 'ativo') { T.ciap += it.v; T.compOut += receita + it.vIPI; }
@@ -524,6 +544,9 @@ var Fiscal = (function () {
         /* PIS/COFINS não cumulativo */
         if (dir === 'S' && nat === 'venda') {
           T.vendas += receita;
+          var trPc = pcTrat(it);
+          if (trPc === 'mono') T.rMono += receita; else if (trPc === 'zero') T.rZero += receita; else if (trPc === 'st') T.rSTpc += receita;
+          if (CST_GRUPO(it.cst) === 'st') T.rSTicms += receita;
           if (mono) res.mono.vendas += receita;
           else { var b = Math.max(0, receita - it.v); T.pisD += b * PIS; T.cofD += b * COF; }
           T.pisDest += it.vP; T.cofDest += it.vC;
@@ -555,6 +578,24 @@ var Fiscal = (function () {
           } else if (pos && seg && interna && ['40', '41', '50', '51', '90'].indexOf(it.cst) >= 0 && nat === 'venda') {
             issue('alerta', it, 'SEM_TRIB', 'Venda sem destaque de ICMS (CST ' + it.cst + '). Conferir fundamento.', receita * aliqInt / 100, ajC('icmsD', receita * aliqInt / 100));
           }
+          if (varejo && classif && interna && nat === 'venda') {
+            var cI = cls(it);
+            if (cI && !cI.erro && !cI.icms.cond && cI.st.st !== 'cest') {
+              var ge = cI.icms.cst === '60' || cI.icms.cst === '500' ? 'st' : (cI.icms.cst === '40' || cI.icms.cst === '103') ? 'isento' : cI.icms.cst === '20' ? 'red' : 'trib';
+              var gn = CST_GRUPO(it.cst), base0 = it.vp - it.vd, carga = base0 > 0 ? it.v / base0 * 100 : 0;
+              var simples = regime === 'simples', erroI = false;
+              var desdeST = cI.st.regra && cI.st.regra.desde ? cI.st.regra.desde.split('/').reverse().join('-') : '';
+              if (desdeST && nt.dt < desdeST) { ge = 'st'; cI = { icms: { titulo: 'Substituição tributária (antes de ' + cI.st.regra.desde + ')', cst: simples ? '500' : '60', carga: 0 }, st: { st: 'sim', regra: cI.st.regra } }; }
+              if (simples) erroI = (ge === 'st') !== (gn === 'st');
+              else if (ge === 'red' || ge === 'trib') erroI = (gn !== 'trib' && gn !== 'red') || Math.abs(carga - cI.icms.carga) > 0.6;
+              else erroI = ge !== gn;
+              if (erroI) {
+                var espV = simples ? it.v : (ge === 'st' || ge === 'isento') ? 0 : base0 * cI.icms.carga / 100;
+                var lei = cI.st.st === 'sim' && cI.st.regra ? cI.st.regra.l : cI.icms.regra ? cI.icms.regra.l : 'RICMS/SP, art. 52, I';
+                issue('erro', it, 'CAD_ICMS', 'Saiu com CST ' + (it.cst || '–') + (carga ? ' e carga de ' + r2(carga) + '%' : ' sem ICMS') + '; o esperado é ' + cI.icms.titulo.charAt(0).toLowerCase() + cI.icms.titulo.slice(1) + ' (CST ' + cI.icms.cst + '; ' + lei + '). Corrigir o cadastro do produto no sistema emissor.', Math.abs(espV - it.v), simples ? null : { c: { icmsD: espV - it.v } });
+              }
+            }
+          }
           if (!interna && nt.mod === '55' && it.p > 0 && nat === 'venda') {
             var esp = aliqInterestadual(it.o, nt.dUF);
             if (it.p !== esp) issue('erro', it, 'ALIQ_INTER', 'Alíquota interestadual de ' + it.p + '% para ' + nt.dUF + ' (origem ' + it.o + '): esperado ' + esp + '%.', Math.abs(it.bc * (it.p - esp) / 100), ajC('icmsD', it.bc * (esp - it.p) / 100));
@@ -563,8 +604,12 @@ var Fiscal = (function () {
             issue('info', it, 'ST_INTER', 'ICMS-ST retido para ' + nt.dUF + ' (' + money(it.vst) + '). Conferir se o protocolo com essa UF continua vigente.', 0);
           }
           if (!interna && nt.dIE === '9' && nat === 'venda' && it.v > 0) semDifal = true;
-          if (nat === 'venda' && mono && (it.vP > 0 || it.vC > 0 || it.cP === '01' || it.cP === '02')) {
-            issue('erro', it, 'MONO_TRIB', 'PIS/COFINS destacado em produto monofásico (NCM ' + it.ncm + '). Na revenda a alíquota é zero (CST 04): possível recolhimento indevido.', it.vP + it.vC, { a: { pisD: it.vP, cofD: it.vC } });
+          if (regime === 'simples' && nat === 'venda' && mono && ['04', '05', '06'].indexOf(it.cP) < 0) {
+            var trS = pcTrat(it);
+            if (trS !== 'zero') issue('alerta', it, 'MONO_SN', 'Produto ' + NOME_PC[trS] + ' saiu com CST ' + (it.cP || '–') + ' de PIS/COFINS. No Simples Nacional use CST ' + (trS === 'st' ? '05' : '04') + ' e segregue a receita no PGDAS-D para não pagar PIS/COFINS no DAS.', 0);
+          } else if (regime !== 'simples' && nat === 'venda' && mono && (it.vP > 0 || it.vC > 0 || it.cP === '01' || it.cP === '02')) {
+            var trM = pcTrat(it), cM = trM === 'zero' ? '06' : trM === 'st' ? '05' : '04';
+            issue('erro', it, 'MONO_TRIB', 'PIS/COFINS destacado em produto ' + NOME_PC[trM] + ' (NCM ' + it.ncm + '). Na revenda não há PIS/COFINS (CST ' + cM + '): possível recolhimento indevido.', it.vP + it.vC, { a: { pisD: it.vP, cofD: it.vC } });
           } else if (nat === 'venda' && !mono && (it.cP === '04' || it.cP === '06')) {
             issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF), { a: { pisD: -Math.max(0, receita - it.v) * PIS, cofD: -Math.max(0, receita - it.v) * COF } });
           } else if (nat === 'venda' && !mono && it.cP === '01' && it.vP > 0) {
@@ -620,7 +665,8 @@ var Fiscal = (function () {
       }
       if (semDifal && !nt.dif) issue('alerta', null, 'DIFAL', 'Venda interestadual a não contribuinte sem o grupo de partilha do DIFAL.', 0);
 
-      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'compIns', 'stE', 'pisDest', 'cofDest'].forEach(function (k) { T[k] = r2(T[k]); });
+      ajusteRegime(T);
+      ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'compIns', 'stE', 'pisDest', 'cofDest', 'rMono', 'rZero', 'rSTpc', 'rSTicms'].forEach(function (k) { T[k] = r2(T[k]); });
 
       var fatos = [], todosMono = nt.it.length && nt.it.every(function (i) { return monoDe(i); });
       var stAntes = !pos && nt.it.some(function (i) { return isSeg(i.ncm, i.cest) && ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(i.cst) >= 0; });
@@ -629,10 +675,10 @@ var Fiscal = (function () {
         else if (stAntes) fatos.push('ST antes de 01/10: imposto já recolhido, sem crédito de ICMS');
         else if (T.icmsUso + T.ciap > 0) fatos.push('uso, insumo ou ativo: sem crédito direto de ICMS');
         if (T.pisC + T.cofC > 0) fatos.push('crédito de PIS/COFINS ' + money(T.pisC + T.cofC));
-        else if (todosMono) fatos.push('monofásico: sem crédito de PIS/COFINS');
+        else if (todosMono) fatos.push((varejo ? 'monofásico ou alíquota zero' : 'monofásico') + ': sem crédito de PIS/COFINS');
       } else {
         if (T.icmsD > 0) fatos.push('ICMS ' + money(T.icmsD) + ' destacado');
-        if (todosMono && T.vendas > 0) fatos.push('monofásico: PIS/COFINS zero');
+        if (todosMono && T.vendas > 0) fatos.push((varejo ? 'monofásico ou alíquota zero' : 'monofásico') + ': PIS/COFINS zero');
         else if (T.pisD + T.cofD > 0) fatos.push('PIS/COFINS ' + money(T.pisD + T.cofD));
       }
       var resumo = { info: fatos.join(' · '), ch: nt.ch, n: nt.n, s: nt.s, mod: nt.mod, dt: nt.dt, dir: dir, proprio: proprio, interna: interna,

@@ -100,12 +100,12 @@ function montarEmpresa(e, d) {
     hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova }; }).reverse(),
     acomp: (function () { var a = {}; (d.acomp || []).forEach(function (x) { a[x.chave] = { s: x.status, t: x.texto, em: x.atualizado_em }; }); return a; })() };
 }
-function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
+function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
 function pendentesPublicar() { if (!S.emp || S.exemplo) return 0; var n = 0; for (var k in S.emp.pub) if (!S.emp.pub[k]) n++; return n; }
 
 function cfgAtual() {
   var e = S.emp, m = e.meta;
-  return { cnpj: m.cnpj, corte: m.corte || '2026-10-01', mono: (m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO, st: (m.st && m.st.length) ? m.st : F.DEFAULT_ST, canceladas: e.canc,
+  return { cnpj: m.cnpj, segmento: m.segmento || 'autopecas', regime: m.regime || 'real', classificar: Regras.classificar, corte: m.corte || '2026-10-01', mono: (m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO, st: (m.st && m.st.length) ? m.st : F.DEFAULT_ST, canceladas: e.canc,
     produtos: mapa(e.prodCad), ncmClasse: mapa(e.ncmCad) };
 }
 function mapa(o) { var r = {}; Object.keys(o || {}).forEach(function (k) { if (o[k] && o[k].c) r[k] = o[k].c; }); return r; }
@@ -288,12 +288,19 @@ function renderOffice() {
   if (imp.gravando) h += '<div class="note">' + (imp.xml ? 'Guardando os XMLs originais… ' : 'Gravando no banco… ') + imp.gravadas + ' de ' + imp.total + '</div>';
   if (imp.feito) h += '<div class="stats"><div class="stat"><div class="v num">' + imp.arquivos + '</div><div class="k">arquivos lidos</div></div><div class="stat"><div class="v num">' + imp.notas + '</div><div class="k">notas da empresa</div></div><div class="stat"><div class="v num">' + imp.canc + '</div><div class="k">canceladas</div></div><div class="stat"><div class="v num">' + (imp.terceiros + imp.erros) + '</div><div class="k">ignoradas</div></div></div>';
   h += '<div class="row"><div class="field"><label for="cnpj">CNPJ do cliente</label><input id="cnpj" value="' + esc(fmtCnpj(m.cnpj)) + '" disabled></div><div class="field"><label for="nome">Razão social</label><input id="nome" value="' + esc(m.nome || '') + '"' + (S.exemplo ? ' disabled' : '') + '></div></div>';
-  h += '<details><summary>Listas de NCM: monofásicos e saída da ST</summary><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">' +
-    '<div class="field"><label for="mono">Monofásicos de PIS/COFINS (Lei 10.485/2002) — só afeta PIS/COFINS</label><textarea id="mono" spellcheck="false">' + esc(mono) + '</textarea></div>' +
+  var seg = m.segmento || 'autopecas', auto = seg === 'autopecas';
+  h += '<div class="row"><div class="field"><label for="segm">Segmento</label><select id="segm"' + (S.exemplo ? '' : '') + '>' + SEGMENTOS.map(function (x) { return '<option value="' + x[0] + '"' + (seg === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="regm">Regime tributário</label><select id="regm">' + REGIMES.map(function (x) { return '<option value="' + x[0] + '"' + ((m.regime || 'real') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
+    '<button class="btn" type="button" data-act="salvarSeg">Salvar e recalcular</button></div>';
+  h += '<p class="note">' + (auto ? 'Pneus e autopeças: PIS/COFINS pela lista de monofásicos abaixo (Lei 10.485/2002) e auditoria da saída da ST em 01/10/2026.' : 'PIS/COFINS pelas regras da aba Classificação fiscal (monofásicos, alíquota zero da cesta básica e ST), mais a lista abaixo. Produtos comprados entram como revenda. As notas de venda são conferidas com o ICMS esperado de cada produto em SP, e as diferenças viram pendências.') +
+    ((m.regime || 'real') === 'presumido' ? ' Lucro Presumido: PIS 0,65% e COFINS 3% cumulativos, sem créditos.' : (m.regime || 'real') === 'simples' ? ' Simples Nacional: o painel mostra a receita separada para o PGDAS-D (monofásica, ST e tributada), sem débito e crédito.' : ' Lucro Real: PIS 1,65% e COFINS 7,6% não cumulativos, com créditos.') + '</p>';
+  h += '<details><summary>' + (auto ? 'Listas de NCM: monofásicos e saída da ST' : 'Monofásicos adicionais da empresa') + '</summary><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">' +
+    '<div class="field"><label for="mono">' + (auto ? 'Monofásicos de PIS/COFINS (Lei 10.485/2002) — só afeta PIS/COFINS' : 'Monofásicos além das regras gerais (ex.: autopeças da Lei 10.485/2002)') + '</label><textarea id="mono" spellcheck="false">' + esc(mono) + '</textarea></div>' +
     '<p class="note">Um NCM por linha (pode ser só o início). Para valer só em destaques Ex da TIPI, escreva <code>40169990 ex:03,05</code>. Para NCM que depende da destinação, escreva <code>4009 ?</code>: o portal segue o CST da nota (02 ou 04 = monofásico) e avisa para conferir.</p>' +
-    '<div class="field"><label for="stl">Saíram da ST em 01/10/2026 (pneus e autopeças) — só afeta o ICMS</label><textarea id="stl" spellcheck="false">' + esc(stl) + '</textarea></div>' +
+    (auto ? '<div class="field"><label for="stl">Saíram da ST em 01/10/2026 (pneus e autopeças) — só afeta o ICMS</label><textarea id="stl" spellcheck="false">' + esc(stl) + '</textarea></div>' +
     '<p class="note">Um NCM por linha. Itens que vierem com CEST 01 (autopeças) ou 16 (pneus) entram automaticamente, mesmo fora da lista.</p>' +
-    '<div class="row"><div class="field"><label for="corte">Início da tributação normal (fim da ST)</label><input id="corte" type="date" value="' + esc(m.corte || '2026-10-01') + '"></div><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div></div></details>';
+    '<div class="row"><div class="field"><label for="corte">Início da tributação normal (fim da ST)</label><input id="corte" type="date" value="' + esc(m.corte || '2026-10-01') + '"></div><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div>'
+    : '<div class="row"><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div>') + '</div></details>';
   if (!S.exemplo) h += S.confirmDel ? '<div class="confirm"><span>Apagar a empresa e todas as notas, produtos e acessos dela? Não dá para desfazer.</span><button class="btn danger" type="button" data-act="apagarSim">Apagar definitivamente</button><button class="btn" type="button" data-act="apagarNao">Cancelar</button></div>'
     : '<div><button class="btn danger" type="button" data-act="apagar">Apagar empresa</button></div>';
   h += '</div>';
@@ -370,9 +377,17 @@ function renderMain() {
     '<div><span class="small">Compras</span><b class="num">' + m0(T.compras + T.compOut + T.compIns) + '</b><span class="small">' + T.nE + ' notas de entrada' + (T.stE ? ' · ST pago ' + m0(T.stE) : '') + (T.compIns ? ' · ' + m0(T.compIns) + ' de insumo' : '') + (T.compOut ? ' · ' + m0(T.compOut) + ' de uso/ativo' : '') + '</span></div>' +
     '<div><span class="small">Serviços e fretes tomados</span><b class="num">' + m0(T.servTom + T.freteTom) + '</b><span class="small">' + T.nST + ' NFS-e · ' + T.nCT + ' CT-e' + (T.nCX ? ' · ' + T.nCX + ' CT-e sem ser tomadora' : '') + '</span></div></div>';
   h += '<div class="kpis">';
+  if (regimeEmp() === 'simples') {
+    var recT = T.vendas + T.servPrest, recSeg = T.rMono + T.rSTpc;
+    h += '<div class="card kpi kpi-simples"><div class="lbl"><span class="badge">' + I.doc + '</span>Receita para o PGDAS-D (Simples Nacional)</div>' +
+      '<div><div class="big num">' + m0(recT) + '</div><div class="state">receita de vendas e serviços no período</div></div>' +
+      '<dl class="num"><dt>Com ICMS por substituição tributária (segregar)</dt><dd>' + m0(T.rSTicms) + '</dd><dt>PIS/COFINS monofásico (segregar)</dt><dd>' + m0(T.rMono) + '</dd>' + (T.rSTpc ? '<dt>PIS/COFINS por ST (segregar)</dt><dd>' + m0(T.rSTpc) + '</dd>' : '') +
+      '<dt>Alíquota zero da cesta básica (tributada normalmente no DAS)</dt><dd>' + m0(T.rZero) + '</dd><dt>Receita sem segregação de PIS/COFINS</dt><dd>' + m0(recT - recSeg) + '</dd><dt>ICMS destacado nas vendas</dt><dd>' + m0(T.icmsD) + '</dd></dl></div>';
+  } else {
   h += kpi('ICMS', I.doc, T.icmsD, T.icmsC, (T.icmsUso || T.ciap) ? '<dt>Uso, insumo e ativo (sem crédito)</dt><dd>' + m0(T.icmsUso + T.ciap) + '</dd>' : '');
   h += kpi('PIS', I.pct, T.pisD, T.pisC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.pisDest) + '</dd>');
   h += kpi('COFINS', I.pct, T.cofD, T.cofC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.cofDest) + '</dd>');
+  }
   h += '<div class="card kpi' + (erros.length ? ' alert' : '') + '"><div class="lbl"><span class="badge">' + I.alert + '</span>Pendências</div><div><div class="big num">' + erros.length + '</div><div class="state">' + (erros.length === 1 ? 'erro' : 'erros') + ' · ' + alertas.length + ' ' + (alertas.length === 1 ? 'alerta' : 'alertas') + '</div></div>' +
     '<dl class="num"><dt>Erros de ICMS</dt><dd' + (eI ? ' class="errtxt"' : '') + '>' + eI + '</dd><dt>Erros de PIS/COFINS</dt><dd' + (eP ? ' class="errtxt"' : '') + '>' + eP + '</dd>' + (eS ? '<dt>Erros de ISS</dt><dd class="errtxt">' + eS + '</dd>' : '') + '<dt>Impacto estimado</dt><dd>' + m0(impacto) + '</dd></dl></div>';
   h += '</div>';
@@ -490,7 +505,8 @@ function tabApuracao(ds, T) {
 /* ---------- classificação fiscal por NCM ---------- */
 var UFS = ['SP', 'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'TO'];
 var REGIMES = [['real', 'Lucro Real'], ['presumido', 'Lucro Presumido'], ['simples', 'Simples Nacional']];
-function regimeEmp() { var r = S.emp && ls('regime:' + S.emp.meta.cnpj); return r || 'real'; }
+function regimeEmp() { return (S.emp && S.emp.meta.regime) || 'real'; }
+var SEGMENTOS = [['autopecas', 'Pneus e autopeças'], ['varejo', 'Varejo de alimentos (mercadinho)'], ['outros', 'Outros (comércio em geral)']];
 function monoEmp() {
   if (!S._monoFn || S._monoFnDe !== S.emp) { var f = F.makeMono(cfgAtual().mono); S._monoFn = function (n) { return f(n) === 'mono'; }; S._monoFnDe = S.emp; }
   return S._monoFn;
@@ -565,11 +581,11 @@ function tabClassif(ds) {
     '<div class="field" style="max-width:130px"><label for="cqCest">CEST (opcional)</label><input id="cqCest" inputmode="numeric" maxlength="9" value="' + esc(q.cest) + '"></div>' +
     '<div class="field" style="max-width:200px"><label for="cqDest">Para quem vende</label><select id="cqDest"><option value="cf"' + (q.destino === 'cf' ? ' selected' : '') + '>Consumidor final</option><option value="revenda"' + (q.destino === 'revenda' ? ' selected' : '') + '>Empresa (revenda ou uso)</option></select></div>' +
     '<div class="field" style="max-width:110px"><label for="cqUf">UF de destino</label><select id="cqUf">' + UFS.map(function (u) { return '<option' + (q.uf === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select></div>' +
-    '<div class="field" style="max-width:190px"><label for="cqReg">Regime da empresa</label><select id="cqReg">' + REGIMES.map(function (r) { return '<option value="' + r[0] + '"' + (regimeEmp() === r[0] ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field" style="max-width:190px"><label for="cqReg">Regime da empresa</label><select id="cqReg">' + REGIMES.map(function (r) { return '<option value="' + r[0] + '"' + ((q.regime || regimeEmp()) === r[0] ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('') + '</select></div>' +
     '<label class="check"><input type="checkbox" id="cqContrib"' + (q.contrib ? ' checked' : '') + '> Comprador é contribuinte do ICMS</label>' +
     '<label class="check"><input type="checkbox" id="cqImp"' + (q.importado ? ' checked' : '') + '> Mercadoria importada</label>' +
     '<button class="btn primary" type="submit">Consultar</button></div>';
-  if (q.ncm) h += resultadoClassif(Regras.classificar({ ncm: q.ncm, cest: q.cest, destino: q.destino, uf: q.uf, contribuinte: q.contrib, regime: regimeEmp(), importado: q.importado, mono: monoEmp() }));
+  if (q.ncm) h += resultadoClassif(Regras.classificar({ ncm: q.ncm, cest: q.cest, destino: q.destino, uf: q.uf, contribuinte: q.contrib, regime: q.regime || regimeEmp(), importado: q.importado, mono: monoEmp() }));
   h += '</form>';
 
   var lista = produtosClassif(ds);
@@ -651,8 +667,8 @@ function tabComparativo(ds, T) {
   return h;
 }
 
-var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS em monofásico', MONO_CST: 'CST monofásico', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', MONO_COND: 'Monofásico condicionado', CFOP_ST: 'CFOP de ST com ICMS normal', CFOP_FORN: 'CFOP de ST na nota do fornecedor', ICMS_ZERO_FORN: 'Tributado sem ICMS destacado', ST_INTER60_FORN: 'Interestadual sem ICMS após a ST', DUP_NF: 'Possível nota duplicada', PROD_PEND: 'Produto sem classificação', CTE_CALC: 'Cálculo do ICMS do frete', CTE_ALIQ: 'Alíquota do frete', CTE_SP: 'Alíquota do frete em SP', CTE_ST: 'Frete com ST', CTE_MONO: 'Frete de monofásico', CTE_SEM_NF: 'Frete sem a nota da compra', ISS_ALIQ: 'Alíquota do ISS', ISS_CALC: 'Cálculo do ISS', NFSE_PIS: 'PIS/COFINS do serviço', NFSE_CST: 'CST do serviço', SERV_PEND: 'Serviço sem classificação', ISS_RET: 'ISS retido a recolher', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL' };
-var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', MONO_COND: 'pc', CFOP_ST: 'icms', CFOP_FORN: 'icms', ICMS_ZERO_FORN: 'icms', ST_INTER60_FORN: 'icms', DUP_NF: 'ambos', PROD_PEND: 'ambos', CTE_CALC: 'icms', CTE_ALIQ: 'icms', CTE_SP: 'icms', CTE_ST: 'icms', CTE_MONO: 'pc', CTE_SEM_NF: 'pc', ISS_ALIQ: 'iss', ISS_CALC: 'iss', NFSE_PIS: 'pc', NFSE_CST: 'pc', SERV_PEND: 'pc', ISS_RET: 'iss' };
+var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS indevido na revenda', MONO_CST: 'CST monofásico', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', MONO_COND: 'Monofásico condicionado', CFOP_ST: 'CFOP de ST com ICMS normal', CFOP_FORN: 'CFOP de ST na nota do fornecedor', ICMS_ZERO_FORN: 'Tributado sem ICMS destacado', ST_INTER60_FORN: 'Interestadual sem ICMS após a ST', DUP_NF: 'Possível nota duplicada', PROD_PEND: 'Produto sem classificação', CTE_CALC: 'Cálculo do ICMS do frete', CTE_ALIQ: 'Alíquota do frete', CTE_SP: 'Alíquota do frete em SP', CTE_ST: 'Frete com ST', CTE_MONO: 'Frete de monofásico', CTE_SEM_NF: 'Frete sem a nota da compra', ISS_ALIQ: 'Alíquota do ISS', ISS_CALC: 'Cálculo do ISS', NFSE_PIS: 'PIS/COFINS do serviço', NFSE_CST: 'CST do serviço', SERV_PEND: 'Serviço sem classificação', ISS_RET: 'ISS retido a recolher', MONO_SN: 'Segregação no PGDAS-D', CAD_ICMS: 'ICMS do cadastro do produto', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL' };
+var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', MONO_COND: 'pc', CFOP_ST: 'icms', CFOP_FORN: 'icms', ICMS_ZERO_FORN: 'icms', ST_INTER60_FORN: 'icms', DUP_NF: 'ambos', PROD_PEND: 'ambos', CTE_CALC: 'icms', CTE_ALIQ: 'icms', CTE_SP: 'icms', CTE_ST: 'icms', CTE_MONO: 'pc', CTE_SEM_NF: 'pc', ISS_ALIQ: 'iss', ISS_CALC: 'iss', NFSE_PIS: 'pc', NFSE_CST: 'pc', SERV_PEND: 'pc', ISS_RET: 'iss', CAD_ICMS: 'icms', MONO_SN: 'pc' };
 var IMP_LBL = { icms: 'ICMS', pc: 'PIS/COFINS', iss: 'ISS', ambos: 'ICMS e PIS/COFINS' };
 function impDe(p) { return COD_IMP[p.cod] || 'ambos'; }
 function impOk(p) { var i = impDe(p); return S.fImp === 'todos' || i === S.fImp || i === 'ambos'; }
@@ -1194,12 +1210,18 @@ document.addEventListener('click', function (ev) {
   else if (a === 'irProdutos') { S.tab = 'produtos'; S.fProd = 'pendente'; renderMain(); }
   else if (a === 'aplicarMono') {
     var lista = $('mono').value.split(/\n+/).map(function (s) { return s.trim().replace(/\s+/g, ' '); }).filter(function (s) { return /^\d/.test(s); });
-    var stl = $('stl').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean);
-    var corte = $('corte').value || '2026-10-01';
+    var stl = $('stl') ? $('stl').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean) : S.emp.meta.st;
+    var corte = $('corte') ? $('corte').value || '2026-10-01' : S.emp.meta.corte;
     S.emp.meta.mono = lista; S.emp.meta.st = stl; S.emp.meta.corte = corte; recalcular(); render();
     var msg = (lista.length && stl.length) ? 'Análise recalculada.' : 'Lista vazia: a análise usa a lista padrão.';
     if (S.exemplo) { toast(msg); return; }
     B.salvarEmpresa(S.emp.id, { ncm_monofasico: lista, ncm_st: stl, corte_st: corte }).then(function () { toast(msg + ' Salvo.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
+  }
+  else if (a === 'salvarSeg') {
+    var sg = $('segm').value, rg = $('regm').value;
+    S.emp.meta.segmento = sg; S.emp.meta.regime = rg; S._cls = {}; S.cq = null; recalcular(); render();
+    if (S.exemplo) { toast('Análise recalculada.'); return; }
+    B.salvarEmpresa(S.emp.id, { segmento: sg, regime: rg }).then(function () { toast('Segmento e regime salvos. Análise recalculada.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }
   else if (a === 'apagar') { S.confirmDel = true; renderOffice(); }
   else if (a === 'apagarNao') { S.confirmDel = false; renderOffice(); }
@@ -1209,8 +1231,7 @@ document.addEventListener('submit', async function (ev) {
   ev.preventDefault();
   var f = ev.target;
   if (f.id === 'fClassif') {
-    var reg = $('cqReg').value; if (S.emp) ls('regime:' + S.emp.meta.cnpj, reg); S._cls = {};
-    S.cq = { ncm: $('cqNcm').value.replace(/\D/g, ''), cest: $('cqCest').value.replace(/\D/g, ''), destino: $('cqDest').value, uf: $('cqUf').value, contrib: $('cqContrib').checked, importado: $('cqImp').checked };
+    S.cq = { regime: $('cqReg').value, ncm: $('cqNcm').value.replace(/\D/g, ''), cest: $('cqCest').value.replace(/\D/g, ''), destino: $('cqDest').value, uf: $('cqUf').value, contrib: $('cqContrib').checked, importado: $('cqImp').checked };
     renderMain(); return;
   }
   if (f.id === 'fLogin') {

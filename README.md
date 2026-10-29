@@ -67,6 +67,23 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
 
+## Segmento e regime da empresa
+
+Na área do escritório, cada empresa tem um **segmento** e um **regime tributário** (colunas `segmento` e `regime` da tabela `empresas`). Empresas novas entram como pneus e autopeças, no Lucro Real.
+
+| Segmento | PIS/COFINS na apuração | Auditoria de ICMS das vendas |
+|---|---|---|
+| Pneus e autopeças | Lista de monofásicos da empresa (Lei 10.485/2002) | Saída da ST em 01/10/2026 (lista de NCM e data de corte) |
+| Varejo de alimentos e Outros | Regras da Classificação fiscal (monofásico, alíquota zero, ST) mais a lista da empresa | Cada produto vendido em SP é comparado com o ICMS esperado (ST, isento, carga de 7%, alíquota); divergências viram a pendência "ICMS do cadastro do produto" |
+
+No varejo, produtos comprados entram como revenda e compras com ST (CST 10, 60 ou 70) não geram crédito de ICMS.
+
+| Regime | Efeito |
+|---|---|
+| Lucro Real | PIS 1,65% e COFINS 7,6% não cumulativos, com créditos. |
+| Lucro Presumido | PIS 0,65% e COFINS 3% cumulativos, sem créditos. |
+| Simples Nacional | Sem débito e crédito. O painel mostra a receita separada para o PGDAS-D (ICMS-ST, PIS/COFINS monofásico ou ST, alíquota zero) e alerta produto monofásico vendido sem CST 04. |
+
 ## Classificação fiscal
 
 A aba **Classificação fiscal** mostra, por NCM, o tratamento de PIS/COFINS, ICMS, ICMS-ST, IPI e CBS/IBS na revenda pelo comércio em SP, com a base legal de cada um. As regras ficam em `js/regras.js` e foram revisadas em out/2026:
