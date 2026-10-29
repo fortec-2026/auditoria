@@ -97,6 +97,10 @@ A aba tem uma consulta por NCM (com destino, tipo de comprador e regime) e a lis
 
 As regras são orientação e devem ser revisadas pelo escritório, principalmente as datas de vigência (benefícios de SP até 31/12/2026) e as listas de ST, que mudam com frequência.
 
+## Semanas
+
+As semanas vão de segunda a domingo, mas são cortadas na virada do mês: a semana de 28/09 a 04/10 vira "Semana 5 de setembro" (28/09 a 30/09) e "Semana 1 de outubro" (01/10 a 04/10). Assim a soma das semanas de um mês é sempre igual ao total do mês.
+
 ## Antes × depois
 
 A aba **Antes × depois** compara duas apurações do período: como as notas foram emitidas e como fica depois de corrigir as pendências. Dá para corrigir só os erros ou erros e alertas. Pendências "Conferida, sem ação" ficam como estão. Uma tabela mostra quanto cada tipo de ocorrência muda o ICMS, o PIS e a COFINS. Pendências que não mudam valores (CFOP, classificação, ST retida pelo fornecedor, duplicidade) são contadas à parte. O Excel traz a mesma comparação na aba "Antes x depois".

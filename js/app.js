@@ -327,7 +327,7 @@ function renderOffice() {
 function semanaCard(w) {
   var t = F.somaDias(S.res.dias, w.dias), n = docs(t);
   var pend = S.res.pend.filter(function (p) { return w.dias.indexOf(p.dt) >= 0 && p.sev !== 'info' && !resolvida(p.ch); }).length;
-  return '<button type="button" class="pcard" data-per="w:' + w.ini + '" aria-pressed="' + (S.periodo === 'w:' + w.ini) + '"><span class="t">Semana ' + w.num + '</span><span class="d num">' + br(w.ini) + ' a ' + br(w.fim) + '</span><span class="m">' + n + ' docs' + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
+  return '<button type="button" class="pcard" data-per="w:' + w.ini + '" aria-pressed="' + (S.periodo === 'w:' + w.ini) + '"><span class="t">Semana ' + w.num + '</span><span class="d num">' + br(w.ini) + ' a ' + br(w.fim) + '</span><span class="m">' + n + (n === 1 ? ' doc' : ' docs') + (pend ? ' · <span class="dot"></span>' + pend + ' pend.' : '') + '</span></button>';
 }
 function mesCard(m) {
   var t = F.somaDias(S.res.dias, m.dias);

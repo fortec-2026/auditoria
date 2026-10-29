@@ -699,20 +699,20 @@ var Fiscal = (function () {
   function periodos(dias) {
     var ds = Object.keys(dias).sort();
     var semanas = {}, meses = {};
+    // semanas de segunda a domingo, cortadas na virada do mês: cada semana pertence a um mês só
     ds.forEach(function (d) {
-      var seg = mondayOf(d);
-      if (!semanas[seg]) semanas[seg] = { ini: seg, fim: addDays(seg, 6), mes: seg.slice(0, 7), dias: [] };
-      semanas[seg].dias.push(d);
+      var m0 = d.slice(0, 7), primeiro = m0 + '-01', seg = mondayOf(d), dom = addDays(seg, 6);
+      var ultimo = addDays(addDays(primeiro, 32).slice(0, 7) + '-01', -1);
+      var ini = seg < primeiro ? primeiro : seg, fim = dom > ultimo ? ultimo : dom;
+      if (!semanas[ini]) {
+        var offset = (parseISO(primeiro).getUTCDay() + 6) % 7;
+        semanas[ini] = { ini: ini, fim: fim, mes: m0, dias: [], num: Math.floor((+ini.slice(8) - 1 + offset) / 7) + 1 };
+      }
+      semanas[ini].dias.push(d);
       var m = d.slice(0, 7);
       if (!meses[m]) meses[m] = { mes: m, dias: [] };
       meses[m].dias.push(d);
     });
-    var porMes = {};
-    Object.keys(semanas).sort().forEach(function (k) {
-      var w = semanas[k];
-      (porMes[w.mes] = porMes[w.mes] || []).push(w);
-    });
-    Object.keys(porMes).forEach(function (m) { porMes[m].forEach(function (w, i) { w.num = i + 1; }); });
     return { semanas: Object.keys(semanas).sort().reverse().map(function (k) { return semanas[k]; }),
       meses: Object.keys(meses).sort().reverse().map(function (k) { return meses[k]; }) };
   }
