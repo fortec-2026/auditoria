@@ -382,13 +382,14 @@ function renderMain() {
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
   var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
-    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['reforma', 'IBS/CBS 2026', '']];
+    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['reforma', 'IBS/CBS 2026', '']];
   h += '<div class="card painel-abas"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
   if (S.tab === 'apuracao') h += tabApuracao(ds, T);
   else if (S.tab === 'comparativo') h += tabComparativo(ds, T);
   else if (S.tab === 'pendencias') h += tabPendencias(pendTodas);
   else if (S.tab === 'notas') h += tabNotas(notasF);
   else if (S.tab === 'produtos') h += tabProdutos();
+  else if (S.tab === 'classif') h += tabClassif(ds);
   else if (S.tab === 'servicos') h += tabServicos(ds, T);
   else h += tabReforma(ds, T);
   h += '</div></div>';
@@ -483,6 +484,120 @@ function tabApuracao(ds, T) {
   });
   h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut + T.compIns) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
   h += '<p class="note">PIS e COFINS apurados pela regra (1,65% e 7,6% sobre a receita sem ICMS), não pelo valor destacado nas notas. Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
+  return h;
+}
+
+/* ---------- classificação fiscal por NCM ---------- */
+var UFS = ['SP', 'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'TO'];
+var REGIMES = [['real', 'Lucro Real'], ['presumido', 'Lucro Presumido'], ['simples', 'Simples Nacional']];
+function regimeEmp() { var r = S.emp && ls('regime:' + S.emp.meta.cnpj); return r || 'real'; }
+function monoEmp() {
+  if (!S._monoFn || S._monoFnDe !== S.emp) { var f = F.makeMono(cfgAtual().mono); S._monoFn = function (n) { return f(n) === 'mono'; }; S._monoFnDe = S.emp; }
+  return S._monoFn;
+}
+function classifDe(ncm, cest, destino, uf, contrib, importado) {
+  S._cls = S._cls || {}; var k = [ncm, cest, destino, uf, contrib, importado, regimeEmp()].join('|');
+  if (!S._cls[k]) S._cls[k] = Regras.classificar({ ncm: ncm, cest: cest, destino: destino, uf: uf, contribuinte: contrib, regime: regimeEmp(), importado: importado, mono: monoEmp() });
+  return S._cls[k];
+}
+function blocoClassif(nome, b, extra) {
+  var r = b.regra;
+  return '<div class="bloco cls"><div class="eyebrow">' + nome + '</div><b>' + esc(b.titulo) + '</b>' + (b.cst ? '<div class="small">CST/CSOSN ' + esc(b.cst) + (b.cClassTrib ? ' · cClassTrib ' + esc(b.cClassTrib) : '') + '</div>' : '') +
+    '<div class="small" style="color:var(--ink)">' + esc(b.texto || '') + '</div>' + (extra || '') +
+    (r ? '<div class="small"><b>' + esc(r.d) + '.</b> ' + esc(r.l) + (r.n ? '. ' + esc(r.n) : '') + '</div>' : '') +
+    (b.cond ? '<span><span class="pill alerta">Conferir a descrição do produto</span></span>' : '') + '</div>';
+}
+function resultadoClassif(c) {
+  if (c.erro) return '<p class="note">' + esc(c.erro) + '</p>';
+  var stTxt = c.st.st === 'sim' ? '<b>Sujeito à ST em SP</b>' : c.st.st === 'cest' ? '<b>Depende do CEST</b>' : '<b>Fora da ST em SP</b>' + (c.st.regra && c.st.regra.desde ? ' desde ' + esc(c.st.regra.desde) : '');
+  var stB = '<div class="bloco cls"><div class="eyebrow">ICMS-ST</div>' + stTxt + (c.st.regra ? '<div class="small"><b>' + esc(c.st.regra.d) + '.</b> ' + esc(c.st.regra.l) + (c.st.regra.n ? '. ' + esc(c.st.regra.n) : '') + '</div>' : '<div class="small">NCM fora dos segmentos de ST de SP. Confira se o fornecedor informa CEST.</div>') + '</div>';
+  return '<div class="blocos">' + blocoClassif('PIS/COFINS', c.pc) + blocoClassif('ICMS', c.icms) + stB + blocoClassif('IPI', c.ipi) + blocoClassif('CBS/IBS', c.cbs) + '</div>';
+}
+var CST_ICMS_GRUPO = function (c) { c = String(c || ''); if (c.length === 3) return { '101': 'trib', '102': 'trib', '103': 'isento', '300': 'isento', '400': 'isento', '500': 'st', '900': 'trib', '201': 'st', '202': 'st', '203': 'st' }[c] || c; return { '00': 'trib', '20': 'red', '40': 'isento', '41': 'isento', '50': 'isento', '60': 'st', '10': 'st', '70': 'st', '30': 'st', '51': 'trib', '90': 'trib' }[c] || c; };
+function esperadoIcms(c) { return c.icms.cst === '60' || c.icms.cst === '500' ? 'st' : c.icms.cst === '40' || c.icms.cst === '103' ? 'isento' : c.icms.cst === '20' ? 'red' : 'trib'; }
+function produtosClassif(ds) {
+  var mapa = {}, regime = regimeEmp();
+  S.res.notas.forEach(function (r) {
+    if (ds.indexOf(r.dt) < 0 || (r.tipo && r.tipo !== 'nfe')) return;
+    var n = notaPorChave(r.ch); if (!n || !n.it) return;
+    var venda = r.dir === 'S' && r.proprio, compra = r.dir === 'E' && !r.proprio;
+    if (!venda && !compra) return;
+    n.it.forEach(function (it) {
+      var nat = F.natureza(it.cf); if (venda && nat !== 'venda') return; if (compra && nat !== 'venda') return;
+      var k = venda ? 'V|' + (it.cp || it.x) + '|' + it.ncm : 'C|' + it.ncm + '|' + (it.x || '').slice(0, 30).toUpperCase();
+      var g = mapa[k] || (mapa[k] = { k: k, venda: venda, x: it.x, cp: it.cp, ncm: it.ncm, cest: it.cest, n: 0, v: 0, cP: {}, cI: {}, carga: {}, div: [], cf: 0, uf: {}, forn: venda ? '' : r.parte.n });
+      g.n++; g.v += it.vp - it.vd; if (it.cest && !g.cest) g.cest = it.cest;
+      if (!venda) return;
+      var cf = n.mod === '65' || n.dIE === '9', uf = n.dUF || 'SP', contrib = n.dIE === '1';
+      if (cf) g.cf++;
+      g.uf[uf] = 1;
+      var c = classifDe(it.ncm, it.cest, cf ? 'cf' : 'revenda', uf, contrib, ['1', '2', '3', '8'].indexOf(String(it.o)) >= 0);
+      if (c.erro) return;
+      g.cP[it.cP || '–'] = 1; g.cI[it.cst || '–'] = 1;
+      var base = it.vp - it.vd, carga = base > 0 ? Math.round(it.v / base * 1000) / 10 : 0; g.carga[carga] = 1;
+      if (!g.c) g.c = c;
+      // PIS/COFINS
+      if (regime !== 'simples') {
+        var esp = c.pc.cst, zeroE = esp === '04' || esp === '05' || esp === '06', zeroN = ['04', '05', '06', '07', '08', '09'].indexOf(it.cP) >= 0;
+        if (zeroE !== zeroN && !c.pc.cond) g.div.push('pc');
+      }
+      // ICMS
+      var ge = esperadoIcms(c), gn = CST_ICMS_GRUPO(it.cst);
+      var desde = c.st.regra && c.st.regra.desde ? c.st.regra.desde.split('/').reverse().join('-') : '';
+      if (desde && r.dt < desde) { if (gn !== 'st') g.div.push('icms'); return; } // antes da saída da ST, o certo era ST
+      if (!c.icms.cond && !(c.st.st === 'cest')) {
+        if (ge !== gn) { if (!(ge === 'red' && gn === 'trib' && Math.abs(carga - 7) < 0.6)) g.div.push('icms'); }
+        else if ((ge === 'trib' || ge === 'red') && c.icms.carga && carga && Math.abs(carga - c.icms.carga) > 0.6 && !(c.st.st === 'nao' && false)) g.div.push('icms');
+      }
+    });
+  });
+  return Object.values(mapa).map(function (g) {
+    if (!g.c) g.c = classifDe(g.ncm, g.cest, 'cf', 'SP', false, false);
+    g.div = g.div.filter(function (d, i, a) { return a.indexOf(d) === i; });
+    return g;
+  });
+}
+function tabClassif(ds) {
+  var q = S.cq || { ncm: '', cest: '', destino: 'cf', uf: 'SP', contrib: false, importado: false };
+  var h = '<p class="note">Classificação de PIS/COFINS, ICMS, ICMS-ST, IPI e CBS/IBS por NCM, para revenda pelo comércio em SP. As regras foram revisadas em ' + Regras.REVISAO + ' pela legislação federal (Leis 10.147/2000, 10.865/2004, 10.925/2004, 13.097/2015 e LC 214/2025) e pelo RICMS/SP. É orientação: casos marcados com "Conferir" dependem da descrição do produto.</p>';
+  h += '<form id="fClassif" class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px"><h3>Consultar um NCM</h3><div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end">' +
+    '<div class="field" style="max-width:150px"><label for="cqNcm">NCM</label><input id="cqNcm" inputmode="numeric" maxlength="10" placeholder="0000.00.00" value="' + esc(q.ncm) + '" required></div>' +
+    '<div class="field" style="max-width:130px"><label for="cqCest">CEST (opcional)</label><input id="cqCest" inputmode="numeric" maxlength="9" value="' + esc(q.cest) + '"></div>' +
+    '<div class="field" style="max-width:200px"><label for="cqDest">Para quem vende</label><select id="cqDest"><option value="cf"' + (q.destino === 'cf' ? ' selected' : '') + '>Consumidor final</option><option value="revenda"' + (q.destino === 'revenda' ? ' selected' : '') + '>Empresa (revenda ou uso)</option></select></div>' +
+    '<div class="field" style="max-width:110px"><label for="cqUf">UF de destino</label><select id="cqUf">' + UFS.map(function (u) { return '<option' + (q.uf === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field" style="max-width:190px"><label for="cqReg">Regime da empresa</label><select id="cqReg">' + REGIMES.map(function (r) { return '<option value="' + r[0] + '"' + (regimeEmp() === r[0] ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('') + '</select></div>' +
+    '<label class="check"><input type="checkbox" id="cqContrib"' + (q.contrib ? ' checked' : '') + '> Comprador é contribuinte do ICMS</label>' +
+    '<label class="check"><input type="checkbox" id="cqImp"' + (q.importado ? ' checked' : '') + '> Mercadoria importada</label>' +
+    '<button class="btn primary" type="submit">Consultar</button></div>';
+  if (q.ncm) h += resultadoClassif(Regras.classificar({ ncm: q.ncm, cest: q.cest, destino: q.destino, uf: q.uf, contribuinte: q.contrib, regime: regimeEmp(), importado: q.importado, mono: monoEmp() }));
+  h += '</form>';
+
+  var lista = produtosClassif(ds);
+  var vend = lista.filter(function (g) { return g.venda; }), comp = lista.filter(function (g) { return !g.venda; });
+  var fonte = S.fCls || 'venda', fdiv = S.fClsDiv || 'todos';
+  var base = fonte === 'venda' ? vend : comp;
+  var cnt = { todos: base.length, div: base.filter(function (g) { return g.div.length; }).length, conf: base.filter(function (g) { return g.c.pc.cond || g.c.icms.cond || g.c.cbs.cond || g.c.st.st === 'cest'; }).length };
+  var f = base.filter(function (g) { return (fdiv === 'todos' || (fdiv === 'div' ? g.div.length : (g.c.pc.cond || g.c.icms.cond || g.c.cbs.cond || g.c.st.st === 'cest'))) && bate(S.q, [g.x, g.cp, g.ncm, g.cest, g.forn]); });
+  f.sort(function (a, b) { return b.div.length - a.div.length || b.v - a.v; });
+  h += '<div><h3>Produtos da empresa no período</h3><p class="note" style="margin-top:4px">' + (fonte === 'venda' ? 'Como a empresa configurou cada produto nas notas de venda (CST e alíquota que saíram nas NF-e e NFC-e), comparado com a classificação esperada. Divergência indica cadastro a corrigir no sistema emissor.' : 'Produtos comprados, com a classificação que deveriam ter na revenda a consumidor final em SP.') + '</p></div>';
+  h += '<div class="toolbar"><div class="chips" role="group" aria-label="Origem">' + [['venda', 'Vendidos (' + vend.length + ')'], ['compra', 'Comprados (' + comp.length + ')']].map(function (c) { return '<button type="button" class="chip" data-fcls="' + c[0] + '" aria-pressed="' + (fonte === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="chips" role="group" aria-label="Filtro">' + [['todos', 'Todos (' + cnt.todos + ')'], ['div', 'Com divergência (' + cnt.div + ')'], ['conf', 'A conferir (' + cnt.conf + ')']].filter(function (c) { return fonte === 'venda' || c[0] !== 'div'; }).map(function (c) { return '<button type="button" class="chip" data-fclsdiv="' + c[0] + '" aria-pressed="' + (fdiv === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div></div>';
+  if (!f.length) return h + '<div class="empty"><p class="note">Nenhum produto neste filtro.</p></div>';
+  h += '<div class="tscroll"><table><thead><tr><th>Produto</th><th>NCM / CEST</th><th class="r">Valor</th><th>PIS/COFINS</th><th>ICMS</th><th>ST em SP</th><th>CBS/IBS</th>' + (fonte === 'venda' ? '<th>Situação</th>' : '') + '</tr></thead><tbody>';
+  f.slice(0, S.imprimindo ? 1e9 : 400).forEach(function (g) {
+    var c = g.c, dP = g.div.indexOf('pc') >= 0, dI = g.div.indexOf('icms') >= 0;
+    var nota = function (obj) { return Object.keys(obj).join(', '); };
+    h += '<tr><td>' + esc(g.x) + '<div class="small">' + (g.venda ? 'Cód. ' + esc(g.cp || '–') : esc(g.forn)) + '</div></td><td class="mono" style="white-space:nowrap"><button type="button" class="link" data-cncm="' + esc(g.ncm) + '" data-ccest="' + esc(g.cest || '') + '">' + esc(g.ncm) + '</button>' + (g.cest ? '<div class="small">' + esc(g.cest) + '</div>' : '') + '</td>' +
+      '<td class="r num">' + m0(g.v) + '<div class="small">' + g.n + (g.n === 1 ? ' item' : ' itens') + '</div></td>' +
+      '<td' + (dP ? ' class="errcell"' : '') + '><b>CST ' + esc(c.pc.cst) + '</b><div class="small">' + esc({ mono: 'Monofásico', st: 'ST', zero: 'Alíquota zero', normal: 'Tributado' }[c.pc.trat]) + '</div>' + (g.venda ? '<div class="small">Na nota: ' + esc(nota(g.cP)) + '</div>' : '') + '</td>' +
+      '<td' + (dI ? ' class="errcell"' : '') + '><b>' + esc(c.icms.titulo.replace('Substituição tributária: ICMS já recolhido na compra', 'ST (CST 60)')) + '</b>' + (g.venda ? '<div class="small">Na nota: CST ' + esc(nota(g.cI)) + ' · ' + esc(Object.keys(g.carga).map(function (x) { return String(x).replace('.', ',') + '%'; }).join(', ')) + '</div>' : '') + '</td>' +
+      '<td>' + (c.st.st === 'sim' ? '<span class="pill alerta">Sim</span>' : c.st.st === 'cest' ? '<span class="pill info">Depende do CEST</span>' : '<span class="small">Não</span>') + '</td>' +
+      '<td>' + esc(c.cbs.titulo) + '<div class="small">cClassTrib ' + esc(c.cbs.cClassTrib) + '</div></td>' +
+      (g.venda ? '<td>' + (g.div.length ? '<span class="pill erro">Divergente</span>' : (c.pc.cond || c.icms.cond || c.st.st === 'cest') ? '<span class="pill alerta">Conferir</span>' : '<span class="pill ok">Confere</span>') + '</td>' : '') + '</tr>';
+  });
+  h += '</tbody></table></div>';
+  if (f.length > 400 && !S.imprimindo) h += '<p class="note">Mostrando 400 de ' + f.length + '. Use a busca ou baixe o Excel.</p>';
+  h += '<p class="note">Clique no NCM para ver a classificação completa com a base legal. A comparação considera o destino de cada nota (consumidor final, empresa, outro estado) e o regime escolhido acima.</p>';
   return h;
 }
 
@@ -842,6 +957,11 @@ async function baixarExcel() {
       c2.c.grupos.map(function (g) { return [(COD_TIT[g.cod] || g.cod) + ' (' + g.n + ')', g.icms, g.pis, g.cof]; }));
     abas.push({ nome: 'Antes x depois', titulo: tit, filtro: false, cols: [{ t: 'Item', w: 44 }, { t: 'Como as notas foram emitidas', w: 22, f: 'din' }, { t: 'Após as correções', w: 20, f: 'din' }, { t: 'Diferença', w: 16, f: 'din' }], rows: linhasCmp });
 
+    // Classificação fiscal
+    var cls = produtosClassif(ds).sort(function (a, b) { return (b.venda - a.venda) || b.div.length - a.div.length || b.v - a.v; });
+    abas.push({ nome: 'Classificação fiscal', titulo: tit + ' · regras revisadas em ' + Regras.REVISAO + ' · ' + (REGIMES.filter(function (r) { return r[0] === regimeEmp(); })[0] || [])[1], cols: [{ t: 'Origem', w: 10 }, { t: 'Produto', w: 40 }, { t: 'Código', w: 12 }, { t: 'NCM', w: 10 }, { t: 'CEST', w: 9 }, { t: 'Valor', w: 13, f: 'din' }, { t: 'PIS/COFINS esperado', w: 22 }, { t: 'CST PIS/COFINS esperado', w: 10 }, { t: 'CST PIS/COFINS na nota', w: 12 }, { t: 'ICMS esperado (SP, consumidor final)', w: 30 }, { t: 'CST ICMS na nota', w: 12 }, { t: 'Carga ICMS na nota', w: 12 }, { t: 'ST em SP', w: 14 }, { t: 'CBS/IBS', w: 16 }, { t: 'cClassTrib', w: 10 }, { t: 'Situação', w: 12 }, { t: 'Base legal PIS/COFINS', w: 40 }, { t: 'Base legal ICMS', w: 40 }, { t: 'Base legal CBS/IBS', w: 30 }],
+      rows: cls.map(function (g) { var c = g.c; return [g.venda ? 'Vendido' : 'Comprado', g.x, g.cp || '', g.ncm, g.cest || '', g.v, { mono: 'Monofásico', st: 'ST', zero: 'Alíquota zero', normal: 'Tributado' }[c.pc.trat], c.pc.cst, g.venda ? Object.keys(g.cP).join(', ') : '', c.icms.titulo, g.venda ? Object.keys(g.cI).join(', ') : '', g.venda ? Object.keys(g.carga).map(function (x) { return x + '%'; }).join(', ') : '', c.st.st === 'sim' ? 'Sim' : c.st.st === 'cest' ? 'Depende do CEST' : 'Não', c.cbs.titulo, c.cbs.cClassTrib, g.venda ? (g.div.length ? 'Divergente' : (c.pc.cond || c.icms.cond || c.st.st === 'cest') ? 'Conferir' : 'Confere') : '', c.pc.regra ? c.pc.regra.l : '', c.icms.regra ? c.icms.regra.l : 'RICMS/SP, art. 52, I (18%)', c.cbs.regra ? c.cbs.regra.l : '']; }) });
+
     // Notas
     var notas = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0; }).slice().sort(function (a, b) { return a.dt < b.dt ? -1 : a.dt > b.dt ? 1 : 0; });
     var tipoDoc = function (n) { return n.tipo === 'cte' ? 'CT-e' : n.tipo === 'nfse' ? 'NFS-e' : n.mod === '65' ? 'NFC-e' : 'NF-e'; };
@@ -1036,6 +1156,9 @@ document.addEventListener('click', function (ev) {
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
   if (d.cmpal) { S.cmpAlertas = d.cmpal === 'true'; renderMain(); return; }
+  if (d.fcls) { S.fCls = d.fcls; if (d.fcls === 'compra' && S.fClsDiv === 'div') S.fClsDiv = 'todos'; renderMain(); return; }
+  if (d.fclsdiv) { S.fClsDiv = d.fclsdiv; renderMain(); return; }
+  if (d.cncm !== undefined) { S.cq = Object.assign({ destino: 'cf', uf: 'SP', contrib: false, importado: false }, S.cq || {}, { ncm: d.cncm, cest: d.ccest || '' }); renderMain(); var fc = $('fClassif'); if (fc) fc.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (d.ac) { S.editAc = d.ac; renderMain(); var fe = $('fAcomp'); if (fe) fe.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
@@ -1085,6 +1208,11 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('submit', async function (ev) {
   ev.preventDefault();
   var f = ev.target;
+  if (f.id === 'fClassif') {
+    var reg = $('cqReg').value; if (S.emp) ls('regime:' + S.emp.meta.cnpj, reg); S._cls = {};
+    S.cq = { ncm: $('cqNcm').value.replace(/\D/g, ''), cest: $('cqCest').value.replace(/\D/g, ''), destino: $('cqDest').value, uf: $('cqUf').value, contrib: $('cqContrib').checked, importado: $('cqImp').checked };
+    renderMain(); return;
+  }
   if (f.id === 'fLogin') {
     var email = $('email').value.trim(), senha = $('senha') ? $('senha').value : '';
     S.emailDigitado = email;

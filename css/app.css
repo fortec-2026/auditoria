@@ -235,3 +235,5 @@ table.cmp tr.tot td{border-bottom:2px solid var(--line);background:var(--surface
   .painel-abas th, .painel-abas td{padding-left:7px;padding-right:7px}
 }
 @media print{ .painel-abas{display:block} .painel-abas .tabs{border-right:0;position:static} }
+td.errcell{background:var(--err-bg)}
+.bloco.cls b{font-size:14px}

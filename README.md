@@ -67,6 +67,19 @@ A estrutura do banco está registrada nas migrations do projeto no Supabase (`po
 
 Eventos de cancelamento de NF-e, CT-e e NFS-e retiram o documento da apuração.
 
+## Classificação fiscal
+
+A aba **Classificação fiscal** mostra, por NCM, o tratamento de PIS/COFINS, ICMS, ICMS-ST, IPI e CBS/IBS na revenda pelo comércio em SP, com a base legal de cada um. As regras ficam em `js/regras.js` e foram revisadas em out/2026:
+
+- **PIS/COFINS:** monofásicos (Lei 13.097/2015, bebidas frias; Lei 10.147/2000, farmacêuticos e higiene; Lei 10.485/2002, autopeças e pneus, pela lista da empresa), ST de cigarros e alíquota zero (Lei 10.925/2004, art. 1º; Lei 10.865/2004, art. 28).
+- **ICMS/SP:** isenções (hortifrutigranjeiros, ovos, arroz e feijão para consumidor final), cesta básica com carga de 7% (Anexo II, art. 3º), alíquotas de 12%, 20%, 25% e 30% e o adicional do FECOEP.
+- **ICMS-ST em SP:** segmentos que continuam na ST (bebidas do Anexo III, cigarros, parte dos alimentícios conforme o CEST, materiais de construção) e os que saíram em 2026.
+- **CBS/IBS:** Cesta Básica Nacional (Anexo I), hortícolas, frutas e ovos (Anexo XV), alimentos com redução de 60% (Anexo VII) e higiene e limpeza (Anexo VIII) da LC 214/2025.
+
+A aba tem uma consulta por NCM (com destino, tipo de comprador e regime) e a lista dos produtos vendidos e comprados no período. Nos vendidos, compara o CST e a carga de ICMS que saíram nas notas com o esperado e marca **Divergente**, **Conferir** (o benefício depende da descrição do produto) ou **Confere**. O regime escolhido fica salvo por empresa no navegador. O Excel traz a aba "Classificação fiscal".
+
+As regras são orientação e devem ser revisadas pelo escritório, principalmente as datas de vigência (benefícios de SP até 31/12/2026) e as listas de ST, que mudam com frequência.
+
 ## Antes × depois
 
 A aba **Antes × depois** compara duas apurações do período: como as notas foram emitidas e como fica depois de corrigir as pendências. Dá para corrigir só os erros ou erros e alertas. Pendências "Conferida, sem ação" ficam como estão. Uma tabela mostra quanto cada tipo de ocorrência muda o ICMS, o PIS e a COFINS. Pendências que não mudam valores (CFOP, classificação, ST retida pelo fornecedor, duplicidade) são contadas à parte. O Excel traz a mesma comparação na aba "Antes x depois".

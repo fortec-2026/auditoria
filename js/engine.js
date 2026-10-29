@@ -123,7 +123,7 @@ var Fiscal = (function () {
       var icms = firstElementChild(icmsWrap);
       var pis = firstElementChild(first(imp, 'PIS'));
       var cof = firstElementChild(first(imp, 'COFINS'));
-      var ipi = first(imp, 'IPI');
+      var ipi = first(imp, 'IPI'), ibscbs = first(imp, 'IBSCBS');
       if (first(imp, 'ICMSUFDest')) difal = true;
       var cst = icms ? (txt(icms, 'CST') || txt(icms, 'CSOSN')) : '';
       nota.it.push({
@@ -146,6 +146,7 @@ var Fiscal = (function () {
         cC: cof ? txt(cof, 'CST') : '',
         vC: num(txt(cof, 'vCOFINS')),
         vIPI: ipi ? num(txt(ipi, 'vIPI')) : 0,
+        cIbs: ibscbs ? txt(ibscbs, 'CST') : '', ctIbs: ibscbs ? txt(ibscbs, 'cClassTrib') : '',
         vp: num(txt(prod, 'vProd')),
         vd: num(txt(prod, 'vDesc')),
         vf: num(txt(prod, 'vFrete')) + num(txt(prod, 'vSeg')) + num(txt(prod, 'vOutro'))
@@ -681,7 +682,7 @@ var Fiscal = (function () {
   }
 
   return { parseDoc: parseDoc, analisar: analisar, periodos: periodos, somaDias: somaDias, emptyTot: emptyTot,
-    natureza: natureza, DEFAULT_MONO: DEFAULT_MONO, DEFAULT_ST: DEFAULT_ST, parseMono: parseMono,
+    natureza: natureza, DEFAULT_MONO: DEFAULT_MONO, DEFAULT_ST: DEFAULT_ST, parseMono: parseMono, makeMono: makeMono,
     money: money, chaveProduto: chaveProduto, mondayOf: mondayOf, addDays: addDays, r2: r2 };
 })();
 if (typeof module !== 'undefined') module.exports = Fiscal;
