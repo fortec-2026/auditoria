@@ -1,6 +1,6 @@
-# Portal Fiscal
+# RG Fiscal · Portal do cliente
 
-Apuração de ICMS, PIS e COFINS e auditoria de notas fiscais (NF-e e NFC-e) para empresas de pneus e autopeças em SP, no Lucro Real.
+Portal da **RG Fiscal (Reis & Godói Consultoria Tributária)**. Apuração de ICMS, PIS e COFINS e auditoria de notas fiscais (NF-e e NFC-e) para empresas de pneus e autopeças em SP, no Lucro Real.
 
 O site fica no GitHub Pages e os dados ficam no Supabase, no projeto **Orçamentos** (`ekhtiductqttqgpyetlk`). Cada pessoa entra com e-mail e senha.
 

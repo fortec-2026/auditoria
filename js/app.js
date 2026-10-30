@@ -211,15 +211,19 @@ function render() {
   else if (S.view === 'cliente') app.innerHTML = vListaCliente();
   else { app.innerHTML = vPainel(); renderOffice(); renderMain(); }
 }
+var LOGO = '<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="var(--logo-bg)"/><text x="20" y="23.5" text-anchor="middle" font-family="Sora, IBM Plex Sans, sans-serif" font-weight="700" font-size="15" letter-spacing="-.5" fill="var(--logo-fg)">RG</text>' +
+  [0, 2.4, 3.6, 6, 8.4, 9.6, 12, 13.2, 15.6, 18, 19.2, 21.6].map(function (x, i) { return '<rect x="' + (9 + x) + '" y="28" width="' + (i % 3 === 1 ? 0.8 : 1.4) + '" height="4.5" fill="var(--logo-bar)"/>'; }).join('') + '</svg>';
+function faixa(conteudo, extra) { return '<div class="faixa' + (extra ? ' ' + extra : '') + '">' + conteudo + '</div>'; }
 function nav(extra) {
   var quem = S.usuario ? '<span class="small">' + esc(S.usuario.email) + '</span><button class="btn ghost" type="button" data-act="sair">Sair</button>' : '';
-  return '<nav class="nav"><button type="button" class="brand" data-act="inicio" style="border:0;background:none;cursor:pointer;font:inherit"><span class="mk">' + I.mark + '</span>Portal Fiscal</button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
+  return '<nav class="nav"><button type="button" class="brand" data-act="inicio" aria-label="RG Fiscal, início">' + LOGO + '<span class="brand-t"><b>RG Fiscal</b><span>Reis &amp; Godói Consultoria Tributária</span></span></button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
 }
 
 function vLogin() {
   var criar = S.telaLogin === 'criar', esq = S.telaLogin === 'esqueci';
-  var h = nav() + '<div class="card gate"><span class="eyebrow">' + (criar ? 'Primeiro acesso' : esq ? 'Recuperar acesso' : 'Acesso') + '</span><h1>' + (criar ? 'Criar conta' : esq ? 'Esqueci a senha' : 'Entrar') + '</h1>';
-  h += '<p class="note">' + (criar ? 'Cadastre seu e-mail e uma senha. O escritório libera o acesso à sua empresa depois.' : esq ? 'Enviaremos um link para você definir uma nova senha.' : 'Apuração de ICMS, PIS e COFINS e auditoria das notas fiscais.') + '</p>';
+  var h = faixa(nav() + '<div class="faixa-login"><h1>Portal do cliente</h1><p>Suas notas fiscais conferidas, a apuração de ICMS, PIS e COFINS e o que precisa ser corrigido, num lugar só.</p></div>', 'alta');
+  h += '<div class="card gate"><h2>' + (criar ? 'Criar conta' : esq ? 'Esqueci a senha' : 'Entrar') + '</h2>';
+  h += '<p class="note">' + (criar ? 'Cadastre seu e-mail e uma senha. O escritório libera o acesso à sua empresa depois.' : esq ? 'Enviaremos um link para você definir uma nova senha.' : 'Use o e-mail e a senha que a RG Fiscal enviou para você.') + '</p>';
   h += '<form id="fLogin" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required value="' + esc(S.emailDigitado || '') + '"></div>';
   if (!esq) h += '<div class="field"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="' + (criar ? 'new-password' : 'current-password') + '" minlength="8" required></div>';
   if (S.erro) h += '<div class="banner">' + esc(S.erro) + '</div>';
@@ -230,20 +234,19 @@ function vLogin() {
   return h;
 }
 function vRecuperar() {
-  return nav() + '<div class="card gate"><span class="eyebrow">Recuperar acesso</span><h1>Nova senha</h1><p class="note">Defina a nova senha da sua conta.</p>' +
+  return faixa(nav() + '<div class="faixa-login"><h1>Nova senha</h1><p>Defina a nova senha da sua conta.</p></div>', 'alta') + '<div class="card gate"><h2>Nova senha</h2>' +
     '<form id="fNovaSenha" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="senhaN">Nova senha</label><input id="senhaN" type="password" autocomplete="new-password" minlength="8" required></div>' +
     (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') + '<button class="btn primary" type="submit">Salvar nova senha</button></form></div>';
 }
 function vListaCliente() {
-  var h = nav() + '<header class="top"><div><span class="eyebrow">Apuração e auditoria</span><h1>Suas empresas</h1></div></header>';
+  var h = faixa(nav() + '<header class="top"><div><h1>Suas empresas</h1><div class="sub">Escolha a empresa para ver a apuração e as notas.</div></div></header>');
   if (!S.empresas.length) return h + '<div class="card"><div class="empty"><h2>Acesso ainda não liberado</h2><p class="note">Sua conta foi criada, mas o escritório ainda não vinculou nenhuma empresa a ela. Avise o escritório com o e-mail ' + esc(S.usuario.email) + '.</p></div></div>';
   return h + '<div class="empresas">' + S.empresas.map(function (e) { return '<button type="button" class="card emp" data-abrir="' + esc(e.cnpj) + '"><span class="eyebrow">' + esc(fmtCnpj(e.cnpj)) + '</span><h3>' + esc(e.razao_social || 'Empresa') + '</h3><span class="small">' + (e.publicado_em ? 'Atualizado em ' + new Date(e.publicado_em).toLocaleDateString('pt-BR') : 'Aguardando a primeira publicação') + '</span></button>'; }).join('') + '</div>';
 }
 function vEscritorio() {
-  var h = nav();
-  h += '<header class="top"><div><span class="eyebrow">Departamento contábil · Área do escritório</span><h1>Empresas</h1><div class="sub">Os dados ficam no banco do escritório. O cliente vê o que foi publicado.</div></div>' +
+  var h = faixa(nav() + '<header class="top"><div><h1>Empresas</h1><div class="sub">Área do escritório. O cliente só vê o que for publicado.</div></div>' +
     '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></header>';
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></header>');
   if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
   if (S.empresas.length) {
     h += '<div class="empresas">' + S.empresas.map(function (e) {
@@ -262,13 +265,13 @@ function vPainel() {
     '<div class="seg" role="group" aria-label="Modo"><button type="button" data-modo="cliente" aria-pressed="' + (S.modo === 'cliente') + '">Visão do cliente</button><button type="button" data-modo="escritorio" aria-pressed="' + (S.modo === 'escritorio') + '">Escritório</button></div>' +
     '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Empresas</button>';
   if (S.exemplo && !S.usuario) navR = '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Entrar</button>';
-  var h = nav(navR);
-  h += '<header class="top"><div><div class="eyebrow">' + (S.readonly ? 'Apuração e auditoria' : 'Departamento contábil · Apuração e auditoria') + '</div><h1>Visão geral</h1><div class="sub" id="subtitle"></div></div>' +
-    '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>';
+  var h = faixa(nav(navR) + '<header class="top"><div style="min-width:0"><h1 id="titEmp"></h1><div class="sub" id="subtitle"></div></div>' +
+    '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>' +
+    '<div class="veredito" id="veredito"></div>');
   var pend = pendentesPublicar();
   if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nada aqui é gravado no banco.</span><button class="btn" type="button" data-act="voltar">Fechar exemplo</button></div>';
   else if (!S.readonly && pend) h += '<div class="banner"><span class="grow"><b>' + pend + (pend === 1 ? ' nota não publicada.' : ' notas não publicadas.') + '</b> O cliente ainda não vê essas notas.</span><button class="btn primary" type="button" data-act="publicar"' + (S.ocupado ? ' disabled' : '') + '>' + (S.ocupado ? 'Publicando…' : 'Publicar para o cliente') + '</button></div>';
-  if (S.readonly && m.publicado) h += '<div class="small">Atualizado pelo escritório em ' + new Date(m.publicado).toLocaleString('pt-BR') + ' · CNPJ ' + esc(fmtCnpj(m.cnpj)) + '</div>';
+
   h += '<section id="office" hidden></section><section id="main" style="display:flex;flex-direction:column;gap:18px;min-width:0"></section>';
   return h;
 }
@@ -342,11 +345,13 @@ function kpi(nome, icone, d, c, extra) {
 function renderHeaderSub() {
   var sub = $('subtitle'); if (!sub) return;
   var e = S.emp, nome = e.meta.nome || nomeDe(e.notas, e.meta.cnpj) || fmtCnpj(e.meta.cnpj);
-  if (!S.res) { sub.innerHTML = '<b>' + esc(nome) + '</b> · sem notas'; return; }
+  var tit = $('titEmp'); if (tit) tit.textContent = nome;
+  var atualiz = S.readonly && e.meta.publicado ? '. Atualizado em ' + new Date(e.meta.publicado).toLocaleDateString('pt-BR') : '';
+  if (!S.res) { sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + ', ainda sem notas' + atualiz; return; }
   var ds = diasSel(), lbl = 'Todo o período';
   if (S.periodo[0] === 'w') { var w = S.per.semanas.filter(function (x) { return 'w:' + x.ini === S.periodo; })[0]; lbl = 'Semana ' + w.num + ' de ' + mesNome(w.mes); }
   if (S.periodo[0] === 'm') lbl = mesNome(S.periodo.slice(2));
-  sub.innerHTML = '<b>' + esc(nome) + '</b> · ' + esc(lbl) + (ds.length ? ' · de ' + br(ds[0]) + ' a ' + br(ds[ds.length - 1]) : '');
+  sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + '. <b>' + esc(lbl) + '</b>' + (ds.length ? ', de ' + brFull(ds[0]) + ' a ' + brFull(ds[ds.length - 1]) : '') + atualiz;
 }
 
 function renderMain() {
@@ -404,8 +409,19 @@ function renderMain() {
     h += '<p class="small" style="margin-top:-8px">Detalhes por ocorrência na aba <button type="button" class="link" data-tab="comparativo">Antes × depois</button>. Pendências "Conferida, sem ação" ficam como estão.</p>';
   }
 
-  h += grafico(ds);
 
+  var vd = $('veredito');
+  if (vd) {
+    var frase;
+    if (regimeEmp() === 'simples') frase = 'No período, a receita de vendas e serviços soma ' + m0(T.vendas + T.servPrest) + ', sendo ' + m0(T.rMono + T.rSTpc) + ' de PIS/COFINS monofásico ou com ST e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária, para segregar no PGDAS-D.';
+    else {
+      var cv = comparativo(ds, T, S.cmpAlertas), sI = cv.atual.icms, sPC = cv.atual.pis + cv.atual.cof, dif = (cv.corr.icms + cv.corr.pis + cv.corr.cof) - (cv.atual.icms + cv.atual.pis + cv.atual.cof);
+      frase = 'No período, o ICMS fecha ' + (sI < 0 ? 'com saldo credor de ' + m0(-sI) : 'com ' + m0(sI) + ' a recolher') + ' e PIS e COFINS ' + (sPC < 0 ? 'com saldo credor de ' + m0(-sPC) : 'somam ' + m0(sPC) + ' a recolher') + ', como as notas foram emitidas.';
+      if (erros.length) frase += ' Encontramos ' + erros.length + (erros.length === 1 ? ' erro' : ' erros') + ' nas notas' + (Math.abs(dif) >= 0.01 ? '; corrigindo, os tributos ' + (dif < 0 ? 'diminuem ' + m0(-dif) : 'aumentam ' + m0(dif)) : '') + '.';
+      else frase += ' Nenhum erro em aberto.';
+    }
+    vd.innerHTML = '<p>' + frase + '</p>' + (erros.length + alertas.length ? '<button type="button" class="btn claro" data-tab="pendencias">Ver o que corrigir</button>' : '');
+  }
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
   var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
@@ -468,7 +484,7 @@ function grafico(ds) {
 }
 // ao mudar a largura da janela, redesenha o gráfico na nova largura (senão o texto encolhe ou estica)
 var _rz;
-window.addEventListener('resize', function () {
+window.addEventListener('resize-desligado', function () {
   clearTimeout(_rz);
   _rz = setTimeout(function () {
     var box = $('chart'); if (!box || !S._gds) return;
@@ -1195,7 +1211,7 @@ document.addEventListener('click', function (ev) {
   if (d.per) { S.periodo = d.per; renderMain(); return; }
   if (d.grupo) { S.grupo = d.grupo; S.periodo = 'all'; renderMain(); return; }
   if (d.det) { S.det = d.det; renderMain(); return; }
-  if (d.tab) { S.tab = d.tab; ls('pf.tab', S.tab); renderMain(); return; }
+  if (d.tab) { var fora = !b.closest('.tabs'); S.tab = d.tab; ls('pf.tab', S.tab); renderMain(); if (fora) { var pa = document.querySelector('.painel-abas'); if (pa) pa.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
   if (d.fquem) { S.fQuem = d.fquem; renderMain(); return; }
   if (d.fsev) { S.fSev = d.fsev; renderMain(); return; }
   if (d.fimp) { S.fImp = d.fimp; renderMain(); return; }
