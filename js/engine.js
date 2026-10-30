@@ -141,6 +141,7 @@ var Fiscal = (function () {
         v: num(txt(icms, 'vICMS')),
         vst: num(txt(icms, 'vICMSST')),
         stR: num(txt(icms, 'vICMSSTRet')),
+        cSN: num(txt(icms, 'vCredICMSSN')),
         cP: pis ? txt(pis, 'CST') : '',
         vP: num(txt(pis, 'vPIS')),
         cC: cof ? txt(cof, 'CST') : '',
@@ -327,7 +328,8 @@ var Fiscal = (function () {
     function pcTrat(it) {
       var r = monoRegra(it.ncm, it.ex);
       if (r === 'mono' || (r === 'cond' && (it.cP === '02' || it.cP === '04'))) return 'mono';
-      if (varejo) { var c = cls(it); if (c && !c.erro && c.pc.trat !== 'normal' && (!c.pc.cond || ['02', '04', '05', '06'].indexOf(it.cP) >= 0)) return c.pc.trat; }
+      // regras gerais da lei (monofásicos, ST e alíquota zero) valem para qualquer segmento
+      var c = cls(it); if (c && !c.erro && c.pc.trat !== 'normal' && (!c.pc.cond || ['02', '04', '05', '06'].indexOf(it.cP) >= 0)) return c.pc.trat;
       return 'normal';
     }
     function monoDe(it) { return pcTrat(it) !== 'normal'; }
@@ -537,7 +539,7 @@ var Fiscal = (function () {
           else if (nat === 'uso') { T.icmsUso += it.v; T.compOut += receita + it.vIPI; }
           else if (nat === 'ativo') { T.ciap += it.v; T.compOut += receita + it.vIPI; }
           else if (nat === 'insumo') { T.icmsUso += it.v; T.compIns += receita + it.vIPI; }
-          else T.icmsC += it.v;
+          else T.icmsC += it.v + (it.cSN || 0); // fornecedor do Simples: crédito informado em vCredICMSSN (LC 123/2006, art. 23)
           T.stE += it.vst;
         }
 
@@ -614,6 +616,9 @@ var Fiscal = (function () {
             var trC = pcTrat(it), cEsp = trC === 'zero' ? '06' : trC === 'st' ? '05' : '04';
             var DESC_CST = { '07': 'operação isenta', '08': 'sem incidência', '09': 'com suspensão', '49': 'outras operações de saída', '99': 'outras operações' };
             issue('alerta', it, 'MONO_CST_ERR', 'Produto ' + NOME_PC[trC] + ' (NCM ' + it.ncm + ') saiu com CST ' + it.cP + (DESC_CST[it.cP] ? ' (' + DESC_CST[it.cP] + ')' : '') + ' de PIS/COFINS. O correto na revenda é CST ' + cEsp + '. Não muda o valor do imposto, mas a nota fica inconsistente com a EFD-Contribuições: corrigir o cadastro do produto no emissor.', 0);
+          } else if (regime !== 'simples' && nat === 'venda' && !mono && ['07', '08', '09', '49', '99'].indexOf(it.cP) >= 0) {
+            var bT = Math.max(0, receita - it.v), DESC_CS = { '07': 'operação isenta', '08': 'sem incidência', '09': 'com suspensão', '49': 'outras operações de saída', '99': 'outras operações' };
+            issue('alerta', it, 'PC_CST_SAIDA', 'Venda com CST ' + it.cP + ' (' + DESC_CS[it.cP] + ') de PIS/COFINS, mas o NCM ' + it.ncm + ' não está nas listas de monofásicos nem de alíquota zero. Se o produto for tributado, o CST é 01, com PIS de ' + (PIS * 100).toLocaleString('pt-BR') + '% e COFINS de ' + (COF * 100).toLocaleString('pt-BR') + '% sobre a receita sem ICMS. Se for monofásico (confira os Anexos da Lei 10.485/2002), inclua o NCM na lista da empresa e use CST 04.', bT * (PIS + COF), { a: { pisD: -bT * PIS, cofD: -bT * COF } });
           } else if (nat === 'venda' && !mono && (it.cP === '04' || it.cP === '06')) {
             issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF), { a: { pisD: -Math.max(0, receita - it.v) * PIS, cofD: -Math.max(0, receita - it.v) * COF } });
           } else if (nat === 'venda' && !mono && it.cP === '01' && it.vP > 0) {

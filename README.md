@@ -176,6 +176,10 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
   - DIFAL.
   - PIS/COFINS em produto monofásico.
   - Monofásico vendido com CST diferente de 04 (por exemplo 07, isento): alerta para corrigir o cadastro do emissor.
+  - Produto fora das listas de monofásico e alíquota zero vendido com CST 07, 08, 09, 49 ou 99 de PIS/COFINS (Lucro Real e Presumido): alerta, com o PIS/COFINS que seria devido se o produto for tributado.
+- **Monofásicos e alíquota zero gerais da lei** (bebidas, higiene, lubrificantes, pneus, cesta básica) valem para qualquer segmento; a lista da empresa acrescenta os específicos, como as autopeças dos Anexos da Lei 10.485/2002.
+- **Fornecedor do Simples Nacional:** o crédito de ICMS é o valor informado em vCredICMSSN (LC 123/2006, art. 23).
+- **Estoque em 30/09/2026 com ST:** o crédito do ICMS-ST do estoque segue a Portaria CAT 28/2020 (Portaria SRE 34/2026, art. 2º) e não é calculado pelo portal.
   - ICMS na base do PIS/COFINS.
   - Produtos sem classificação.
 - **IBS/CBS 2026:** valores informativos, lidos dos XMLs.
