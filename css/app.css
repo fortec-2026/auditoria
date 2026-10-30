@@ -240,3 +240,5 @@ td.errcell{background:var(--err-bg)}
 .kpi-simples{grid-column:span 3}
 @media (max-width:960px){.kpi-simples{grid-column:span 2}}
 @media (max-width:520px){.kpi-simples{grid-column:auto}}
+.kpi-tit{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:-8px}
+.kpis-corr .card{background:var(--surface-2)}

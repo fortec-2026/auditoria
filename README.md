@@ -103,6 +103,8 @@ As semanas vão de segunda a domingo, mas são cortadas na virada do mês: a sem
 
 ## Antes × depois
 
+No topo do painel há duas linhas de cards: **Como as notas foram emitidas** (ICMS, PIS e COFINS com os valores das notas, inclusive os errados) e, logo abaixo, **Após corrigir as pendências**, com o card **Impacto das correções** (diferença em cada tributo). Os botões "Só os erros" e "Erros e alertas" valem para os cards e para a aba.
+
 A aba **Antes × depois** compara duas apurações do período: como as notas foram emitidas e como fica depois de corrigir as pendências. Dá para corrigir só os erros ou erros e alertas. Pendências "Conferida, sem ação" ficam como estão. Uma tabela mostra quanto cada tipo de ocorrência muda o ICMS, o PIS e a COFINS. Pendências que não mudam valores (CFOP, classificação, ST retida pelo fornecedor, duplicidade) são contadas à parte. O Excel traz a mesma comparação na aba "Antes x depois".
 
 ## Excel e impressão

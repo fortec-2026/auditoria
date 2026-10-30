@@ -376,6 +376,7 @@ function renderMain() {
     '<div><span class="small">Serviços prestados</span><b class="num">' + m0(T.servPrest) + '</b><span class="small">' + T.nSP + ' NFS-e · ISS a recolher ' + m0(T.issDev) + '</span></div>' +
     '<div><span class="small">Compras</span><b class="num">' + m0(T.compras + T.compOut + T.compIns) + '</b><span class="small">' + T.nE + ' notas de entrada' + (T.stE ? ' · ST pago ' + m0(T.stE) : '') + (T.compIns ? ' · ' + m0(T.compIns) + ' de insumo' : '') + (T.compOut ? ' · ' + m0(T.compOut) + ' de uso/ativo' : '') + '</span></div>' +
     '<div><span class="small">Serviços e fretes tomados</span><b class="num">' + m0(T.servTom + T.freteTom) + '</b><span class="small">' + T.nST + ' NFS-e · ' + T.nCT + ' CT-e' + (T.nCX ? ' · ' + T.nCX + ' CT-e sem ser tomadora' : '') + '</span></div></div>';
+  if (regimeEmp() !== 'simples') h += '<div class="kpi-tit"><span class="eyebrow">Como as notas foram emitidas</span></div>';
   h += '<div class="kpis">';
   if (regimeEmp() === 'simples') {
     var recT = T.vendas + T.servPrest, recSeg = T.rMono + T.rSTpc;
@@ -384,13 +385,24 @@ function renderMain() {
       '<dl class="num"><dt>Com ICMS por substituição tributária (segregar)</dt><dd>' + m0(T.rSTicms) + '</dd><dt>PIS/COFINS monofásico (segregar)</dt><dd>' + m0(T.rMono) + '</dd>' + (T.rSTpc ? '<dt>PIS/COFINS por ST (segregar)</dt><dd>' + m0(T.rSTpc) + '</dd>' : '') +
       '<dt>Alíquota zero da cesta básica (tributada normalmente no DAS)</dt><dd>' + m0(T.rZero) + '</dd><dt>Receita sem segregação de PIS/COFINS</dt><dd>' + m0(recT - recSeg) + '</dd><dt>ICMS destacado nas vendas</dt><dd>' + m0(T.icmsD) + '</dd></dl></div>';
   } else {
-  h += kpi('ICMS', I.doc, T.icmsD, T.icmsC, (T.icmsUso || T.ciap) ? '<dt>Uso, insumo e ativo (sem crédito)</dt><dd>' + m0(T.icmsUso + T.ciap) + '</dd>' : '');
-  h += kpi('PIS', I.pct, T.pisD, T.pisC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.pisDest) + '</dd>');
-  h += kpi('COFINS', I.pct, T.cofD, T.cofC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.cofDest) + '</dd>');
+  var A = comparativo(ds, T, S.cmpAlertas).atual;
+  h += kpi('ICMS', I.doc, A.icmsD, A.icmsC, (T.icmsUso || T.ciap) ? '<dt>Uso, insumo e ativo (sem crédito)</dt><dd>' + m0(T.icmsUso + T.ciap) + '</dd>' : '');
+  h += kpi('PIS', I.pct, A.pisD, A.pisC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.pisDest) + '</dd>');
+  h += kpi('COFINS', I.pct, A.cofD, A.cofC, '<dt>Destacado nas vendas</dt><dd>' + m0(T.cofDest) + '</dd>');
   }
   h += '<div class="card kpi' + (erros.length ? ' alert' : '') + '"><div class="lbl"><span class="badge">' + I.alert + '</span>Pendências</div><div><div class="big num">' + erros.length + '</div><div class="state">' + (erros.length === 1 ? 'erro' : 'erros') + ' · ' + alertas.length + ' ' + (alertas.length === 1 ? 'alerta' : 'alertas') + '</div></div>' +
     '<dl class="num"><dt>Erros de ICMS</dt><dd' + (eI ? ' class="errtxt"' : '') + '>' + eI + '</dd><dt>Erros de PIS/COFINS</dt><dd' + (eP ? ' class="errtxt"' : '') + '>' + eP + '</dd>' + (eS ? '<dt>Erros de ISS</dt><dd class="errtxt">' + eS + '</dd>' : '') + '<dt>Impacto estimado</dt><dd>' + m0(impacto) + '</dd></dl></div>';
   h += '</div>';
+  if (regimeEmp() !== 'simples') {
+    var cc = comparativo(ds, T, S.cmpAlertas), a0 = cc.atual, c0 = cc.corr;
+    var dI = (c0.icmsD - c0.icmsC) - (a0.icmsD - a0.icmsC), dP = (c0.pisD - c0.pisC) - (a0.pisD - a0.pisC), dC = (c0.cofD - c0.cofC) - (a0.cofD - a0.cofC), dT = dI + dP + dC;
+    var linhaD = function (nome, v) { return '<dt>' + nome + '</dt><dd' + (Math.abs(v) < 0.005 ? '' : v > 0 ? ' class="errtxt"' : ' class="credor"') + '>' + (Math.abs(v) < 0.005 ? '–' : (v > 0 ? '+' : '') + m0(v)) + '</dd>'; };
+    h += '<div class="kpi-tit"><span class="eyebrow">Após corrigir as pendências</span><div class="chips" role="group" aria-label="O que corrigir">' + [[false, 'Só os erros'], [true, 'Erros e alertas']].map(function (o) { return '<button type="button" class="chip" data-cmpal="' + o[0] + '" aria-pressed="' + (!!S.cmpAlertas === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+    h += '<div class="kpis kpis-corr">' + kpi('ICMS', I.doc, c0.icmsD, c0.icmsC, '') + kpi('PIS', I.pct, c0.pisD, c0.pisC, '') + kpi('COFINS', I.pct, c0.cofD, c0.cofC, '') +
+      '<div class="card kpi"><div class="lbl"><span class="badge">' + I.pct + '</span>Impacto das correções</div><div><div class="big num' + (dT > 0.004 ? ' errtxt' : dT < -0.004 ? ' credor' : '') + '">' + (dT > 0.004 ? '+' : '') + m0(dT) + '</div><div class="state">' + (Math.abs(dT) < 0.005 ? 'sem mudança nos tributos' : dT > 0 ? 'a mais nos tributos (débito maior ou crédito menor)' : 'a menos nos tributos (débito menor ou crédito maior)') + '</div></div>' +
+      '<dl class="num">' + linhaD('ICMS', dI) + linhaD('PIS', dP) + linhaD('COFINS', dC) + '</dl></div></div>';
+    h += '<p class="small" style="margin-top:-8px">Detalhes por ocorrência na aba <button type="button" class="link" data-tab="comparativo">Antes × depois</button>. Pendências "Conferida, sem ação" ficam como estão.</p>';
+  }
 
   h += grafico(ds);
 
