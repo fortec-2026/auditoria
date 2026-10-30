@@ -1077,12 +1077,15 @@ function fecharTour() {
   S.tour = null; var el = $('tour'); if (el) el.remove();
   window.removeEventListener('resize', desenharTour); window.removeEventListener('scroll', posicionarTour, true);
 }
-function passoTour(d) { if (!S.tour) return; var n = passosTour().length; S.tour.i = Math.max(0, Math.min(n - 1, S.tour.i + d)); desenharTour(); }
+function passoTour(d) { if (!S.tour) return; var n = passosTour().length; S.tour.i = Math.max(0, Math.min(n - 1, S.tour.i + d)); S.tour.rolou = false; desenharTour(); }
 function desenharTour() {
   if (!S.tour) return;
   var ps = passosTour(), i = S.tour.i, p = ps[i];
   var alvo = p.el ? document.querySelector(p.el) : null;
   if (p.el && !alvo) { if (i < ps.length - 1) { S.tour.i++; return desenharTour(); } }
+  // bloco mais alto que a tela (celular): destaca só o primeiro item dele
+  while (alvo && alvo.firstElementChild && alvo.getBoundingClientRect().height > window.innerHeight * 0.5) alvo = alvo.firstElementChild;
+  S.tour.alvo = alvo;
   var el = $('tour');
   if (!el) {
     el = document.createElement('div'); el.id = 'tour'; el.className = 'tour'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'tourTit');
@@ -1101,7 +1104,7 @@ function desenharTour() {
 function posicionarTour() {
   if (!S.tour) return;
   var p = passosTour()[S.tour.i], foco = $('tourFoco'), card = $('tourCard'); if (!foco || !card) return;
-  var alvo = p && p.el ? document.querySelector(p.el) : null;
+  var alvo = S.tour.alvo || (p && p.el ? document.querySelector(p.el) : null);
   var vw = window.innerWidth, vh = window.innerHeight, cw = Math.min(380, vw - 24);
   card.style.width = cw + 'px';
   if (!alvo) { foco.style.cssText = 'left:50%;top:50%;width:0;height:0'; card.style.left = (vw - cw) / 2 + 'px'; card.style.top = Math.max(12, (vh - card.offsetHeight) / 2) + 'px'; return; }
@@ -1109,7 +1112,12 @@ function posicionarTour() {
   foco.style.cssText = 'left:' + (r.left - m) + 'px;top:' + (r.top - m) + 'px;width:' + (r.width + 2 * m) + 'px;height:' + (r.height + 2 * m) + 'px';
   var ch = card.offsetHeight, top = r.bottom + 14;
   if (top + ch > vh - 12) top = r.top - ch - 14;
-  if (top < 12) top = Math.max(12, vh - ch - 12);
+  if (top < 12) {
+    // não cabe acima nem abaixo: rola a página para deixar o destaque no alto e o quadro logo abaixo
+    var desejado = Math.max(12, vh - ch - 26 - r.height);
+    if (!S.tour.rolou && Math.abs(r.top - desejado) > 4) { S.tour.rolou = true; window.scrollBy(0, r.top - desejado); return posicionarTour(); }
+    top = Math.min(vh - ch - 12, r.bottom + 14);
+  }
   var left = Math.min(Math.max(12, r.left), vw - cw - 12);
   card.style.left = left + 'px'; card.style.top = top + 'px';
 }
