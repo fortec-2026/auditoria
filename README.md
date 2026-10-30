@@ -175,6 +175,7 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
   - Cálculo base × alíquota.
   - DIFAL.
   - PIS/COFINS em produto monofásico.
+  - Monofásico vendido com CST diferente de 04 (por exemplo 07, isento): alerta para corrigir o cadastro do emissor.
   - ICMS na base do PIS/COFINS.
   - Produtos sem classificação.
 - **IBS/CBS 2026:** valores informativos, lidos dos XMLs.

@@ -610,6 +610,10 @@ var Fiscal = (function () {
           } else if (regime !== 'simples' && nat === 'venda' && mono && (it.vP > 0 || it.vC > 0 || it.cP === '01' || it.cP === '02')) {
             var trM = pcTrat(it), cM = trM === 'zero' ? '06' : trM === 'st' ? '05' : '04';
             issue('erro', it, 'MONO_TRIB', 'PIS/COFINS destacado em produto ' + NOME_PC[trM] + ' (NCM ' + it.ncm + '). Na revenda não há PIS/COFINS (CST ' + cM + '): possível recolhimento indevido.', it.vP + it.vC, { a: { pisD: it.vP, cofD: it.vC } });
+          } else if (regime !== 'simples' && nat === 'venda' && mono && it.cP && ['04', '05', '06'].indexOf(it.cP) < 0) {
+            var trC = pcTrat(it), cEsp = trC === 'zero' ? '06' : trC === 'st' ? '05' : '04';
+            var DESC_CST = { '07': 'operação isenta', '08': 'sem incidência', '09': 'com suspensão', '49': 'outras operações de saída', '99': 'outras operações' };
+            issue('alerta', it, 'MONO_CST_ERR', 'Produto ' + NOME_PC[trC] + ' (NCM ' + it.ncm + ') saiu com CST ' + it.cP + (DESC_CST[it.cP] ? ' (' + DESC_CST[it.cP] + ')' : '') + ' de PIS/COFINS. O correto na revenda é CST ' + cEsp + '. Não muda o valor do imposto, mas a nota fica inconsistente com a EFD-Contribuições: corrigir o cadastro do produto no emissor.', 0);
           } else if (nat === 'venda' && !mono && (it.cP === '04' || it.cP === '06')) {
             issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF), { a: { pisD: -Math.max(0, receita - it.v) * PIS, cofD: -Math.max(0, receita - it.v) * COF } });
           } else if (nat === 'venda' && !mono && it.cP === '01' && it.vP > 0) {
