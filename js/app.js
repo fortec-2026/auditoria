@@ -790,24 +790,61 @@ function tabNotas(notas) {
 }
 var CLASSES = [['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']];
 var ORIGEM = { manual: 'Definido pelo escritório', ncm: 'Regra do NCM', sugerido: 'Sugerido como revenda', nenhum: '' };
+function soma(l) { return l.reduce(function (a, p) { return a + p.v; }, 0); }
+function nomeBase(x) {
+  var w = String(x || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z ]/g, ' ').split(/\s+/).filter(function (t) { return t.length >= 3 && ['COM', 'PARA', 'DOS', 'DAS'].indexOf(t) < 0; });
+  return w[0] || '(sem nome)';
+}
+async function classificarGrupo(tipo, chave, classe) {
+  var e = S.emp, todos = Object.values(S.res.produtos);
+  var alvo = todos.filter(function (p) { return (!S.fProd || S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]) && (tipo === 'ncm' ? p.ncm === chave : nomeBase(p.x) === chave); });
+  if (!alvo.length) return;
+  if (tipo === 'ncm') { var antes = S.porNcm; S.porNcm = true; await classificar(alvo[0].k, chave, classe); S.porNcm = antes; toast('NCM ' + chave + ' classificado como ' + nomeClasse(classe).toLowerCase() + '.'); return; }
+  var agora = new Date().toISOString(), copia = JSON.parse(JSON.stringify(e.prodCad)), nHist = e.hist.length;
+  alvo.forEach(function (p) { var a = e.prodCad[p.k]; e.prodCad[p.k] = { c: classe, em: agora, x: p.x || '', ncm: p.ncm || '' }; e.hist.push({ em: agora, alvo: 'produto', ref: p.k, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe }); });
+  recalcular(); renderMain();
+  var msgG = (alvo.length === 1 ? '1 produto classificado' : alvo.length + ' produtos classificados') + ' como ' + nomeClasse(classe).toLowerCase() + '.';
+  if (S.exemplo) { toast(msgG); return; }
+  try {
+    for (var i = 0; i < alvo.length; i += 8) await Promise.all(alvo.slice(i, i + 8).map(function (p) { return B.classificarProduto(e.id, p.k, p.ncm, (p.x || '') + ' · ' + (p.fn || ''), classe); }));
+    toast(msgG);
+  } catch (err) { e.prodCad = copia; e.hist.length = nHist; recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
+}
 function tabProdutos() {
   var todos = Object.values(S.res.produtos);
   var cnt = function (c) { return todos.filter(function (p) { return c === 'todos' || p.classe === c; }).length; };
-  var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
+  var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fNome || nomeBase(p.x) === S.fNome) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
   f.sort(function (a, b) { return (a.classe === 'pendente' ? 0 : 1) - (b.classe === 'pendente' ? 0 : 1) || b.v - a.v; });
+  var grp = S.gProd || 'nenhum';
   var h = '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. ' + ((S.emp.meta.segmento || 'autopecas') === 'autopecas' ? 'NCM de pneus e autopeças já vem sugerido como revenda.' : 'No varejo, toda compra vem sugerida como revenda; marque o que for uso e consumo ou ativo.') + ' A classificação fica no histórico e vale para as próximas importações.</p>';
   h += '<div class="toolbar"><div class="chips" role="group" aria-label="Classificação">' + [['todos', 'Todos'], ['pendente', 'Sem classificação'], ['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']].map(function (c) { return '<button type="button" class="chip" data-fprod="' + c[0] + '" aria-pressed="' + (S.fProd === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt(c[0]) + ')</span></button>'; }).join('') + '</div>';
   if (!S.readonly) h += '<label class="check" for="porNcm"><input type="checkbox" id="porNcm"' + (S.porNcm ? ' checked' : '') + '> Aplicar a todos os produtos do mesmo NCM</label>';
   h += '</div>';
+  h += '<div class="toolbar"><div class="row" style="gap:8px;align-items:center"><span class="small">Agrupar</span><div class="seg" role="group" aria-label="Agrupar produtos">' + [['nenhum', 'Sem grupos'], ['ncm', 'Por NCM'], ['nome', 'Por nome']].map(function (g) { return '<button type="button" data-gprod="' + g[0] + '" aria-pressed="' + (grp === g[0]) + '">' + g[1] + '</button>'; }).join('') + '</div></div>' +
+    (S.fNcm || S.fNome ? '<button type="button" class="chip" aria-pressed="true" data-limpafiltro="1">' + (S.fNcm ? 'NCM ' + esc(S.fNcm) : 'Nome: ' + esc(S.fNome)) + ' ✕</button>' : '<span class="small">Clique no NCM de um produto para ver só os produtos com o mesmo NCM.</span>') + '</div>';
   if (!f.length) h += '<div class="empty"><p class="note">Nenhum produto neste filtro.</p></div>';
   else {
     h += '<div class="tscroll"><table><thead><tr><th>Produto</th><th>NCM</th><th class="r">Compras</th><th>Classificação</th></tr></thead><tbody>';
-    f.slice(0, S.imprimindo ? 1e9 : 400).forEach(function (p) {
+    var linhas = [];
+    if (grp === 'nenhum') f.forEach(function (p) { linhas.push(p); });
+    else {
+      var gs = {}; f.forEach(function (p) { var k = grp === 'ncm' ? p.ncm : nomeBase(p.x); (gs[k] = gs[k] || []).push(p); });
+      Object.keys(gs).sort(function (a, b) { return gs[b].length - gs[a].length || soma(gs[b]) - soma(gs[a]); }).forEach(function (k) { linhas.push({ grupo: k, itens: gs[k] }); gs[k].forEach(function (p) { linhas.push(p); }); });
+    }
+    var mostrados = 0;
+    linhas.forEach(function (p) {
+      if (p.grupo !== undefined) {
+        var its = p.itens, pend = its.filter(function (x) { return x.classe === 'pendente'; }).length;
+        h += '<tr class="grp-prod"><td colspan="4"><div class="grp-cab"><div><b>' + (grp === 'ncm' ? 'NCM <span class="mono">' + esc(p.grupo) + '</span>' : esc(p.grupo)) + '</b> <span class="small">' + its.length + (its.length === 1 ? ' produto' : ' produtos') + ' · ' + m0(soma(its)) + (pend ? ' · ' + pend + ' sem classificação' : '') + '</span></div>' +
+          (S.readonly ? '' : '<div class="row" style="gap:6px;align-items:center"><span class="small">' + (grp === 'ncm' ? 'Classificar o NCM inteiro (vale também nas próximas compras):' : 'Classificar os ' + its.length + ' como:') + '</span><div class="seg" role="group" aria-label="Classificar o grupo">' + CLASSES.map(function (c) { return '<button type="button" data-gclasse="' + c[0] + '" data-gtipo="' + grp + '" data-gchave="' + esc(p.grupo) + '">' + c[1] + '</button>'; }).join('') + '</div></div>') + '</div></td></tr>';
+        return;
+      }
+      if (mostrados++ >= (S.imprimindo ? 1e9 : 400)) return;
       var ctrl = S.readonly ? (p.classe === 'pendente' ? '' : '<span class="pill ok">' + esc((CLASSES.filter(function (c) { return c[0] === p.classe; })[0] || [])[1] || p.classe) + '</span>')
         : '<div class="seg" role="group" aria-label="Classificar">' + CLASSES.map(function (c) { return '<button type="button" data-classe="' + c[0] + '" data-pk="' + esc(p.k) + '" data-ncm="' + esc(p.ncm) + '" aria-pressed="' + (p.classe === c[0] && p.origem !== 'sugerido') + '">' + c[1] + '</button>'; }).join('') + '</div>';
       var orig = p.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : '<span class="small">' + esc(ORIGEM[p.origem]) + '</span>';
       var desf = !S.readonly && (p.origem === 'manual' || p.origem === 'ncm') ? ' <button type="button" class="link" data-desfazer="' + esc(p.k) + '" data-origem="' + p.origem + '" data-ncm="' + esc(p.ncm) + '">Desfazer</button>' : '';
-      h += '<tr><td>' + esc(p.x) + '<div class="small">Cód. ' + esc(p.cp || '–') + ' · ' + esc(p.fn) + '</div></td><td class="mono" style="white-space:nowrap">' + esc(p.ncm) + ((p.mono || p.monoCond || p.st) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + (p.mono ? '<span class="tag">Monofásico</span>' : p.monoCond ? '<span class="tag" title="Depende da destinação (Anexos I e II)">Monofásico?</span>' : '') + (p.st ? '<span class="tag">Saiu da ST</span>' : '') + '</div>' : '') + '</td><td class="r num">' + m0(p.v) + '<div class="small">' + p.n + ' ' + (p.n === 1 ? 'compra' : 'compras') + ' · última ' + brFull(p.ult) + '</div></td><td>' + ctrl + '<div style="margin-top:5px">' + orig + desf + '</div></td></tr>';
+      h += '<tr><td>' + esc(p.x) + '<div class="small">Cód. ' + esc(p.cp || '–') + ' · ' + esc(p.fn) + '</div></td><td class="mono" style="white-space:nowrap"><button type="button" class="link mono" data-fncm="' + esc(p.ncm) + '" title="Ver só este NCM">' + esc(p.ncm) + '</button>' + ((p.mono || p.monoCond || p.st) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + (p.mono ? '<span class="tag">Monofásico</span>' : p.monoCond ? '<span class="tag" title="Depende da destinação (Anexos I e II)">Monofásico?</span>' : '') + (p.st ? '<span class="tag">Saiu da ST</span>' : '') + '</div>' : '') + '</td><td class="r num">' + m0(p.v) + '<div class="small">' + p.n + ' ' + (p.n === 1 ? 'compra' : 'compras') + ' · última ' + brFull(p.ult) + '</div></td><td>' + ctrl + '<div style="margin-top:5px">' + orig + desf + '</div></td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -1240,6 +1277,10 @@ document.addEventListener('click', function (ev) {
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
   if (d.classe) { if (!S.readonly) classificar(d.pk, d.ncm, d.classe); return; }
+  if (d.gclasse) { if (!S.readonly) classificarGrupo(d.gtipo, d.gchave, d.gclasse); return; }
+  if (d.gprod) { S.gProd = d.gprod; renderMain(); return; }
+  if (d.fncm) { S.fNcm = d.fncm; S.fNome = ''; renderMain(); return; }
+  if (d.limpafiltro) { S.fNcm = ''; S.fNome = ''; renderMain(); return; }
   if (d.cserv) { if (!S.readonly) classificarServ(d.pk, d.cserv); return; }
   if (d.pedeeq) { S.confirmEquipe = d.pedeeq; render(); return; }
   if (d.rmeq) { B.removerEquipe(d.rmeq).then(function () { S.confirmEquipe = null; toast('Removido da equipe.'); carregarEquipe(); }).catch(function (e) { toast(erroTexto(e)); }); return; }

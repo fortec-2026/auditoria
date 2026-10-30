@@ -330,3 +330,6 @@ th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
 .banner.demo{background:color-mix(in srgb,var(--ciano-vivo) 16%,var(--surface));color:var(--ink);border:1px solid color-mix(in srgb,var(--ciano) 45%,var(--line))}
 .banner.demo .btn.primary{background:var(--ciano);border-color:var(--ciano);color:var(--accent-ink)}
 @media (max-width:640px){.banner.demo .grow{flex-basis:100%}.banner.demo .btn{flex:1;justify-content:center}}
+.grp-prod td{background:var(--surface-2);border-top:1px solid var(--line);padding:9px 10px}
+.grp-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+tbody tr.grp-prod:hover td{background:var(--surface-2)}
