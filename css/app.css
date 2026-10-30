@@ -326,3 +326,4 @@ td.errcell{background:var(--err-bg)}
 :root[data-theme="dark"] .pcard[aria-pressed="true"]{background:var(--hero-2);border-color:var(--ciano)}
 .pgroup > .eyebrow{text-transform:capitalize}
 th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
+.btn.tema{padding:8px 9px}
