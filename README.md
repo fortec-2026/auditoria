@@ -10,7 +10,7 @@ Na área do escritório, **Excluir notas de um período** apaga do banco as nota
 
 ## Passo a passo para o cliente
 
-Quando o cliente (ou quem abre o link de demonstração) entra no painel, aparece um passo a passo de 10 telas explicando o resumo, os períodos, os cards de impostos, as pendências, as notas e o Excel. Dá para pular, voltar e marcar "Não mostrar ao entrar" (fica salvo no navegador). O ícone de interrogação no topo abre o passo a passo de novo. O escritório não vê o passo a passo automaticamente, só pelo ícone.
+Quando o cliente (ou quem abre o link de demonstração) entra no painel, aparece um passo a passo de 11 telas explicando o resumo, os períodos, os cards de impostos, as pendências, as notas, a classificação dos produtos e o Excel. Dá para pular, voltar e marcar "Não mostrar ao entrar" (fica salvo no navegador). O ícone de interrogação no topo abre o passo a passo de novo. O escritório não vê o passo a passo automaticamente, só pelo ícone.
 
 ## Link de demonstração
 
