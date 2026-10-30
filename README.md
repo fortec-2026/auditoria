@@ -4,6 +4,10 @@ Portal da **RG Fiscal (Reis & Godói Consultoria Tributária)**. Apuração de I
 
 O site fica no GitHub Pages e os dados ficam no Supabase, no projeto **Orçamentos** (`ekhtiductqttqgpyetlk`). Cada pessoa entra com e-mail e senha.
 
+## Excluir notas de um período
+
+Na área do escritório, **Excluir notas de um período** apaga do banco as notas de um mês (ou de um intervalo de datas), junto com os XMLs e as anotações delas. Serve para tirar, por exemplo, notas de setembro de um cliente que começa em outubro. Pede confirmação, mostra quantas notas serão apagadas e não pode ser desfeito (para voltar, importe os XMLs de novo). A exclusão é feita pela função `excluir_periodo` do banco, que só funciona para a equipe do escritório.
+
 ## Passo a passo para o cliente
 
 Quando o cliente (ou quem abre o link de demonstração) entra no painel, aparece um passo a passo de 10 telas explicando o resumo, os períodos, os cards de impostos, as pendências, as notas e o Excel. Dá para pular, voltar e marcar "Não mostrar ao entrar" (fica salvo no navegador). O ícone de interrogação no topo abre o passo a passo de novo. O escritório não vê o passo a passo automaticamente, só pelo ícone.

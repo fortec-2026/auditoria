@@ -75,6 +75,7 @@ var Banco = (function () {
     ok(await sb.from('cancelamentos').upsert(chaves.map(function (c) { return { chave: c, empresa_cnpj: cnpj }; }), { onConflict: 'chave' }));
   }
   async function publicar(cnpj) { return ok(await sb.rpc('publicar_empresa', { p_cnpj: cnpj })); }
+  async function excluirPeriodo(cnpj, ini, fim) { return ok(await sb.rpc('excluir_periodo', { p_cnpj: cnpj, p_ini: ini, p_fim: fim })); }
 
   /* ---------- classificação de produtos ---------- */
   async function classificarProduto(cnpj, chave, ncm, descricao, classe) {
@@ -135,7 +136,7 @@ var Banco = (function () {
 
   return { sessao: sessao, entrar: entrar, criarConta: criarConta, sair: sair, esqueciSenha: esqueciSenha, novaSenha: novaSenha, aoMudarSessao: aoMudarSessao, perfil: perfil,
     empresas: empresas, contarNotas: contarNotas, garantirEmpresa: garantirEmpresa, salvarEmpresa: salvarEmpresa, apagarEmpresa: apagarEmpresa,
-    carregar: carregar, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar,
+    carregar: carregar, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar, excluirPeriodo: excluirPeriodo,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
     acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
     equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe,

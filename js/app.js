@@ -319,6 +319,7 @@ function renderOffice() {
     '<p class="note">Um NCM por linha. Itens que vierem com CEST 01 (autopeças) ou 16 (pneus) entram automaticamente, mesmo fora da lista.</p>' +
     '<div class="row"><div class="field"><label for="corte">Início da tributação normal (fim da ST)</label><input id="corte" type="date" value="' + esc(m.corte || '2026-10-01') + '"></div><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div>'
     : '<div class="row"><button class="btn" type="button" data-act="aplicarMono">Salvar e recalcular</button></div>') + '</div></details>';
+  h += blocoExcluirPeriodo();
   if (!S.exemplo) h += S.confirmDel ? '<div class="confirm"><span>Apagar a empresa e todas as notas, produtos e acessos dela? Não dá para desfazer.</span><button class="btn danger" type="button" data-act="apagarSim">Apagar definitivamente</button><button class="btn" type="button" data-act="apagarNao">Cancelar</button></div>'
     : '<div><button class="btn danger" type="button" data-act="apagar">Apagar empresa</button></div>';
   h += '</div>';
@@ -339,6 +340,40 @@ function renderOffice() {
   h += '</div></div>';
   el.innerHTML = h;
   bindDrop();
+}
+
+/* ---------- excluir notas de um período ---------- */
+function notasNoPeriodo(ini, fim) { return S.emp.notas.filter(function (n) { return n.dt >= ini && n.dt <= fim; }); }
+function blocoExcluirPeriodo() {
+  var meses = {}; S.emp.notas.forEach(function (n) { var m = n.dt.slice(0, 7); meses[m] = (meses[m] || 0) + 1; });
+  var lista = Object.keys(meses).sort();
+  var x = S.excl || {}, h = '<details' + (x.aberto ? ' open' : '') + ' id="dExcl"><summary>Excluir notas de um período</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">' +
+    '<p class="note">Use quando vieram notas de um período que não entra no trabalho, por exemplo setembro para um cliente que começa em outubro. As notas, os XMLs e as anotações do período são apagados do banco. As demais notas não mudam.</p>';
+  if (!lista.length) return h + '<p class="small">Nenhuma nota importada.</p></div></details>';
+  h += '<div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end"><div class="field" style="max-width:220px"><label for="exMes">Mês</label><select id="exMes"><option value="">Escolher datas…</option>' +
+    lista.map(function (m) { return '<option value="' + m + '"' + (x.mes === m ? ' selected' : '') + '>' + mesNome(m).charAt(0).toUpperCase() + mesNome(m).slice(1) + ' (' + meses[m] + (meses[m] === 1 ? ' nota' : ' notas') + ')</option>'; }).join('') + '</select></div>' +
+    '<div class="field" style="max-width:160px"><label for="exIni">De</label><input type="date" id="exIni" value="' + esc(x.ini || '') + '"></div><div class="field" style="max-width:160px"><label for="exFim">Até</label><input type="date" id="exFim" value="' + esc(x.fim || '') + '"></div>' +
+    '<button class="btn danger" type="button" data-act="exclPrever">Excluir…</button></div>';
+  if (x.confirmar) {
+    var alvo = notasNoPeriodo(x.ini, x.fim);
+    h += alvo.length ? '<div class="confirm"><span>Excluir <b>' + alvo.length + (alvo.length === 1 ? ' nota' : ' notas') + '</b> de ' + brFull(x.ini) + ' a ' + brFull(x.fim) + '? Não dá para desfazer; para trazer de volta, é preciso importar os XMLs de novo.</span><button class="btn danger" type="button" data-act="exclSim"' + (S.ocupado ? ' disabled' : '') + '>' + (S.ocupado ? 'Excluindo…' : 'Excluir definitivamente') + '</button><button class="btn" type="button" data-act="exclNao">Cancelar</button></div>'
+      : '<p class="small">Nenhuma nota entre ' + brFull(x.ini) + ' e ' + brFull(x.fim) + '.</p>';
+  }
+  return h + '</div></details>';
+}
+async function excluirPeriodo() {
+  var x = S.excl, e = S.emp; if (!x || !x.ini || !x.fim) return;
+  var alvo = notasNoPeriodo(x.ini, x.fim); if (!alvo.length) return;
+  S.ocupado = true; renderOffice();
+  try {
+    var n = S.exemplo ? alvo.length : await B.excluirPeriodo(e.meta.cnpj, x.ini, x.fim);
+    var fora = {}; alvo.forEach(function (a) { fora[a.ch] = 1; });
+    e.notas = e.notas.filter(function (a) { return !fora[a.ch]; });
+    Object.keys(fora).forEach(function (k) { delete e.pub[k]; if (e.xmls) delete e.xmls[k]; if (e.acomp) delete e.acomp[k]; });
+    S.excl = { aberto: true }; S.ocupado = false; S.periodo = 'all';
+    recalcular(); render();
+    toast((n === 1 ? '1 nota excluída' : n + ' notas excluídas') + ' do período de ' + brFull(x.ini) + ' a ' + brFull(x.fim) + '.');
+  } catch (err) { S.ocupado = false; renderOffice(); toast('Não foi possível excluir: ' + erroTexto(err)); }
 }
 
 /* ---------- painel principal ---------- */
@@ -1407,6 +1442,14 @@ document.addEventListener('click', function (ev) {
     if (S.exemplo) { toast('Análise recalculada.'); return; }
     B.salvarEmpresa(S.emp.id, { segmento: sg, regime: rg }).then(function () { toast('Segmento e regime salvos. Análise recalculada.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }
+  else if (a === 'exclPrever') {
+    var ini = $('exIni').value, fim = $('exFim').value, mes = $('exMes').value;
+    if (!ini || !fim) { toast('Escolha o mês ou as datas de início e fim.'); return; }
+    if (fim < ini) { toast('A data final é anterior à inicial.'); return; }
+    S.excl = { aberto: true, mes: mes, ini: ini, fim: fim, confirmar: true }; renderOffice();
+  }
+  else if (a === 'exclNao') { S.excl = { aberto: true }; renderOffice(); }
+  else if (a === 'exclSim') excluirPeriodo();
   else if (a === 'apagar') { S.confirmDel = true; renderOffice(); }
   else if (a === 'apagarNao') { S.confirmDel = false; renderOffice(); }
   else if (a === 'apagarSim') { B.apagarEmpresa(S.emp.id).then(function () { toast('Empresa apagada.'); voltarEmpresas(); }).catch(function (e) { toast(erroTexto(e)); }); }
@@ -1456,6 +1499,7 @@ document.addEventListener('change', function (ev) {
   var t = ev.target;
   if (t.id === 'porNcm') { S.porNcm = t.checked; return; }
   if (t.id === 'fForn') { S.fForn = t.value; renderMain(); return; }
+  if (t.id === 'exMes') { var mm = t.value; if (mm) { var ult = new Date(Date.UTC(+mm.slice(0, 4), +mm.slice(5, 7), 0)).toISOString().slice(0, 10); $('exIni').value = mm + '-01'; $('exFim').value = ult; } return; }
   var lista = t.files ? Array.prototype.slice.call(t.files) : [];
   if (t.id === 'files') { importar(lista); t.value = ''; }
   else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }
