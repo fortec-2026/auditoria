@@ -38,6 +38,7 @@ var I = {
   back: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18 9 12l6-6"/></svg>',
   zap: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 1.7 3.6 3.6 4.4l1.2-1.1 2 .9c-.2 1.2-1.2 1.9-2.4 1.8-3.2-.3-6-3.1-6.3-6.3C7 8 7.7 7 8.9 6.8l.9 2z"/></svg>',
   link: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  ajuda: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.9"/><path d="M12 17h.01"/></svg>',
   sol: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   lua: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   mark: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/></svg>'
@@ -198,6 +199,7 @@ function abrirEmpresa(e, readonly, exemplo) {
   S.view = 'painel'; S.periodo = 'all'; S.q = ''; S.imp = null; S.confirmDel = false;
   S.modo = readonly || exemplo ? 'cliente' : (e.notas.length ? 'cliente' : 'escritorio');
   recalcular(); render(); window.scrollTo(0, 0);
+  if ((S.readonly || S.demo) && !S.tourVisto && ls('pf.tourOff') !== '1') { S.tourVisto = true; setTimeout(function () { iniciarTour(); }, 350); }
 }
 function voltarEmpresas() {
   if (S.demo) { S.demo = false; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} S.emp = null; S.res = null; S.exemplo = false; S.view = 'carregando'; render(); iniciar(); return; }
@@ -225,7 +227,8 @@ function temaAtual() { var t = document.documentElement.getAttribute('data-theme
 function nav(extra) {
   var escuro = temaAtual() === 'dark';
   var tema = '<button class="btn ghost tema" type="button" data-act="tema" aria-label="' + (escuro ? 'Usar tema claro' : 'Usar tema escuro') + '" title="' + (escuro ? 'Tema claro' : 'Tema escuro') + '">' + (escuro ? I.sol : I.lua) + '</button>';
-  var quem = tema + (S.usuario ? '<span class="small">' + esc(S.usuario.email) + '</span><button class="btn ghost" type="button" data-act="sair">Sair</button>' : '');
+  var ajuda = S.view === 'painel' ? '<button class="btn ghost tema" type="button" data-act="tour" aria-label="Como usar o portal" title="Como usar o portal">' + I.ajuda + '</button>' : '';
+  var quem = ajuda + tema + (S.usuario ? '<span class="small">' + esc(S.usuario.email) + '</span><button class="btn ghost" type="button" data-act="sair">Sair</button>' : '');
   return '<nav class="nav"><button type="button" class="brand" data-act="inicio" aria-label="RG Fiscal, início">' + LOGO + '<span class="brand-t"><b>RG Fiscal</b><span>Reis &amp; Godói Consultoria Tributária</span></span></button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
 }
 
@@ -790,6 +793,11 @@ function tabNotas(notas) {
 }
 var CLASSES = [['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']];
 var ORIGEM = { manual: 'Definido pelo escritório', ncm: 'Regra do NCM', sugerido: 'Sugerido como revenda', nenhum: '' };
+function fornecedores(todos) {
+  var m = {}; todos.forEach(function (p) { var x = m[p.fc] || (m[p.fc] = { c: p.fc, n: p.fn || fmtCnpj(p.fc), q: 0 }); x.q++; });
+  return Object.values(m).sort(function (a, b) { return a.n.localeCompare(b.n, 'pt-BR'); });
+}
+function nomeForn(todos, c) { var p = todos.filter(function (x) { return x.fc === c; })[0]; return p ? p.fn : fmtCnpj(c); }
 function soma(l) { return l.reduce(function (a, p) { return a + p.v; }, 0); }
 function nomeBase(x) {
   var w = String(x || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z ]/g, ' ').split(/\s+/).filter(function (t) { return t.length >= 3 && ['COM', 'PARA', 'DOS', 'DAS'].indexOf(t) < 0; });
@@ -797,7 +805,7 @@ function nomeBase(x) {
 }
 async function classificarGrupo(tipo, chave, classe) {
   var e = S.emp, todos = Object.values(S.res.produtos);
-  var alvo = todos.filter(function (p) { return (!S.fProd || S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]) && (tipo === 'ncm' ? p.ncm === chave : nomeBase(p.x) === chave); });
+  var alvo = todos.filter(function (p) { return (!S.fProd || S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fForn || p.fc === S.fForn) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]) && (tipo === 'ncm' ? p.ncm === chave : tipo === 'forn' ? p.fc === chave : nomeBase(p.x) === chave); });
   if (!alvo.length) return;
   if (tipo === 'ncm') { var antes = S.porNcm; S.porNcm = true; await classificar(alvo[0].k, chave, classe); S.porNcm = antes; toast('NCM ' + chave + ' classificado como ' + nomeClasse(classe).toLowerCase() + '.'); return; }
   var agora = new Date().toISOString(), copia = JSON.parse(JSON.stringify(e.prodCad)), nHist = e.hist.length;
@@ -813,30 +821,31 @@ async function classificarGrupo(tipo, chave, classe) {
 function tabProdutos() {
   var todos = Object.values(S.res.produtos);
   var cnt = function (c) { return todos.filter(function (p) { return c === 'todos' || p.classe === c; }).length; };
-  var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fNome || nomeBase(p.x) === S.fNome) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
+  var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fNome || nomeBase(p.x) === S.fNome) && (!S.fForn || p.fc === S.fForn) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
   f.sort(function (a, b) { return (a.classe === 'pendente' ? 0 : 1) - (b.classe === 'pendente' ? 0 : 1) || b.v - a.v; });
   var grp = S.gProd || 'nenhum';
   var h = '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. ' + ((S.emp.meta.segmento || 'autopecas') === 'autopecas' ? 'NCM de pneus e autopeças já vem sugerido como revenda.' : 'No varejo, toda compra vem sugerida como revenda; marque o que for uso e consumo ou ativo.') + ' A classificação fica no histórico e vale para as próximas importações.</p>';
   h += '<div class="toolbar"><div class="chips" role="group" aria-label="Classificação">' + [['todos', 'Todos'], ['pendente', 'Sem classificação'], ['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']].map(function (c) { return '<button type="button" class="chip" data-fprod="' + c[0] + '" aria-pressed="' + (S.fProd === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt(c[0]) + ')</span></button>'; }).join('') + '</div>';
   if (!S.readonly) h += '<label class="check" for="porNcm"><input type="checkbox" id="porNcm"' + (S.porNcm ? ' checked' : '') + '> Aplicar a todos os produtos do mesmo NCM</label>';
   h += '</div>';
-  h += '<div class="toolbar"><div class="row" style="gap:8px;align-items:center"><span class="small">Agrupar</span><div class="seg" role="group" aria-label="Agrupar produtos">' + [['nenhum', 'Sem grupos'], ['ncm', 'Por NCM'], ['nome', 'Por nome']].map(function (g) { return '<button type="button" data-gprod="' + g[0] + '" aria-pressed="' + (grp === g[0]) + '">' + g[1] + '</button>'; }).join('') + '</div></div>' +
-    (S.fNcm || S.fNome ? '<button type="button" class="chip" aria-pressed="true" data-limpafiltro="1">' + (S.fNcm ? 'NCM ' + esc(S.fNcm) : 'Nome: ' + esc(S.fNome)) + ' ✕</button>' : '<span class="small">Clique no NCM de um produto para ver só os produtos com o mesmo NCM.</span>') + '</div>';
+  h += '<div class="toolbar"><div class="row" style="gap:8px;align-items:center"><span class="small">Agrupar</span><div class="seg" role="group" aria-label="Agrupar produtos">' + [['nenhum', 'Sem grupos'], ['ncm', 'Por NCM'], ['nome', 'Por nome'], ['forn', 'Por fornecedor']].map(function (g) { return '<button type="button" data-gprod="' + g[0] + '" aria-pressed="' + (grp === g[0]) + '">' + g[1] + '</button>'; }).join('') + '</div>' +
+    '<label class="small" for="fForn" style="margin-left:6px">Fornecedor</label><select id="fForn" class="sel-forn"><option value="">Todos</option>' + fornecedores(todos).map(function (x) { return '<option value="' + esc(x.c) + '"' + (S.fForn === x.c ? ' selected' : '') + '>' + esc(x.n) + ' (' + x.q + ')</option>'; }).join('') + '</select></div>' +
+    (S.fNcm || S.fNome || S.fForn ? '<button type="button" class="chip" aria-pressed="true" data-limpafiltro="1">' + [S.fNcm ? 'NCM ' + esc(S.fNcm) : '', S.fForn ? esc(nomeForn(todos, S.fForn)) : ''].filter(Boolean).join(' e ') + ' ✕</button>' : '<span class="small">Clique no NCM ou no fornecedor de um produto para filtrar.</span>') + '</div>';
   if (!f.length) h += '<div class="empty"><p class="note">Nenhum produto neste filtro.</p></div>';
   else {
     h += '<div class="tscroll"><table><thead><tr><th>Produto</th><th>NCM</th><th class="r">Compras</th><th>Classificação</th></tr></thead><tbody>';
     var linhas = [];
     if (grp === 'nenhum') f.forEach(function (p) { linhas.push(p); });
     else {
-      var gs = {}; f.forEach(function (p) { var k = grp === 'ncm' ? p.ncm : nomeBase(p.x); (gs[k] = gs[k] || []).push(p); });
+      var gs = {}; f.forEach(function (p) { var k = grp === 'ncm' ? p.ncm : grp === 'forn' ? p.fc : nomeBase(p.x); (gs[k] = gs[k] || []).push(p); });
       Object.keys(gs).sort(function (a, b) { return gs[b].length - gs[a].length || soma(gs[b]) - soma(gs[a]); }).forEach(function (k) { linhas.push({ grupo: k, itens: gs[k] }); gs[k].forEach(function (p) { linhas.push(p); }); });
     }
     var mostrados = 0;
     linhas.forEach(function (p) {
       if (p.grupo !== undefined) {
         var its = p.itens, pend = its.filter(function (x) { return x.classe === 'pendente'; }).length;
-        h += '<tr class="grp-prod"><td colspan="4"><div class="grp-cab"><div><b>' + (grp === 'ncm' ? 'NCM <span class="mono">' + esc(p.grupo) + '</span>' : esc(p.grupo)) + '</b> <span class="small">' + its.length + (its.length === 1 ? ' produto' : ' produtos') + ' · ' + m0(soma(its)) + (pend ? ' · ' + pend + ' sem classificação' : '') + '</span></div>' +
-          (S.readonly ? '' : '<div class="row" style="gap:6px;align-items:center"><span class="small">' + (grp === 'ncm' ? 'Classificar o NCM inteiro (vale também nas próximas compras):' : 'Classificar os ' + its.length + ' como:') + '</span><div class="seg" role="group" aria-label="Classificar o grupo">' + CLASSES.map(function (c) { return '<button type="button" data-gclasse="' + c[0] + '" data-gtipo="' + grp + '" data-gchave="' + esc(p.grupo) + '">' + c[1] + '</button>'; }).join('') + '</div></div>') + '</div></td></tr>';
+        h += '<tr class="grp-prod"><td colspan="4"><div class="grp-cab"><div><b>' + (grp === 'ncm' ? 'NCM <span class="mono">' + esc(p.grupo) + '</span>' : grp === 'forn' ? esc(its[0].fn) + ' <span class="small" style="font-weight:400">' + esc(fmtCnpj(p.grupo)) + '</span>' : esc(p.grupo)) + '</b> <span class="small">' + its.length + (its.length === 1 ? ' produto' : ' produtos') + ' · ' + m0(soma(its)) + (pend ? ' · ' + pend + ' sem classificação' : '') + '</span></div>' +
+          (S.readonly ? '' : '<div class="row" style="gap:6px;align-items:center"><span class="small">' + (grp === 'ncm' ? 'Classificar o NCM inteiro (vale também nas próximas compras):' : its.length === 1 ? 'Classificar como:' : 'Classificar os ' + its.length + ' como:') + '</span><div class="seg" role="group" aria-label="Classificar o grupo">' + CLASSES.map(function (c) { return '<button type="button" data-gclasse="' + c[0] + '" data-gtipo="' + grp + '" data-gchave="' + esc(p.grupo) + '">' + c[1] + '</button>'; }).join('') + '</div></div>') + '</div></td></tr>';
         return;
       }
       if (mostrados++ >= (S.imprimindo ? 1e9 : 400)) return;
@@ -844,7 +853,7 @@ function tabProdutos() {
         : '<div class="seg" role="group" aria-label="Classificar">' + CLASSES.map(function (c) { return '<button type="button" data-classe="' + c[0] + '" data-pk="' + esc(p.k) + '" data-ncm="' + esc(p.ncm) + '" aria-pressed="' + (p.classe === c[0] && p.origem !== 'sugerido') + '">' + c[1] + '</button>'; }).join('') + '</div>';
       var orig = p.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : '<span class="small">' + esc(ORIGEM[p.origem]) + '</span>';
       var desf = !S.readonly && (p.origem === 'manual' || p.origem === 'ncm') ? ' <button type="button" class="link" data-desfazer="' + esc(p.k) + '" data-origem="' + p.origem + '" data-ncm="' + esc(p.ncm) + '">Desfazer</button>' : '';
-      h += '<tr><td>' + esc(p.x) + '<div class="small">Cód. ' + esc(p.cp || '–') + ' · ' + esc(p.fn) + '</div></td><td class="mono" style="white-space:nowrap"><button type="button" class="link mono" data-fncm="' + esc(p.ncm) + '" title="Ver só este NCM">' + esc(p.ncm) + '</button>' + ((p.mono || p.monoCond || p.st) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + (p.mono ? '<span class="tag">Monofásico</span>' : p.monoCond ? '<span class="tag" title="Depende da destinação (Anexos I e II)">Monofásico?</span>' : '') + (p.st ? '<span class="tag">Saiu da ST</span>' : '') + '</div>' : '') + '</td><td class="r num">' + m0(p.v) + '<div class="small">' + p.n + ' ' + (p.n === 1 ? 'compra' : 'compras') + ' · última ' + brFull(p.ult) + '</div></td><td>' + ctrl + '<div style="margin-top:5px">' + orig + desf + '</div></td></tr>';
+      h += '<tr><td>' + esc(p.x) + '<div class="small">Cód. ' + esc(p.cp || '–') + ' · <button type="button" class="link" data-fforn="' + esc(p.fc) + '" title="Ver só este fornecedor">' + esc(p.fn) + '</button></div></td><td class="mono" style="white-space:nowrap"><button type="button" class="link mono" data-fncm="' + esc(p.ncm) + '" title="Ver só este NCM">' + esc(p.ncm) + '</button>' + ((p.mono || p.monoCond || p.st) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + (p.mono ? '<span class="tag">Monofásico</span>' : p.monoCond ? '<span class="tag" title="Depende da destinação (Anexos I e II)">Monofásico?</span>' : '') + (p.st ? '<span class="tag">Saiu da ST</span>' : '') + '</div>' : '') + '</td><td class="r num">' + m0(p.v) + '<div class="small">' + p.n + ' ' + (p.n === 1 ? 'compra' : 'compras') + ' · última ' + brFull(p.ult) + '</div></td><td>' + ctrl + '<div style="margin-top:5px">' + orig + desf + '</div></td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -1008,6 +1017,72 @@ async function desfazerClasse(pk, origem, ncm) {
   try { if (origem === 'ncm') await B.removerNcm(e.id, ncm); else await B.removerProduto(e.id, pk); }
   catch (err) { toast('Não foi possível desfazer: ' + erroTexto(err)); }
 }
+
+/* ---------- passo a passo ---------- */
+function passosTour() {
+  var simples = regimeEmp() === 'simples';
+  return [
+    { t: 'Bem-vindo ao portal da RG Fiscal', x: 'Aqui você acompanha as notas fiscais da sua empresa, os impostos do período e o que precisa ser corrigido. Em poucos passos mostramos onde fica cada informação.' },
+    { el: '#veredito', t: 'O resumo do período', x: 'Esta frase resume tudo: como fecham o ICMS, o PIS e a COFINS e quantos erros encontramos nas notas. O botão leva direto ao que precisa ser corrigido.' },
+    { el: '.periods', t: 'Escolha o período', x: 'Toque numa semana ou em "Todas as semanas" para mudar o período. Em "Meses", acima dos números, a visão passa a ser mensal, que é a da apuração oficial.' },
+    { el: '.mov', t: 'Vendas e compras', x: 'Quanto a empresa vendeu, comprou e contratou de serviços e fretes no período escolhido.' },
+    simples ? { el: '.kpi-simples', t: 'Receita para o Simples', x: 'A receita do período já separada como o PGDAS-D pede: com ICMS por substituição tributária, monofásica e tributada normalmente.' }
+      : { el: '.kpis', t: 'Impostos como as notas foram emitidas', x: 'ICMS, PIS e COFINS calculados com os valores que estão nas notas, inclusive os errados. Verde é saldo credor (crédito sobrando); escuro é imposto a recolher.' },
+    simples ? null : { el: '.kpis-corr', t: 'Como deve ficar depois das correções', x: 'Os mesmos impostos depois de corrigir as notas com erro. O último card mostra o impacto: quanto os tributos aumentam ou diminuem com as correções.' },
+    { el: '.tabs [data-tab="pendencias"]', t: 'O que corrigir', x: 'A lista de erros e alertas encontrados nas notas, com a explicação de cada um e o valor envolvido. Os itens que o escritório já tratou aparecem como resolvidos.' },
+    { el: '.tabs [data-tab="notas"]', t: 'Todas as notas', x: 'Cada nota do período, com o resultado da conferência. Clique no número da nota para ver o documento completo e baixar o XML.' },
+    { el: '[data-act="excel"]', t: 'Leve os dados com você', x: 'Baixe tudo em Excel ou imprima a tela. Os arquivos respeitam o período escolhido.' },
+    { el: '[data-act="tour"]', t: 'Pronto!', x: 'Sempre que quiser rever este passo a passo, clique neste ícone. Se tiver dúvida, fale com a RG Fiscal.' }
+  ].filter(Boolean);
+}
+function iniciarTour() { S.tour = { i: 0 }; desenharTour(); }
+function fecharTour() {
+  var nao = $('tourNao'); if (nao && nao.checked) ls('pf.tourOff', '1');
+  S.tour = null; var el = $('tour'); if (el) el.remove();
+  window.removeEventListener('resize', desenharTour); window.removeEventListener('scroll', posicionarTour, true);
+}
+function passoTour(d) { if (!S.tour) return; var n = passosTour().length; S.tour.i = Math.max(0, Math.min(n - 1, S.tour.i + d)); desenharTour(); }
+function desenharTour() {
+  if (!S.tour) return;
+  var ps = passosTour(), i = S.tour.i, p = ps[i];
+  var alvo = p.el ? document.querySelector(p.el) : null;
+  if (p.el && !alvo) { if (i < ps.length - 1) { S.tour.i++; return desenharTour(); } }
+  var el = $('tour');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'tour'; el.className = 'tour'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'tourTit');
+    document.body.appendChild(el);
+    window.addEventListener('resize', desenharTour); window.addEventListener('scroll', posicionarTour, true);
+  }
+  el.innerHTML = '<div class="tour-foco" id="tourFoco"></div><div class="tour-card" id="tourCard"><div class="tour-passo">Passo ' + (i + 1) + ' de ' + ps.length + '</div><h3 id="tourTit">' + esc(p.t) + '</h3><p>' + esc(p.x) + '</p>' +
+    '<div class="tour-pontos" aria-hidden="true">' + ps.map(function (_, k) { return '<i' + (k === i ? ' class="on"' : '') + '></i>'; }).join('') + '</div>' +
+    '<div class="tour-acoes"><label class="check small"><input type="checkbox" id="tourNao"' + (ls('pf.tourOff') === '1' ? ' checked' : '') + '> Não mostrar ao entrar</label><div class="row" style="gap:6px">' +
+    (i > 0 ? '<button class="btn" type="button" data-act="tourVolta">Voltar</button>' : '<button class="btn ghost" type="button" data-act="tourFim">Pular</button>') +
+    (i < ps.length - 1 ? '<button class="btn primary" type="button" data-act="tourProx" id="tourProx">Próximo</button>' : '<button class="btn primary" type="button" data-act="tourFim" id="tourProx">Começar</button>') + '</div></div></div>';
+  if (alvo) alvo.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
+  posicionarTour();
+  var bp = $('tourProx'); if (bp) bp.focus({ preventScroll: true });
+}
+function posicionarTour() {
+  if (!S.tour) return;
+  var p = passosTour()[S.tour.i], foco = $('tourFoco'), card = $('tourCard'); if (!foco || !card) return;
+  var alvo = p && p.el ? document.querySelector(p.el) : null;
+  var vw = window.innerWidth, vh = window.innerHeight, cw = Math.min(380, vw - 24);
+  card.style.width = cw + 'px';
+  if (!alvo) { foco.style.cssText = 'left:50%;top:50%;width:0;height:0'; card.style.left = (vw - cw) / 2 + 'px'; card.style.top = Math.max(12, (vh - card.offsetHeight) / 2) + 'px'; return; }
+  var r = alvo.getBoundingClientRect(), m = 6;
+  foco.style.cssText = 'left:' + (r.left - m) + 'px;top:' + (r.top - m) + 'px;width:' + (r.width + 2 * m) + 'px;height:' + (r.height + 2 * m) + 'px';
+  var ch = card.offsetHeight, top = r.bottom + 14;
+  if (top + ch > vh - 12) top = r.top - ch - 14;
+  if (top < 12) top = Math.max(12, vh - ch - 12);
+  var left = Math.min(Math.max(12, r.left), vw - cw - 12);
+  card.style.left = left + 'px'; card.style.top = top + 'px';
+}
+document.addEventListener('keydown', function (ev) {
+  if (!S.tour) return;
+  if (ev.key === 'Escape') fecharTour();
+  else if (ev.key === 'ArrowRight') passoTour(1);
+  else if (ev.key === 'ArrowLeft') passoTour(-1);
+});
 
 /* ---------- Excel e impressão ---------- */
 function imprimirPainel() {
@@ -1280,7 +1355,8 @@ document.addEventListener('click', function (ev) {
   if (d.gclasse) { if (!S.readonly) classificarGrupo(d.gtipo, d.gchave, d.gclasse); return; }
   if (d.gprod) { S.gProd = d.gprod; renderMain(); return; }
   if (d.fncm) { S.fNcm = d.fncm; S.fNome = ''; renderMain(); return; }
-  if (d.limpafiltro) { S.fNcm = ''; S.fNome = ''; renderMain(); return; }
+  if (d.fforn) { S.fForn = d.fforn; renderMain(); return; }
+  if (d.limpafiltro) { S.fNcm = ''; S.fNome = ''; S.fForn = ''; renderMain(); return; }
   if (d.cserv) { if (!S.readonly) classificarServ(d.pk, d.cserv); return; }
   if (d.pedeeq) { S.confirmEquipe = d.pedeeq; render(); return; }
   if (d.rmeq) { B.removerEquipe(d.rmeq).then(function () { S.confirmEquipe = null; toast('Removido da equipe.'); carregarEquipe(); }).catch(function (e) { toast(erroTexto(e)); }); return; }
@@ -1296,6 +1372,10 @@ document.addEventListener('click', function (ev) {
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario || S.demo) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
+  else if (a === 'tour') iniciarTour();
+  else if (a === 'tourProx') passoTour(1);
+  else if (a === 'tourVolta') passoTour(-1);
+  else if (a === 'tourFim') fecharTour();
   else if (a === 'tema') { var novo = temaAtual() === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', novo); ls('pf.tema', novo); var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = novo === 'dark' ? '#0d1830' : '#101b33'; render(); }
   else if (a === 'excel') baixarExcel();
   else if (a === 'imprimirPainel') imprimirPainel();
@@ -1375,6 +1455,7 @@ document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S
 document.addEventListener('change', function (ev) {
   var t = ev.target;
   if (t.id === 'porNcm') { S.porNcm = t.checked; return; }
+  if (t.id === 'fForn') { S.fForn = t.value; renderMain(); return; }
   var lista = t.files ? Array.prototype.slice.call(t.files) : [];
   if (t.id === 'files') { importar(lista); t.value = ''; }
   else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }

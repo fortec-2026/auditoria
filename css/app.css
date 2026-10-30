@@ -333,3 +333,18 @@ th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
 .grp-prod td{background:var(--surface-2);border-top:1px solid var(--line);padding:9px 10px}
 .grp-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 tbody tr.grp-prod:hover td{background:var(--surface-2)}
+
+/* Passo a passo */
+.tour{position:fixed;inset:0;z-index:40}
+.tour-foco{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(8,14,30,.62),0 0 0 2px var(--ciano-vivo);transition:all .25s ease;pointer-events:none}
+.tour-card{position:fixed;background:var(--surface);color:var(--ink);border-radius:16px;padding:18px 18px 14px;box-shadow:0 20px 50px rgba(0,0,0,.35);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px;transition:top .25s ease,left .25s ease}
+.tour-card h3{font-family:var(--f-display);font-size:17px;letter-spacing:-.01em}
+.tour-card p{margin:0;font-size:14px;line-height:1.55;color:var(--ink-2)}
+.tour-passo{font-size:12px;color:var(--ciano);font-weight:600}
+.tour-pontos{display:flex;gap:5px;margin-top:4px}
+.tour-pontos i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.tour-pontos i.on{background:var(--ciano);width:16px;border-radius:4px}
+.tour-acoes{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sel-forn{max-width:260px;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:5px 8px;font-size:13px}
+@media (prefers-reduced-motion:reduce){.tour-foco,.tour-card{transition:none}}
+@media print{.tour{display:none}}
