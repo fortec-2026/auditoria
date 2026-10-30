@@ -307,7 +307,11 @@ td.errcell{background:var(--err-bg)}
 .pcard[aria-pressed="true"]{background:var(--hero);border-color:var(--hero);color:var(--hero-ink);box-shadow:inset 0 -3px 0 var(--ciano-vivo)}
 .painel-abas .tabs button[aria-selected="true"]{box-shadow:inset 3px 0 0 var(--ciano)}
 .tabs button[aria-selected="true"]{border-bottom-color:var(--ciano)}
-.kpis-corr .card{background:var(--surface);border-style:dashed;border-color:color-mix(in srgb,var(--ciano) 45%,var(--line))}
+.kpis-corr .card{background:linear-gradient(180deg,color-mix(in srgb,var(--ciano-vivo) 14%,var(--surface)),var(--surface) 70%);border:1px solid color-mix(in srgb,var(--ciano) 55%,var(--line));box-shadow:0 8px 22px -14px color-mix(in srgb,var(--ciano) 70%,transparent)}
+.kpis-corr .kpi .badge{background:var(--ciano);color:var(--accent-ink)}
+.kpis-corr .kpi dl{border-top-color:color-mix(in srgb,var(--ciano) 35%,var(--line))}
+.kpi-tit-corr > .eyebrow{color:var(--ciano)}
+.kpi-tit-corr .chip[aria-pressed="true"]{background:var(--ciano);border-color:var(--ciano);color:var(--accent-ink)}
 @media (max-width:640px){
   .faixa{padding-bottom:24px;gap:16px}
   .faixa h1{font-size:26px}
