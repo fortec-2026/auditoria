@@ -327,3 +327,6 @@ td.errcell{background:var(--err-bg)}
 .pgroup > .eyebrow{text-transform:capitalize}
 th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
 .btn.tema{padding:8px 9px}
+.banner.demo{background:color-mix(in srgb,var(--ciano-vivo) 16%,var(--surface));color:var(--ink);border:1px solid color-mix(in srgb,var(--ciano) 45%,var(--line))}
+.banner.demo .btn.primary{background:var(--ciano);border-color:var(--ciano);color:var(--accent-ink)}
+@media (max-width:640px){.banner.demo .grow{flex-basis:100%}.banner.demo .btn{flex:1;justify-content:center}}

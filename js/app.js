@@ -36,6 +36,8 @@ var I = {
   up: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>',
   search: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   back: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18 9 12l6-6"/></svg>',
+  zap: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 1.7 3.6 3.6 4.4l1.2-1.1 2 .9c-.2 1.2-1.2 1.9-2.4 1.8-3.2-.3-6-3.1-6.3-6.3C7 8 7.7 7 8.9 6.8l.9 2z"/></svg>',
+  link: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
   sol: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   lua: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   mark: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/></svg>'
@@ -198,6 +200,7 @@ function abrirEmpresa(e, readonly, exemplo) {
   recalcular(); render(); window.scrollTo(0, 0);
 }
 function voltarEmpresas() {
+  if (S.demo) { S.demo = false; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} S.emp = null; S.res = null; S.exemplo = false; S.view = 'carregando'; render(); iniciar(); return; }
   S.emp = null; S.res = null; S.exemplo = false;
   S.view = S.usuario && S.usuario.papel === 'escritorio' ? 'escritorio' : 'cliente';
   render(); if (S.view === 'escritorio') B.empresas().then(function (l) { S.empresas = l; contarTudo(); });
@@ -215,6 +218,8 @@ function render() {
 }
 var LOGO = '<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="var(--logo-bg)"/><text x="20" y="23.5" text-anchor="middle" font-family="Sora, IBM Plex Sans, sans-serif" font-weight="700" font-size="15" letter-spacing="-.5" fill="var(--logo-fg)">RG</text>' +
   [0, 2.4, 3.6, 6, 8.4, 9.6, 12, 13.2, 15.6, 18, 19.2, 21.6].map(function (x, i) { return '<rect x="' + (9 + x) + '" y="28" width="' + (i % 3 === 1 ? 0.8 : 1.4) + '" height="4.5" fill="var(--logo-bar)"/>'; }).join('') + '</svg>';
+function WA(n) { return 'https://wa.me/' + n + '?text=' + encodeURIComponent('Olá! Vi a demonstração do portal da RG Fiscal e quero saber como funciona para a minha empresa.'); }
+function linkDemo() { return location.origin + location.pathname + '#demo'; }
 function faixa(conteudo, extra) { return '<div class="faixa' + (extra ? ' ' + extra : '') + '">' + conteudo + '</div>'; }
 function temaAtual() { var t = document.documentElement.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
 function nav(extra) {
@@ -251,7 +256,7 @@ function vListaCliente() {
 function vEscritorio() {
   var h = faixa(nav() + '<header class="top"><div><h1>Empresas</h1><div class="sub">Área do escritório. O cliente só vê o que for publicado.</div></div>' +
     '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button></div></header>');
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Copiar link de demonstração</button></div></header>');
   if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
   if (S.empresas.length) {
     h += '<div class="empresas">' + S.empresas.map(function (e) {
@@ -269,12 +274,14 @@ function vPainel() {
   var navR = S.readonly ? (S.empresas.length > 1 ? '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Empresas</button>' : '') :
     '<div class="seg" role="group" aria-label="Modo"><button type="button" data-modo="cliente" aria-pressed="' + (S.modo === 'cliente') + '">Visão do cliente</button><button type="button" data-modo="escritorio" aria-pressed="' + (S.modo === 'escritorio') + '">Escritório</button></div>' +
     '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Empresas</button>';
-  if (S.exemplo && !S.usuario) navR = '<button class="btn ghost" type="button" data-act="voltar">' + I.back + 'Entrar</button>';
+  if (S.exemplo && (!S.usuario || S.demo)) navR = '<button class="btn ghost" type="button" data-act="voltar">' + (S.demo ? 'Já sou cliente' : I.back + 'Entrar') + '</button>';
   var h = faixa(nav(navR) + '<header class="top"><div style="min-width:0"><h1 id="titEmp"></h1><div class="sub" id="subtitle"></div></div>' +
     '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>' +
     '<div class="veredito" id="veredito"></div>');
   var pend = pendentesPublicar();
-  if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nada aqui é gravado no banco.</span><button class="btn" type="button" data-act="voltar">Fechar exemplo</button></div>';
+  if (S.demo) h += '<div class="banner demo"><span class="grow"><b>Demonstração com notas fictícias</b> de uma revendedora de pneus e autopeças. Navegue à vontade: veja as pendências, abra as notas e baixe o Excel. Quer ver com as notas da sua empresa? Fale com a RG Fiscal.</span>' +
+    '<a class="btn primary" target="_blank" rel="noopener" href="' + WA('5516981505852') + '">' + I.zap + 'Cassiano</a><a class="btn primary" target="_blank" rel="noopener" href="' + WA('5516993392325') + '">' + I.zap + 'Vinicius</a></div>';
+  else if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nada aqui é gravado no banco.</span><button class="btn" type="button" data-act="voltar">Fechar exemplo</button></div>';
   else if (!S.readonly && pend) h += '<div class="banner"><span class="grow"><b>' + pend + (pend === 1 ? ' nota não publicada.' : ' notas não publicadas.') + '</b> O cliente ainda não vê essas notas.</span><button class="btn primary" type="button" data-act="publicar"' + (S.ocupado ? ' disabled' : '') + '>' + (S.ocupado ? 'Publicando…' : 'Publicar para o cliente') + '</button></div>';
 
   h += '<section id="office" hidden></section><section id="main" style="display:flex;flex-direction:column;gap:18px;min-width:0"></section>';
@@ -1244,8 +1251,9 @@ document.addEventListener('click', function (ev) {
   }
   var a = d.act;
   if (a === 'exemplo') carregarExemplo();
+  if (a === 'copiarDemo') { var url = linkDemo(); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copiado: ' + url); }).catch(function () { window.prompt('Copie o link de demonstração:', url); }); return; }
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
-  else if (a === 'inicio' || a === 'voltar') { if (S.usuario) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
+  else if (a === 'inicio' || a === 'voltar') { if (S.usuario || S.demo) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
   else if (a === 'tema') { var novo = temaAtual() === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', novo); ls('pf.tema', novo); var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = novo === 'dark' ? '#0d1830' : '#101b33'; render(); }
   else if (a === 'excel') baixarExcel();
@@ -1349,7 +1357,7 @@ async function carregarExemplo() {
     var acc = await lerArquivos([new File([blob], 'exemplo.zip')]);
     var e = { id: 'exemplo', meta: { cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', corte: '2026-10-01', mono: F.DEFAULT_MONO.slice(), st: F.DEFAULT_ST.slice(), publicado: null },
       notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
-    abrirEmpresa(e, !(S.usuario && S.usuario.papel === 'escritorio'), true);
+    abrirEmpresa(e, S.demo || !(S.usuario && S.usuario.papel === 'escritorio'), true);
   } catch (err) { toast('Não foi possível carregar o exemplo.'); }
 }
 
@@ -1359,6 +1367,6 @@ if (/type=recovery/.test(location.hash)) S.view = 'recuperar';
 B.aoMudarSessao(function (evento) {
   if (evento === 'PASSWORD_RECOVERY') { S.view = 'recuperar'; render(); }
 });
-render();
-iniciar();
+if (/^#demo\b/.test(location.hash)) { S.demo = true; S.view = 'carregando'; render(); carregarExemplo(); }
+else { render(); iniciar(); }
 })();

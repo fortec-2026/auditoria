@@ -4,6 +4,10 @@ Portal da **RG Fiscal (Reis & Godói Consultoria Tributária)**. Apuração de I
 
 O site fica no GitHub Pages e os dados ficam no Supabase, no projeto **Orçamentos** (`ekhtiductqttqgpyetlk`). Cada pessoa entra com e-mail e senha.
 
+## Link de demonstração
+
+O endereço do site com `#demo` no final (por exemplo `https://fortec-2026.github.io/auditoria/#demo`) abre a empresa de exemplo, com notas fictícias, na visão do cliente e sem login. A faixa da demonstração traz botões de WhatsApp para falar com Cassiano e Vinicius. Na tela de empresas, o botão **Copiar link de demonstração** copia esse endereço.
+
 ## Quem faz o quê
 
 | Papel | O que vê e faz |
