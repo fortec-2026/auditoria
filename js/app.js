@@ -420,7 +420,7 @@ function renderMain() {
   else if (S.tab === 'servicos') h += tabServicos(ds, T);
   else h += tabReforma(ds, T);
   h += '</div></div>';
-  h += '<p class="legal">Documentos lidos: NF-e, NFC-e, CT-e e NFS-e do padrão nacional. Base: ICMS/SP com tributação normal de pneus e autopeças a partir de 01/10/2026 (Portaria SRE 34/2026, que revogou os Anexos de pneumáticos e autopeças da Portaria CAT 68/2019); PIS/COFINS não cumulativo do Lucro Real (Leis 10.637/2002 e 10.833/2003), com ICMS excluído da base do débito (Tema 69/STF) e do crédito (Lei 14.592/2023); produtos monofásicos conforme a Lei 10.485/2002, sem débito na revenda e sem crédito na compra. Valores apurados a partir dos XMLs; não substituem a escrituração (SPED) nem a apuração oficial.</p>';
+  h += '<p class="legal">' + textoLegal() + '</p>';
   el.innerHTML = h;
   bindChart();
 }
@@ -444,7 +444,7 @@ function grafico(ds) {
   if (!gs.length) return '';
   var max = 0; gs.forEach(function (g) { max = Math.max(max, g.t.icmsD, g.t.icmsC); });
   var larg = ($('chart') && $('chart').clientWidth) || (($('main') && $('main').clientWidth) || 1000) - 38;
-  var sc = escala(max), W = Math.max(560, Math.round(larg)), H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
+  var sc = escala(max), W = Math.max(300, Math.round(larg)), H = 260, L = 56, R = 12, Tp = 12, B = 30, iw = W - L - R, ih = H - Tp - B;
   var gw = iw / gs.length, bw = Math.max(6, Math.min(44, gw * 0.26)), gap = 3;
   var y = function (v) { return Tp + ih - v / sc.max * ih; };
   var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="ICMS débito e crédito por ' + (S.periodo[0] === 'w' ? 'dia' : 'semana') + '">';
@@ -462,7 +462,7 @@ function grafico(ds) {
     if (i % passoRotulo === 0) s += '<text class="axis" x="' + cx + '" y="' + (H - 10) + '" text-anchor="middle">' + esc(g.lbl) + '</text>';
   });
   s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (Tp + ih) + '" y2="' + (Tp + ih) + '" stroke="var(--muted)" stroke-width="1"/></svg>';
-  return '<div class="card chart-card"><div class="chart-head"><div><h3>ICMS por ' + (S.periodo[0] === 'w' ? 'dia' : 'semana') + '</h3><div class="small">Débito das saídas e crédito das entradas. Passe o mouse para ver o saldo.</div></div>' +
+  return '<div class="card chart-card"><div class="chart-head"><div><h3>ICMS por ' + (S.periodo[0] === 'w' ? 'dia' : 'semana') + '</h3><div class="small">Débito das saídas e crédito das entradas. Passe o mouse ou toque numa barra para ver o saldo.</div></div>' +
     '<div class="legend"><span><i style="background:var(--s1)"></i>Débito</span><span><i style="background:var(--s2)"></i>Crédito</span></div></div>' +
     '<div class="chart" id="chart">' + s + '<div class="tip" id="tip" hidden></div></div></div>';
 }
@@ -479,7 +479,7 @@ window.addEventListener('resize', function () {
 function bindChart() {
   var box = $('chart'); if (!box) return;
   var tip = $('tip');
-  box.addEventListener('mousemove', function (ev) {
+  var mostrar = function (ev) {
     var r = ev.target.closest && ev.target.closest('.hit');
     if (!r) { tip.hidden = true; return; }
     var g = S._gs[+r.getAttribute('data-g')], t = g.t, saldo = t.icmsD - t.icmsC;
@@ -487,9 +487,19 @@ function bindChart() {
     tip.hidden = false;
     var b = box.getBoundingClientRect(), x = ev.clientX - b.left + box.scrollLeft + 14, yy = ev.clientY - b.top + 10;
     if (x + 190 > box.scrollWidth) x -= 210;
-    tip.style.left = x + 'px'; tip.style.top = yy + 'px';
-  });
+    tip.style.left = Math.max(0, x) + 'px'; tip.style.top = yy + 'px';
+  };
+  box.addEventListener('mousemove', mostrar);
+  box.addEventListener('click', mostrar);
   box.addEventListener('mouseleave', function () { tip.hidden = true; });
+}
+
+function textoLegal() {
+  var seg = (S.emp.meta.segmento || 'autopecas'), reg = regimeEmp();
+  var icms = seg === 'autopecas' ? 'ICMS/SP com tributação normal de pneus e autopeças a partir de 01/10/2026 (Portaria SRE 34/2026)' : 'ICMS/SP conforme o RICMS/SP e a Portaria CAT 68/2019 (substituição tributária), com as isenções e a redução da cesta básica vigentes';
+  var pc = reg === 'simples' ? 'Simples Nacional (LC 123/2006), com a receita monofásica e com ST segregada no PGDAS-D' : reg === 'presumido' ? 'PIS/COFINS cumulativo do Lucro Presumido (Lei 9.718/1998), com ICMS excluído da base (Tema 69/STF)' : 'PIS/COFINS não cumulativo do Lucro Real (Leis 10.637/2002 e 10.833/2003), com ICMS excluído da base do débito (Tema 69/STF) e do crédito (Lei 14.592/2023)';
+  var mono = seg === 'autopecas' ? 'produtos monofásicos conforme a Lei 10.485/2002' : 'monofásicos e alíquota zero conforme as Leis 10.147/2000, 10.485/2002, 10.865/2004, 10.925/2004 e 13.097/2015';
+  return 'Documentos lidos: NF-e, NFC-e, CT-e e NFS-e do padrão nacional. Base: ' + icms + '; ' + pc + '; ' + mono + '. Valores apurados a partir dos XMLs; não substituem a escrituração (SPED) nem a apuração oficial.';
 }
 
 /* ---------- abas ---------- */
@@ -501,16 +511,23 @@ function linhasApuracao(ds) {
   else S.per.meses.forEach(function (m) { var x = m.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) rows.push({ lbl: mesNome(m.mes), dias: x }); });
   return rows;
 }
+function visaoApur(dias, t) {
+  var c = comparativo(dias, t, S.cmpAlertas), v = S.apVisao === 'corr' ? c.corr : c.atual, o = {};
+  for (var k in t) o[k] = t[k];
+  ['icmsD', 'icmsC', 'pisD', 'pisC', 'cofD', 'cofC'].forEach(function (k) { o[k] = v[k]; });
+  return o;
+}
 function tabApuracao(ds, T) {
-  var rows = linhasApuracao(ds).map(function (r) { return { lbl: r.lbl, t: F.somaDias(S.res.dias, r.dias) }; });
-  var h = '<div class="toolbar"><div class="seg" role="group" aria-label="Detalhar por"><button type="button" data-det="dia" aria-pressed="' + (S.det === 'dia') + '">Dia</button><button type="button" data-det="semana" aria-pressed="' + (S.det === 'semana') + '">Semana</button><button type="button" data-det="mes" aria-pressed="' + (S.det === 'mes') + '">Mês</button></div><span class="small">Valores entre parênteses são saldo credor.</span></div>';
+  var rows = linhasApuracao(ds).map(function (r) { var t = F.somaDias(S.res.dias, r.dias); return { lbl: r.lbl, t: regimeEmp() === 'simples' ? t : visaoApur(r.dias, t) }; });
+  if (regimeEmp() !== 'simples') T = visaoApur(ds, T);
+  var h = '<div class="toolbar"><div class="seg" role="group" aria-label="Detalhar por"><button type="button" data-det="dia" aria-pressed="' + (S.det === 'dia') + '">Dia</button><button type="button" data-det="semana" aria-pressed="' + (S.det === 'semana') + '">Semana</button><button type="button" data-det="mes" aria-pressed="' + (S.det === 'mes') + '">Mês</button></div>' + (regimeEmp() === 'simples' ? '' : '<div class="seg" role="group" aria-label="Visão"><button type="button" data-apv="emit" aria-pressed="' + (S.apVisao !== 'corr') + '">Como emitidas</button><button type="button" data-apv="corr" aria-pressed="' + (S.apVisao === 'corr') + '">Após as correções</button></div>') + '<span class="small">Valores entre parênteses são saldo credor.</span></div>';
   h += '<div class="tscroll"><table><thead><tr class="grp"><th></th><th></th><th></th><th colspan="3">ICMS</th><th colspan="3">PIS</th><th colspan="3">COFINS</th></tr><tr><th>Período</th><th class="r">Vendas</th><th class="r">Compras</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody>';
   rows.forEach(function (r) {
     var t = r.t;
     h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + (t.nS + t.nSP) + ((t.nS + t.nSP) === 1 ? ' saída · ' : ' saídas · ') + (t.nE + t.nST + t.nCT) + ((t.nE + t.nST + t.nCT) === 1 ? ' entrada' : ' entradas') + '</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.compras + t.compOut + t.compIns) + (t.compIns ? '<div class="small">insumo ' + m0(t.compIns) + '</div>' : '') + (t.compOut ? '<div class="small">uso/ativo ' + m0(t.compOut) + '</div>' : '') + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
   });
   h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut + T.compIns) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
-  h += '<p class="note">PIS e COFINS apurados pela regra (1,65% e 7,6% sobre a receita sem ICMS), não pelo valor destacado nas notas. Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
+  h += '<p class="note">' + (regimeEmp() === 'simples' ? 'Simples Nacional: PIS e COFINS vão no DAS; os valores de ICMS são os destacados nas notas. ' : S.apVisao === 'corr' ? 'Após as correções: a apuração como fica depois de corrigir as pendências (' + (S.cmpAlertas ? 'erros e alertas' : 'só os erros') + '; mude no topo do painel). ' : 'Como emitidas: ICMS destacado nas notas e PIS/COFINS como as notas foram emitidas, inclusive os erros. ') + 'Produtos monofásicos não geram débito nem crédito. Entradas de setembro com ST não geram crédito de ICMS: o imposto foi encerrado na retenção. Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
   return h;
 }
 
@@ -744,13 +761,13 @@ function tabNotas(notas) {
   return h;
 }
 var CLASSES = [['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']];
-var ORIGEM = { manual: 'Definido pelo escritório', ncm: 'Regra do NCM', sugerido: 'Sugerido pelo NCM (pneus/autopeças)', nenhum: '' };
+var ORIGEM = { manual: 'Definido pelo escritório', ncm: 'Regra do NCM', sugerido: 'Sugerido como revenda', nenhum: '' };
 function tabProdutos() {
   var todos = Object.values(S.res.produtos);
   var cnt = function (c) { return todos.filter(function (p) { return c === 'todos' || p.classe === c; }).length; };
   var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
   f.sort(function (a, b) { return (a.classe === 'pendente' ? 0 : 1) - (b.classe === 'pendente' ? 0 : 1) || b.v - a.v; });
-  var h = '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. NCM de pneus e autopeças já vem sugerido como revenda. A classificação fica no histórico e vale para as próximas importações.</p>';
+  var h = '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. ' + ((S.emp.meta.segmento || 'autopecas') === 'autopecas' ? 'NCM de pneus e autopeças já vem sugerido como revenda.' : 'No varejo, toda compra vem sugerida como revenda; marque o que for uso e consumo ou ativo.') + ' A classificação fica no histórico e vale para as próximas importações.</p>';
   h += '<div class="toolbar"><div class="chips" role="group" aria-label="Classificação">' + [['todos', 'Todos'], ['pendente', 'Sem classificação'], ['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']].map(function (c) { return '<button type="button" class="chip" data-fprod="' + c[0] + '" aria-pressed="' + (S.fProd === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt(c[0]) + ')</span></button>'; }).join('') + '</div>';
   if (!S.readonly) h += '<label class="check" for="porNcm"><input type="checkbox" id="porNcm"' + (S.porNcm ? ' checked' : '') + '> Aplicar a todos os produtos do mesmo NCM</label>';
   h += '</div>';
@@ -963,15 +980,18 @@ async function baixarExcel() {
 
     // Apuração por mês, semana e dia
     var colsAp = [{ t: 'Período', w: 26 }, { t: 'Saídas', w: 8, f: 'int' }, { t: 'Entradas', w: 9, f: 'int' }, { t: 'Vendas', w: 15, f: 'din' }, { t: 'Compras', w: 15, f: 'din' }, { t: 'ICMS débito', w: 14, f: 'din' }, { t: 'ICMS crédito', w: 14, f: 'din' }, { t: 'ICMS saldo', w: 14, f: 'din' }, { t: 'PIS débito', w: 13, f: 'din' }, { t: 'PIS crédito', w: 13, f: 'din' }, { t: 'PIS saldo', w: 13, f: 'din' }, { t: 'COFINS débito', w: 14, f: 'din' }, { t: 'COFINS crédito', w: 14, f: 'din' }, { t: 'COFINS saldo', w: 14, f: 'din' }];
+    var visaoX = S.apVisao === 'corr' ? 'após as correções' : 'como as notas foram emitidas';
+    var linhaAp0 = function (lbl, t, dias) { return linhaAp(lbl, regimeEmp() === 'simples' ? t : visaoApur(dias, t)); };
     var linhaAp = function (lbl, t) { return [lbl, t.nS + t.nSP, t.nE + t.nST + t.nCT, t.vendas, t.compras + t.compOut + t.compIns, t.icmsD, t.icmsC, t.icmsD - t.icmsC, t.pisD, t.pisC, t.pisD - t.pisC, t.cofD, t.cofC, t.cofD - t.cofC]; };
-    var tot = linhaAp('Total', T);
+    var tot = linhaAp0('Total', T, ds);
     var porMes = [], porSem = [], porDia = [];
-    S.per.meses.forEach(function (m) { var x = m.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) porMes.push(linhaAp(mesNome(m.mes), F.somaDias(S.res.dias, x))); });
-    S.per.semanas.slice().reverse().forEach(function (w) { var x = w.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) porSem.push(linhaAp('Sem. ' + w.num + ' · ' + brFull(w.ini) + ' a ' + brFull(w.fim), F.somaDias(S.res.dias, x))); });
-    ds.forEach(function (d) { var l = linhaAp(d, F.somaDias(S.res.dias, [d])); porDia.push(l); });
-    abas.push({ nome: 'Apuração por mês', titulo: tit, cols: colsAp, rows: porMes, total: tot });
-    abas.push({ nome: 'Apuração por semana', titulo: tit, cols: colsAp, rows: porSem, total: tot });
-    abas.push({ nome: 'Apuração por dia', titulo: tit, cols: [{ t: 'Data', w: 12, f: 'data' }].concat(colsAp.slice(1)), rows: porDia, total: tot });
+    S.per.meses.forEach(function (m) { var x = m.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) porMes.push(linhaAp0(mesNome(m.mes).charAt(0).toUpperCase() + mesNome(m.mes).slice(1), F.somaDias(S.res.dias, x), x)); });
+    S.per.semanas.slice().reverse().forEach(function (w) { var x = w.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) porSem.push(linhaAp0('Sem. ' + w.num + ' · ' + brFull(w.ini) + ' a ' + brFull(w.fim), F.somaDias(S.res.dias, x), x)); });
+    ds.forEach(function (d) { porDia.push(linhaAp0(d, F.somaDias(S.res.dias, [d]), [d])); });
+    var titAp = tit + (regimeEmp() === 'simples' ? '' : ' · ' + visaoX);
+    abas.push({ nome: 'Apuração por mês', titulo: titAp, cols: colsAp, rows: porMes, total: tot });
+    abas.push({ nome: 'Apuração por semana', titulo: titAp, cols: colsAp, rows: porSem, total: tot });
+    abas.push({ nome: 'Apuração por dia', titulo: titAp, cols: [{ t: 'Data', w: 12, f: 'data' }].concat(colsAp.slice(1)), rows: porDia, total: tot });
 
     // Comparativo
     var cmpL = function (al) {
@@ -1183,6 +1203,7 @@ document.addEventListener('click', function (ev) {
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
+  if (d.apv) { S.apVisao = d.apv; renderMain(); return; }
   if (d.cmpal) { S.cmpAlertas = d.cmpal === 'true'; renderMain(); return; }
   if (d.fcls) { S.fCls = d.fcls; if (d.fcls === 'compra' && S.fClsDiv === 'div') S.fClsDiv = 'todos'; renderMain(); return; }
   if (d.fclsdiv) { S.fClsDiv = d.fclsdiv; renderMain(); return; }

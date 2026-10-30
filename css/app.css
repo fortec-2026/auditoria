@@ -242,3 +242,21 @@ td.errcell{background:var(--err-bg)}
 @media (max-width:520px){.kpi-simples{grid-column:auto}}
 .kpi-tit{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:-8px}
 .kpis-corr .card{background:var(--surface-2)}
+
+/* Celular */
+@media (max-width:640px){
+  .mov{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mov > div + div{border-top:0;border-left:0}
+  .mov > div:nth-child(n+3){border-top:1px solid var(--line)}
+  .mov > div:nth-child(even){border-left:1px solid var(--line)}
+  .mov > div{padding:10px 12px}
+  .mov b{font-size:17px}
+  .tabs{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .chart svg{min-width:0}
+  .kpi .big{font-size:24px}
+  .ver{padding:8px}
+  .ver .doc{padding:14px;gap:12px}
+  .ver-head .r{text-align:left}
+  .ver-top{top:-14px}
+}
