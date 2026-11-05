@@ -240,3 +240,12 @@ exemplos/               notas fictícias para teste
 
 - O cabeçalho mostra "Regras fiscais revisadas em dd/mm/aaaa conforme a legislação vigente". A data vem de `REVISAO` em `js/regras.js` e também aparece na aba Classificação e no Excel.
 - Toda segunda-feira uma tarefa agendada consulta as fontes oficiais (SEFAZ-SP, Planalto, Receita Federal, CONFAZ, Portal da NF-e) e entrega um relatório com o que mudou e o que corrigir. Ela não altera o site: as correções, e a nova data do selo, só são aplicadas depois da aprovação do escritório.
+
+## Demonstração e teste grátis
+
+- **Links:** `#demo` (revenda de pneus e autopeças), `#demo-mercado` (mercadinho, Lucro Presumido) e `#teste` (teste grátis com as próprias notas). No painel do escritório há um botão para copiar cada link.
+- **Cartão "O que o portal encontrou":** no topo da demo e do teste. Mostra o total a corrigir, quanto é a favor da empresa (vira "possível recuperação" quando o período já está fechado) e quanto é a recolher a mais. No Simples, lembra a segregação da receita monofásica e com ST no PGDAS-D.
+- **Teste grátis:** o visitante escolhe ramo e regime e envia .zip ou XMLs. A leitura e a análise rodam no navegador dele: nada é enviado nem gravado. Ele vê o resumo, a apuração e as 5 primeiras pendências; as demais, o Excel e a impressão ficam para o relatório completo, com botões de WhatsApp para Cassiano e Vinicius.
+- **Passo a passo de vendas:** na demo, o tour tem 5 passos (o dinheiro em jogo, cada erro explicado, antes e depois e o convite para o teste).
+- **Prévia no WhatsApp:** `og.png` (1200×630) e as tags Open Graph no `index.html`.
+- **Dados fictícios do mercadinho:** `exemplos/notas-mercadinho.zip` (NFC-e diárias de set. e out./2026 e compras de três fornecedores), com erros típicos: arroz tributado a 18% (isento), sabão em pó como ST depois de 01/08/2026, shampoo com PIS/COFINS em setembro (monofásico).

@@ -352,3 +352,31 @@ tbody tr.grp-prod:hover td{background:var(--surface-2)}
 .selo-rev .ico{width:14px;height:14px;color:#3fd3e3}
 @media (max-width:720px){.selo-rev{display:flex;width:max-content;max-width:100%;white-space:normal;margin:6px 0 0}}
 @media print{.selo-rev{border-color:#999;color:#333}.selo-rev .ico{color:#333}}
+/* demo: cartão do valor encontrado */
+.achado{display:grid;grid-template-columns:minmax(220px,1.1fr) 2fr;gap:18px 26px;padding:22px 24px;border:1px solid color-mix(in srgb,var(--ciano) 40%,var(--line));background:linear-gradient(135deg,color-mix(in srgb,var(--ciano-vivo) 12%,var(--surface)),var(--surface) 60%)}
+.ach-main p{margin:4px 0 0;color:var(--muted)}
+.ach-big{font-family:var(--f-display);font-size:clamp(34px,5vw,50px);font-weight:700;letter-spacing:-.02em;line-height:1.05;margin-top:6px;color:var(--ink)}
+.ach-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ach-c{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.ach-c b{font-size:20px;font-family:var(--f-display)}
+.ach-c.favor b{color:var(--ok)} .ach-c.contra b{color:var(--err)}
+.ach-c .link{align-self:flex-start;margin-top:auto}
+.ach-nota{grid-column:1/-1;margin:-6px 0 0}
+.ach-cta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding-top:14px;border-top:1px solid var(--line)}
+.ach-cta>span{font-weight:600}
+.ach-cta .btn.primary{background:var(--ciano);border-color:var(--ciano);color:var(--accent-ink)}
+@media (max-width:860px){.achado{grid-template-columns:1fr;padding:18px}.ach-cols{grid-template-columns:1fr}.ach-cta .btn,.ach-cta .row{flex:1}.ach-cta .row .btn{justify-content:center}}
+.demo-ramo{display:inline-flex;margin-left:10px;vertical-align:middle}
+@media (max-width:640px){.demo-ramo{display:flex;margin:8px 0 0}}
+/* teste grátis */
+.teste-card{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:22px;padding:26px}
+.teste-passo{display:flex;gap:14px;align-items:flex-start}
+.teste-passo h2{margin:0;font-size:18px}
+.teste-n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--ciano);color:var(--accent-ink)}
+.teste-passo .drop{margin-top:10px;padding:30px}
+.teste-priv{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:12px;background:var(--ok-bg);color:var(--ink);font-size:14px}
+.teste-priv .ico{flex:none;margin-top:2px;color:var(--ok)}
+.mais-teste td{background:color-mix(in srgb,var(--ciano-vivo) 10%,var(--surface))}
+.mais-teste-c{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;padding:6px 2px}
+.mais-teste-c>div:first-child{max-width:560px}
+@media print{.achado .ach-cta{display:none}}

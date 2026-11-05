@@ -4,6 +4,11 @@
 var F = Fiscal, B = Banco, M = F.money;
 var MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 var EXEMPLO_URL = 'exemplos/notas-exemplo.zip';
+var DEMOS = {
+  pneus: { url: EXEMPLO_URL, cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', segmento: 'autopecas', regime: 'real', ramo: 'uma revendedora de pneus e autopeças', rot: 'Pneus e autopeças' },
+  mercado: { url: 'exemplos/notas-mercadinho.zip', cnpj: '98765432000155', nome: 'Mercadinho Bom Preço Exemplo Ltda (fictícia)', segmento: 'varejo', regime: 'presumido', ramo: 'um mercadinho', rot: 'Mercadinho' }
+};
+var WA_TESTE = 'Olá! Testei o portal da RG Fiscal com as notas da minha empresa e quero receber o relatório completo.';
 
 var S = {
   view: 'carregando',      // carregando | login | recuperar | escritorio | cliente | painel
@@ -203,7 +208,7 @@ function abrirEmpresa(e, readonly, exemplo) {
   if ((S.readonly || S.demo) && !S.tourVisto && ls('pf.tourOff') !== '1') { S.tourVisto = true; setTimeout(function () { iniciarTour(); }, 350); }
 }
 function voltarEmpresas() {
-  if (S.demo) { S.demo = false; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} S.emp = null; S.res = null; S.exemplo = false; S.view = 'carregando'; render(); iniciar(); return; }
+  if (S.demo) { S.demo = false; S.teste = false; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} S.emp = null; S.res = null; S.exemplo = false; S.view = 'carregando'; render(); iniciar(); return; }
   S.emp = null; S.res = null; S.exemplo = false;
   S.view = S.usuario && S.usuario.papel === 'escritorio' ? 'escritorio' : 'cliente';
   render(); if (S.view === 'escritorio') B.empresas().then(function (l) { S.empresas = l; contarTudo(); });
@@ -217,12 +222,14 @@ function render() {
   else if (S.view === 'recuperar') app.innerHTML = vRecuperar();
   else if (S.view === 'escritorio') app.innerHTML = vEscritorio();
   else if (S.view === 'cliente') app.innerHTML = vListaCliente();
+  else if (S.view === 'teste') app.innerHTML = vTeste();
   else { app.innerHTML = vPainel(); renderOffice(); renderMain(); }
 }
 var LOGO = '<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="var(--logo-bg)"/><text x="20" y="23.5" text-anchor="middle" font-family="Sora, IBM Plex Sans, sans-serif" font-weight="700" font-size="15" letter-spacing="-.5" fill="var(--logo-fg)">RG</text>' +
   [0, 2.4, 3.6, 6, 8.4, 9.6, 12, 13.2, 15.6, 18, 19.2, 21.6].map(function (x, i) { return '<rect x="' + (9 + x) + '" y="28" width="' + (i % 3 === 1 ? 0.8 : 1.4) + '" height="4.5" fill="var(--logo-bar)"/>'; }).join('') + '</svg>';
-function WA(n) { return 'https://wa.me/' + n + '?text=' + encodeURIComponent('Olá! Vi a demonstração do portal da RG Fiscal e quero saber como funciona para a minha empresa.'); }
-function linkDemo() { return location.origin + location.pathname + '#demo'; }
+function WA(n, msg) { return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg || 'Olá! Vi a demonstração do portal da RG Fiscal e quero saber como funciona para a minha empresa.'); }
+function botoesWA(msg, cls) { return '<a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516981505852', msg) + '">' + I.zap + 'Cassiano</a><a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516993392325', msg) + '">' + I.zap + 'Vinicius</a>'; }
+function linkDemo(k) { return location.origin + location.pathname + (k === 'teste' ? '#teste' : k === 'mercado' ? '#demo-mercado' : '#demo'); }
 function faixa(conteudo, extra) { return '<div class="faixa' + (extra ? ' ' + extra : '') + '">' + conteudo + '</div>'; }
 function temaAtual() { var t = document.documentElement.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
 function nav(extra) {
@@ -260,7 +267,7 @@ function vListaCliente() {
 function vEscritorio() {
   var h = faixa(nav() + '<header class="top"><div><h1>Empresas</h1><div class="sub">Área do escritório. O cliente só vê o que for publicado.</div></div>' +
     '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Copiar link de demonstração</button></div></header>');
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Link da demo: pneus</button><button class="btn" type="button" data-act="copiarDemo" data-k="mercado">' + I.link + 'Link da demo: mercadinho</button><button class="btn" type="button" data-act="copiarDemo" data-k="teste">' + I.link + 'Link do teste grátis</button></div></header>');
   if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
   if (S.empresas.length) {
     h += '<div class="empresas">' + S.empresas.map(function (e) {
@@ -283,8 +290,11 @@ function vPainel() {
     '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>' +
     '<div class="veredito" id="veredito"></div>');
   var pend = pendentesPublicar();
-  if (S.demo) h += '<div class="banner demo"><span class="grow"><b>Demonstração com notas fictícias</b> de uma revendedora de pneus e autopeças. Navegue à vontade: veja as pendências, abra as notas e baixe o Excel. Quer ver com as notas da sua empresa? Fale com a RG Fiscal.</span>' +
-    '<a class="btn primary" target="_blank" rel="noopener" href="' + WA('5516981505852') + '">' + I.zap + 'Cassiano</a><a class="btn primary" target="_blank" rel="noopener" href="' + WA('5516993392325') + '">' + I.zap + 'Vinicius</a></div>';
+  if (S.demo && S.teste) h += '<div class="banner demo"><span class="grow"><b>Resultado do teste com as suas notas.</b> A análise rodou só no seu navegador: nenhum arquivo foi enviado nem gravado, e tudo some ao fechar a página. Os valores são estimativas para conferir com a RG Fiscal.</span>' +
+    '<button class="btn" type="button" data-act="teste">Testar outro arquivo</button>' + botoesWA(WA_TESTE) + '</div>';
+  else if (S.demo) { var dm = DEMOS[S.demoTipo || 'pneus']; h += '<div class="banner demo"><span class="grow"><b>Demonstração com notas fictícias</b> de ' + dm.ramo + '. Navegue à vontade: veja as pendências, abra as notas e baixe o Excel.' +
+    '<span class="seg demo-ramo" role="group" aria-label="Ramo da demonstração">' + Object.keys(DEMOS).map(function (k) { return '<button type="button" data-demo="' + k + '" aria-pressed="' + ((S.demoTipo || 'pneus') === k) + '">' + DEMOS[k].rot + '</button>'; }).join('') + '</span></span>' +
+    botoesWA(null, '') + '</div>'; }
   else if (S.exemplo) h += '<div class="banner info"><span class="grow"><b>Exemplo com notas fictícias.</b> Nada aqui é gravado no banco.</span><button class="btn" type="button" data-act="voltar">Fechar exemplo</button></div>';
   else if (!S.readonly && pend) h += '<div class="banner"><span class="grow"><b>' + pend + (pend === 1 ? ' nota não publicada.' : ' notas não publicadas.') + '</b> O cliente ainda não vê essas notas.</span><button class="btn primary" type="button" data-act="publicar"' + (S.ocupado ? ' disabled' : '') + '>' + (S.ocupado ? 'Publicando…' : 'Publicar para o cliente') + '</button></div>';
 
@@ -420,14 +430,15 @@ function renderMain() {
   var impacto = erros.concat(alertas).reduce(function (a, p) { return a + p.imp; }, 0);
   var eI = erros.filter(function (p) { return impDe(p) === 'icms' || impDe(p) === 'ambos'; }).length, eP = erros.filter(function (p) { return impDe(p) === 'pc'; }).length, eS = erros.filter(function (p) { return impDe(p) === 'iss'; }).length;
 
-  var h = '<div class="periods" role="group" aria-label="Período">';
+  var h = S.demo ? cardAchado(ds, T, erros, alertas) : '';
+  h += '<div class="periods" role="group" aria-label="Período">';
   h += '<div class="pgroup"><span class="eyebrow">Período</span><div class="pcards"><button type="button" class="pcard" data-per="all" aria-pressed="' + (S.periodo === 'all') + '"><span class="t">' + (S.grupo === 'semana' ? 'Todas as semanas' : 'Todos os meses') + '</span><span class="d">' + (S.grupo === 'semana' ? S.per.semanas.length + ' semanas' : S.per.meses.length + ' meses') + '</span><span class="m"><span class="dot"></span>' + S.res.notas.length + ' notas</span></button></div></div>';
   if (S.grupo === 'semana') {
     var porMes = {}; S.per.semanas.forEach(function (w) { (porMes[w.mes] = porMes[w.mes] || []).push(w); });
     Object.keys(porMes).sort().reverse().forEach(function (m) { h += '<div class="pgroup"><span class="eyebrow">' + esc(mesNome(m)) + '</span><div class="pcards">' + porMes[m].map(semanaCard).join('') + '</div></div>'; });
   } else h += '<div class="pgroup"><span class="eyebrow">Meses</span><div class="pcards">' + S.per.meses.map(mesCard).join('') + '</div></div>';
   h += '</div>';
-  h += '<div class="toolbar"><div class="seg" role="group" aria-label="Agrupar períodos"><button type="button" data-grupo="semana" aria-pressed="' + (S.grupo === 'semana') + '">Semanas</button><button type="button" data-grupo="mes" aria-pressed="' + (S.grupo === 'mes') + '">Meses</button></div><span class="small grow">A apuração oficial é mensal. Dia e semana servem para acompanhamento.</span><div class="row no-print" style="gap:8px"><button class="btn" type="button" data-act="excel"' + (S.gerando ? ' disabled' : '') + '>' + I.up.replace('M12 16V4M7 9l5-5 5 5', 'M12 4v12M7 11l5 5 5-5') + (S.gerando ? 'Gerando…' : 'Baixar Excel') + '</button><button class="btn" type="button" data-act="imprimirPainel">Imprimir</button></div></div>';
+  h += '<div class="toolbar"><div class="seg" role="group" aria-label="Agrupar períodos"><button type="button" data-grupo="semana" aria-pressed="' + (S.grupo === 'semana') + '">Semanas</button><button type="button" data-grupo="mes" aria-pressed="' + (S.grupo === 'mes') + '">Meses</button></div><span class="small grow">A apuração oficial é mensal. Dia e semana servem para acompanhamento.</span><div class="row no-print" style="gap:8px">' + (S.teste ? '<a class="btn" target="_blank" rel="noopener" href="' + WA('5516981505852', WA_TESTE) + '">' + I.zap + 'Receber o relatório completo</a>' : '<button class="btn" type="button" data-act="excel"' + (S.gerando ? ' disabled' : '') + '>' + I.up.replace('M12 16V4M7 9l5-5 5 5', 'M12 4v12M7 11l5 5 5-5') + (S.gerando ? 'Gerando…' : 'Baixar Excel') + '</button><button class="btn" type="button" data-act="imprimirPainel">Imprimir</button>') + '</div></div>';
 
   h += '<div class="mov card"><div><span class="small">Vendas</span><b class="num">' + m0(T.vendas) + '</b><span class="small">' + T.nS + ' notas de saída</span></div>' +
     '<div><span class="small">Serviços prestados</span><b class="num">' + m0(T.servPrest) + '</b><span class="small">' + T.nSP + ' NFS-e · ISS a recolher ' + m0(T.issDev) + '</span></div>' +
@@ -716,6 +727,75 @@ function tabClassif(ds) {
 
 /* ---------- comparativo: como as notas foram emitidas × após corrigir as pendências ---------- */
 var CAMPOS_AJ = ['icmsD', 'icmsC', 'pisD', 'pisC', 'cofD', 'cofC'];
+function cardAchado(ds, T, erros, alertas) {
+  var favor = 0, contra = 0, notasP = {};
+  S.res.pend.forEach(function (p) {
+    if (ds.indexOf(p.dt) < 0 || p.sev === 'info' || resolvida(p.ch)) return;
+    notasP[p.ch] = 1;
+    var A = (p.aj && p.aj.a) || {}, C = (p.aj && p.aj.c) || {};
+    var d = 0; ['icms', 'pis', 'cof'].forEach(function (t) { d += ((C[t + 'D'] || 0) - (A[t + 'D'] || 0)) - ((C[t + 'C'] || 0) - (A[t + 'C'] || 0)); });
+    if (!p.aj && p.imp && /^(MONO_TRIB|REM_PC|REM_ICMS|DEV_ICMS_A_MAIS)$/.test(p.cod)) d = -p.imp;
+    if (d < 0) favor -= d; else contra += d;
+  });
+  var nN = Object.keys(notasP).length, total = favor + contra;
+  var hoje = new Date(), iniMes = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), 1)).toISOString().slice(0, 10);
+  var fechado = ds.length && ds[ds.length - 1] < iniMes;
+  var simples = regimeEmp() === 'simples';
+  var h = '<div class="card achado"><div class="ach-main"><span class="eyebrow">' + (S.teste ? 'O que encontramos nas suas notas' : 'O que o portal encontrou nesta empresa') + '</span>' +
+    '<div class="ach-big num">' + m0(total) + '</div><p>em tributos a corrigir' + (nN ? ' em ' + nN + (nN === 1 ? ' nota' : ' notas') : '') + ', no período escolhido.</p></div>' +
+    '<div class="ach-cols">' +
+    '<div class="ach-c favor"><span class="small">' + (fechado ? 'Possível recuperação' : 'A favor da empresa') + '</span><b class="num">' + m0(favor) + '</b><span class="small">' + (fechado ? 'imposto pago a mais ou crédito não aproveitado em período já fechado' : 'imposto pago a mais ou crédito não aproveitado') + '</span></div>' +
+    '<div class="ach-c contra"><span class="small">A recolher a mais</span><b class="num">' + m0(contra) + '</b><span class="small">risco de autuação se não for corrigido</span></div>' +
+    '<div class="ach-c"><span class="small">Pendências</span><b class="num">' + erros.length + (erros.length === 1 ? ' erro' : ' erros') + ' · ' + alertas.length + (alertas.length === 1 ? ' alerta' : ' alertas') + '</b><button type="button" class="link" data-tab="pendencias">Ver o que corrigir</button></div></div>';
+  if (simples && (T.rMono || T.rSTicms)) h += '<p class="small ach-nota">No Simples Nacional, ' + m0(T.rMono + T.rSTpc) + ' de receita monofásica e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária não pagam esses tributos no DAS quando segregados no PGDAS-D. Se não foram segregados, parte do DAS pago pode ser recuperada.</p>';
+  if (fechado && favor > 0) h += '<p class="small ach-nota">Como o período já foi apurado, valores pagos a mais podem ser recuperados por compensação ou restituição (em geral, dos últimos 5 anos). É uma estimativa: a RG Fiscal confirma caso a caso.</p>';
+  h += '<div class="ach-cta">' + (S.teste ? '<span>Quer o relatório completo e ajuda para corrigir e recuperar?</span><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div>'
+    : '<span>Quer ver isso com as notas da sua empresa? É grátis e nada sai do seu computador.</span><button class="btn primary" type="button" data-act="teste">' + I.up + 'Testar com as minhas notas</button>') + '</div></div>';
+  return h;
+}
+function vTeste() {
+  var navR = '<button class="btn ghost" type="button" data-act="verDemo">Ver a demonstração</button><button class="btn ghost" type="button" data-act="voltar">Já sou cliente</button>';
+  var t = S.testeCfg || { seg: 'autopecas', reg: 'simples' };
+  var h = faixa(nav(navR) + '<div class="faixa-login"><h1>Teste grátis com as notas da sua empresa</h1><p>Envie os XMLs de um mês e veja em segundos os erros nas notas, o imposto pago a mais e os créditos que ficaram para trás.</p></div>', 'alta');
+  h += '<div class="card teste-card">';
+  h += '<div class="teste-passo"><span class="teste-n">1</span><div><h2>Conte o ramo e o regime</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
+    '<div class="field"><label for="tSeg">Ramo</label><select id="tSeg">' + [['autopecas', 'Pneus e autopeças'], ['varejo', 'Mercadinho, supermercado ou varejo'], ['outros', 'Outro comércio']].map(function (o) { return '<option value="' + o[0] + '"' + (t.seg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="tReg">Regime</label><select id="tReg">' + [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real']].map(function (o) { return '<option value="' + o[0] + '"' + (t.reg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div></div></div>';
+  h += '<div class="teste-passo"><span class="teste-n">2</span><div style="flex:1;min-width:0"><h2>Envie os XMLs</h2><p class="note">Use um mês já fechado, por exemplo setembro: o que aparecer de imposto pago a mais pode ser recuperado. Inclua as notas de venda (NF-e e NFC-e) e as de compra; um arquivo .zip serve.</p>' +
+    (S.testeLendo ? '<div class="drop"><b>Lendo ' + S.testeLendo + '…</b><span class="small">Isso leva alguns segundos.</span></div>'
+      : '<label class="drop" id="dropTeste" for="arqTeste"><b>' + I.up + ' Arraste os arquivos aqui</b><span class="small">ou clique para escolher · .zip ou .xml</span></label><input id="arqTeste" type="file" accept=".zip,.xml" multiple hidden>') + '</div></div>';
+  h += '<div class="teste-priv">' + I.lock + '<div><b>Seus arquivos não saem do seu computador.</b> A análise roda no seu navegador: nada é enviado para a internet nem gravado, e tudo some ao fechar a página. Você vê o resumo completo e as primeiras pendências; o relatório detalhado fica com a RG Fiscal, se você quiser.</div></div>';
+  h += '</div>';
+  return h;
+}
+function abrirTeste() {
+  S.teste = false; S.demo = true; S.emp = null; S.res = null; S.exemplo = false; S.testeLendo = 0; S.view = 'teste';
+  try { history.replaceState(null, '', location.pathname + location.search + '#teste'); } catch (e) {}
+  if (S.tour) fecharTour();
+  render(); bindDropTeste(); window.scrollTo(0, 0);
+}
+function bindDropTeste() {
+  var d = $('dropTeste'); if (!d) return;
+  d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', function () { d.classList.remove('over'); });
+  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); testarArquivos(Array.prototype.slice.call(e.dataTransfer.files)); });
+}
+async function testarArquivos(files) {
+  files = files.filter(function (f) { return /\.(zip|xml)$/i.test(f.name); });
+  if (!files.length) { toast('Envie arquivos .zip ou .xml.'); return; }
+  var t = S.testeCfg = { seg: ($('tSeg') || {}).value || 'autopecas', reg: ($('tReg') || {}).value || 'simples' };
+  S.testeLendo = files.length === 1 ? files[0].name : files.length + ' arquivos'; render();
+  try {
+    var acc = await lerArquivos(files);
+    var nfs = acc.notas.filter(function (n) { return !n.tipoDoc; });
+    if (!nfs.length) { S.testeLendo = 0; render(); bindDropTeste(); toast('Não encontramos NF-e nem NFC-e nesses arquivos.'); return; }
+    var cnpj = detectarCnpj(nfs), nome = nomeDe(nfs, cnpj);
+    var e = { id: 'teste', meta: { cnpj: cnpj, nome: nome || fmtCnpj(cnpj), segmento: t.seg, regime: t.reg, corte: '2026-10-01', mono: [], st: [], publicado: null },
+      notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
+    S.testeLendo = 0; S.teste = true; S.demo = true; S.tourVisto = true; S.tab = 'apuracao';
+    abrirEmpresa(e, true, true); S.imp = null; window.scrollTo(0, 0);
+  } catch (err) { S.testeLendo = 0; render(); bindDropTeste(); toast('Não foi possível ler os arquivos: ' + erroTexto(err)); }
+}
 function comparativo(ds, T, comAlertas) {
   var atual = {}, corr = {}, porCod = {}, semEfeito = 0, foraConta = 0;
   CAMPOS_AJ.forEach(function (k) { atual[k] = T[k]; corr[k] = T[k]; });
@@ -805,12 +885,14 @@ function tabPendencias(pend) {
   h += '<div class="chips" role="group" aria-label="Gravidade">' + [['todos', 'Todas'], ['erro', 'Erros'], ['alerta', 'Alertas'], ['info', 'Avisos']].map(function (c) { return '<button type="button" class="chip" data-fsev="' + c[0] + '" aria-pressed="' + (S.fSev === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div></div>';
   if (!f.length) return h + '<div class="empty"><span class="pill ok">Nenhuma pendência</span><p class="note">Nada encontrado para este período e filtro.</p></div>';
   h += '<div class="tscroll"><table><thead><tr><th>Gravidade</th><th>Imposto</th><th>Nota</th><th>Emitente / destinatário</th><th>Item</th><th>O que corrigir</th><th class="r">Impacto est.</th><th>Acompanhamento</th></tr></thead><tbody>';
-  f.slice(0, S.imprimindo ? 1e9 : 500).forEach(function (p) {
+  var LIM_TESTE = 5, restoTeste = S.teste ? Math.max(0, f.length - LIM_TESTE) : 0;
+  f.slice(0, S.teste ? LIM_TESTE : S.imprimindo ? 1e9 : 500).forEach(function (p) {
     h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
+  if (restoTeste) h += '<tr class="mais-teste"><td colspan="8"><div class="mais-teste-c"><div><b>Mais ' + restoTeste + (restoTeste === 1 ? ' pendência' : ' pendências') + ' encontradas nas suas notas.</b> O relatório completo traz cada uma com a explicação, o valor e como corrigir, além da apuração por mês e do Excel.</div><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div></td></tr>';
   h += '</tbody></table></div>';
-  if (f.length > 500 && !S.imprimindo) h += '<p class="note">Mostrando 500 de ' + f.length + '. Use a busca ou os filtros.</p>';
-  h += '<div><button class="btn" type="button" data-act="csv">Baixar pendências (CSV)</button></div>';
+  if (f.length > 500 && !S.imprimindo && !S.teste) h += '<p class="note">Mostrando 500 de ' + f.length + '. Use a busca ou os filtros.</p>';
+  if (!S.teste) h += '<div><button class="btn" type="button" data-act="csv">Baixar pendências (CSV)</button></div>';
   return h;
 }
 function tabNotas(notas) {
@@ -1073,6 +1155,14 @@ async function desfazerClasse(pk, origem, ncm) {
 /* ---------- passo a passo ---------- */
 function passosTour() {
   var simples = regimeEmp() === 'simples';
+  if (S.demo) return [
+    { t: S.teste ? 'Pronto: suas notas foram conferidas' : 'Em 1 minuto: o que o portal encontra', x: S.teste ? 'Veja o que encontramos. Lembre que nada foi enviado nem gravado: a análise rodou no seu navegador.' : 'Esta é uma empresa fictícia de ' + DEMOS[S.demoTipo || 'pneus'].ramo.replace(/^uma? /, '') + ', com notas como as de qualquer loja. Veja em três passos o que o portal da RG Fiscal mostra.' },
+    { el: '.achado .ach-main', t: 'O dinheiro em jogo', x: 'O total de tributos a corrigir nas notas: o que a empresa pagou a mais ou deixou de aproveitar de crédito, e o que recolheu a menos e pode virar autuação.' },
+    { el: '.tabs [data-tab="pendencias"]', t: 'Cada erro explicado', x: 'Na aba Pendências, cada erro aparece com a nota, o produto, o valor e a base legal, em linguagem simples, para corrigir no sistema emissor ou pedir ao fornecedor.' },
+    { el: '.tabs [data-tab="comparativo"]', t: 'Antes e depois', x: 'Aqui o ICMS, o PIS e a COFINS lado a lado: como as notas foram emitidas e como ficam depois das correções.' },
+    S.teste ? { el: '.ach-cta', t: 'Quer o relatório completo?', x: 'Fale com a RG Fiscal: enviamos o relatório com todas as pendências, a apuração mês a mês e o que dá para recuperar.' }
+      : { el: '.ach-cta [data-act="teste"]', t: 'Agora com as suas notas', x: 'Envie os XMLs de um mês já fechado e veja o resultado da sua empresa na hora. É grátis e os arquivos não saem do seu computador.' }
+  ];
   return [
     { t: 'Bem-vindo ao portal da RG Fiscal', x: 'Aqui você acompanha as notas fiscais da sua empresa, os impostos do período e o que precisa ser corrigido. Em poucos passos mostramos onde fica cada informação.' },
     { el: '#veredito', t: 'O resumo do período', x: 'Esta frase resume tudo: como fecham o ICMS, o PIS e a COFINS e quantos erros encontramos nas notas. O botão leva direto ao que precisa ser corrigido.' },
@@ -1393,6 +1483,7 @@ document.addEventListener('click', function (ev) { if (S.ver && ev.target && ev.
 document.addEventListener('click', function (ev) {
   var b = ev.target.closest('button'); if (!b) return;
   var d = b.dataset;
+  if (d.demo) { if (d.demo === S.demoTipo && S.emp) return; S.demoTipo = d.demo; try { history.replaceState(null, '', location.pathname + location.search + (d.demo === 'mercado' ? '#demo-mercado' : '#demo')); } catch (e) {} S.periodo = 'all'; S.tab = 'apuracao'; carregarExemplo(d.demo); return; }
   if (d.per) { S.periodo = d.per; renderMain(); return; }
   if (d.grupo) { S.grupo = d.grupo; S.periodo = 'all'; renderMain(); return; }
   if (d.det) { S.det = d.det; renderMain(); return; }
@@ -1429,8 +1520,10 @@ document.addEventListener('click', function (ev) {
     return;
   }
   var a = d.act;
-  if (a === 'exemplo') carregarExemplo();
-  if (a === 'copiarDemo') { var url = linkDemo(); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copiado: ' + url); }).catch(function () { window.prompt('Copie o link de demonstração:', url); }); return; }
+  if (a === 'exemplo') carregarExemplo('pneus');
+  else if (a === 'teste') abrirTeste();
+  else if (a === 'verDemo') { S.demo = true; S.teste = false; S.demoTipo = S.demoTipo || 'pneus'; try { history.replaceState(null, '', location.pathname + location.search + (S.demoTipo === 'mercado' ? '#demo-mercado' : '#demo')); } catch (e) {} S.view = 'carregando'; render(); carregarExemplo(); }
+  if (a === 'copiarDemo') { var url = linkDemo(b.dataset.k); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copiado: ' + url); }).catch(function () { window.prompt('Copie o link de demonstração:', url); }); return; }
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario || S.demo) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
   else if (a === 'csv') csv();
@@ -1534,6 +1627,8 @@ document.addEventListener('change', function (ev) {
   var lista = t.files ? Array.prototype.slice.call(t.files) : [];
   if (t.id === 'files') { importar(lista); t.value = ''; }
   else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }
+  else if (t.id === 'arqTeste') { testarArquivos(lista); t.value = ''; }
+  else if (t.id === 'tSeg' || t.id === 'tReg') { S.testeCfg = { seg: $('tSeg').value, reg: $('tReg').value }; }
   else if (t.id === 'nome' && S.emp && !S.exemplo) {
     var nm = t.value.trim(); S.emp.meta.nome = nm;
     B.salvarEmpresa(S.emp.id, { razao_social: nm }).then(function () { toast('Razão social salva.'); renderHeaderSub(); }).catch(function (e) { toast(erroTexto(e)); });
@@ -1546,13 +1641,17 @@ function bindDrop() {
   d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); importar(Array.prototype.slice.call(e.dataTransfer.files)); });
 }
 
-async function carregarExemplo() {
+async function carregarExemplo(tipo) {
+  tipo = tipo || (S.demo && S.demoTipo) || 'pneus';
+  var dm = DEMOS[tipo] || DEMOS.pneus;
   try {
     var blob;
-    if (window.EXEMPLO_B64) { var bin = atob(window.EXEMPLO_B64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); blob = new Blob([u]); }
+    if (tipo !== 'pneus') { var rr = await fetch(dm.url); if (!rr.ok) throw new Error(); blob = await rr.blob(); }
+    else if (window.EXEMPLO_B64) { var bin = atob(window.EXEMPLO_B64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); blob = new Blob([u]); }
     else { var r = await fetch(EXEMPLO_URL); if (!r.ok) throw new Error(); blob = await r.blob(); }
     var acc = await lerArquivos([new File([blob], 'exemplo.zip')]);
-    var e = { id: 'exemplo', meta: { cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', corte: '2026-10-01', mono: F.DEFAULT_MONO.slice(), st: F.DEFAULT_ST.slice(), publicado: null },
+    S.teste = false;
+    var e = { id: 'exemplo', meta: { cnpj: dm.cnpj, nome: dm.nome, segmento: dm.segmento, regime: dm.regime, corte: '2026-10-01', mono: [], st: [], publicado: null },
       notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
     abrirEmpresa(e, S.demo || !(S.usuario && S.usuario.papel === 'escritorio'), true);
   } catch (err) { toast('Não foi possível carregar o exemplo.'); }
@@ -1564,6 +1663,7 @@ if (/type=recovery/.test(location.hash)) S.view = 'recuperar';
 B.aoMudarSessao(function (evento) {
   if (evento === 'PASSWORD_RECOVERY') { S.view = 'recuperar'; render(); }
 });
-if (/^#demo\b/.test(location.hash)) { S.demo = true; S.view = 'carregando'; render(); carregarExemplo(); }
+if (/^#teste\b/.test(location.hash)) { abrirTeste(); }
+else if (/^#demo\b/.test(location.hash)) { S.demo = true; S.demoTipo = /^#demo-mercado/.test(location.hash) ? 'mercado' : 'pneus'; S.view = 'carregando'; render(); carregarExemplo(); }
 else { render(); iniciar(); }
 })();
