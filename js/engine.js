@@ -113,6 +113,12 @@ var Fiscal = (function () {
       it: []
     };
     if (nota.mod === '65' && !nota.dUF) nota.dUF = nota.eUF;
+    var refs = [], refEls = inf.getElementsByTagName('refNFe');
+    for (var rI = 0; rI < refEls.length; rI++) refs.push(String(refEls[rI].textContent || '').trim());
+    var infAd = first(inf, 'infAdic'), compl = infAd ? (txt(infAd, 'infCpl') + ' ' + txt(infAd, 'infAdFisco')) : '';
+    (compl.replace(/\s+/g, '').match(/\d{44}/g) || []).forEach(function (k) { if (refs.indexOf(k) < 0) refs.push(k); });
+    nota.refs = refs;
+    nota.stInf = /ICMS[\s-]*ST|SUBST|RETIDO/i.test(compl);
 
     var dets = inf.getElementsByTagName('det');
     var difal = false;
@@ -359,6 +365,63 @@ var Fiscal = (function () {
     var ncmKeys = Object.keys(ncmCad).sort(function (a, b) { return b.length - a.length; });
     function classeNcm(ncm) { for (var i = 0; i < ncmKeys.length; i++) if (String(ncm).indexOf(ncmKeys[i]) === 0) return ncmCad[ncmKeys[i]]; return null; }
 
+    // compras por fornecedor, para achar a nota original de uma devolução
+    var comprasForn = {};
+    notas.forEach(function (n) { if (n.tipoDoc || n.dC !== cnpj || n.eC === cnpj) return; (comprasForn[n.eC] = comprasForn[n.eC] || []).push(n); });
+    Object.keys(comprasForn).forEach(function (k) { comprasForn[k].sort(function (a, b) { return a.dt < b.dt ? 1 : -1; }); });
+    var ST_CST = ['10', '30', '60', '70', '201', '202', '203', '500'];
+    function originalDe(nt, it) {
+      var cands = [];
+      (nt.refs || []).forEach(function (k) { var o = porChave[k]; if (o && o.eC !== cnpj) cands.push(o); });
+      if (!cands.length) cands = (comprasForn[nt.dC] || []).filter(function (o) { return o.dt <= nt.dt; });
+      // devolução de compra com ST (x411): procura primeiro uma compra que tenha vindo com ST
+      if (/411$/.test(it.cf)) {
+        for (var j = 0; j < cands.length; j++) {
+          var st = cands[j].it.filter(function (x) { return x.ncm === it.ncm && (ST_CST.indexOf(x.cst) >= 0 || x.vst > 0 || /^[56]40[1-5]$/.test(x.cf)); })[0];
+          if (st) return { nota: cands[j], it: st, porRef: (nt.refs || []).indexOf(cands[j].ch) >= 0 };
+        }
+      }
+      for (var i = 0; i < cands.length; i++) {
+        var its = cands[i].it.filter(function (x) { return x.ncm === it.ncm; });
+        if (its.length) {
+          var mesmo = its.filter(function (x) { return x.cp && x.cp === it.cp; })[0] || its[0];
+          return { nota: cands[i], it: mesmo, porRef: (nt.refs || []).indexOf(cands[i].ch) >= 0 };
+        }
+      }
+      return null;
+    }
+    function auditarDevolucao(nt, it, receita, issue) {
+      if (nt.refs && !nt.refs.length && /^[56](202|411)$/.test(it.cf) && !auditarDevolucao['sr' + nt.ch]) {
+        auditarDevolucao['sr' + nt.ch] = 1;
+        issue('alerta', null, 'DEV_SEM_REF', 'Nota de devolução sem a NF-e original referenciada (grupo NFref). A devolução deve indicar a chave da nota de compra.', 0);
+      }
+      var o = originalDe(nt, it);
+      if (!o) { issue('info', it, 'DEV_SEM_ORIG', 'Devolução ou remessa em garantia ao fornecedor: a nota de compra original não está entre as importadas, então não foi possível conferir se o CST e o ICMS reproduzem a operação original (RICMS/SP, art. 4º, IV).', 0); return; }
+      var oi = o.it, ref = 'nota de compra nº ' + o.nota.n + ' de ' + o.nota.dt.split('-').reverse().join('/') + (o.porRef ? '' : ' (localizada pelo fornecedor e NCM)');
+      var origST = ST_CST.indexOf(oi.cst) >= 0 || oi.vst > 0 || oi.stR > 0 || /^[56]40[1-5]$/.test(oi.cf);
+      var devST = ST_CST.indexOf(it.cst) >= 0;
+      var lei = 'RICMS/SP, art. 4º, IV; RC 26.649/2022';
+      if (origST) {
+        var faltaProprio = oi.v > 0 && !(it.v > 0), espST = faltaProprio ? receita * oi.p / 100 : 0;
+        if (!devST || faltaProprio)
+          issue('alerta', it, 'DEV_ST', 'A ' + ref + ' veio com ICMS-ST (CST ' + (oi.cst || '–') + ', CFOP ' + oi.cf + (oi.v > 0 ? ', ICMS próprio de ' + oi.p + '%' : '') + (oi.vst > 0 ? ' e ST retido de ' + money(oi.vst) : '') + '), e a devolução saiu com CST ' + (it.cst || '–') + (it.v > 0 ? '' : ' sem ICMS') + '. A devolução deve reproduzir a nota original: ' + (oi.v > 0 ? 'destacar o ICMS próprio com a mesma base e alíquota, ' : '') + 'usar CST de substituição tributária e informar a base e o valor do ICMS-ST nas informações complementares, somando o ST ao total da nota (RICMS/SP, art. 4º, IV, e art. 127, § 5º; RC 33.446/2026).', espST, faltaProprio ? { c: { icmsD: espST } } : null);
+        else if (oi.vst > 0 && nt.stInf === false)
+          issue('info', it, 'DEV_ST_INF', 'Devolução de mercadoria recebida com ICMS-ST retido (' + money(oi.vst) + ' na ' + ref + '): confira se a base e o valor do ICMS-ST estão nas informações complementares e no total da nota (RICMS/SP, art. 127, § 5º; RC 33.446/2026).', 0);
+        return;
+      }
+      if (oi.v > 0 && !(it.v > 0)) {
+        var esp = receita * oi.p / 100;
+        issue(o.porRef ? 'erro' : 'alerta', it, 'DEV_SEM_ICMS', 'A ' + ref + ' destacou ICMS de ' + oi.p + '% (CST ' + (oi.o || '') + oi.cst + '), mas a devolução saiu com CST ' + (it.cst || '–') + ' sem ICMS. A devolução deve reproduzir a base de cálculo, a alíquota e o imposto da nota original (' + lei + ').' + (/411$/.test(it.cf) ? ' O CFOP ' + it.cf + ' é de devolução de compra com ST: se a compra original foi com ST, confira se a nota localizada é mesmo a original.' : ''), esp, { c: { icmsD: esp } });
+      } else if (oi.v > 0 && it.v > 0 && Math.abs(it.p - oi.p) > 0.01) {
+        issue('alerta', it, 'DEV_ALIQ', 'Alíquota de ' + it.p + '% na devolução e de ' + oi.p + '% na ' + ref + '. A devolução deve usar a mesma alíquota da operação original (' + lei + ').', Math.abs(it.bc * (oi.p - it.p) / 100), { c: { icmsD: it.bc * (oi.p - it.p) / 100 } });
+      }
+      if (devST) {
+        issue('alerta', it, 'DEV_ST_INDEVIDO', 'A devolução saiu com CST ' + it.cst + ' (substituição tributária), mas a ' + ref + ' foi tributada normalmente (CST ' + (oi.cst || '–') + '). A devolução deve reproduzir a tributação original (' + lei + ').', 0);
+      } else if (!origST && !(oi.v > 0) && it.v > 0) {
+        issue('alerta', it, 'DEV_ICMS_A_MAIS', 'A devolução destacou ICMS de ' + money(it.v) + ', mas a ' + ref + ' não teve ICMS destacado (CST ' + (oi.cst || '–') + '). Confira: a devolução deve reproduzir a operação original (' + lei + ').', it.v, { c: { icmsD: -it.v } });
+      }
+    }
+
     var res = { notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {}, servicos: {}, fretes: [] };
     var seen = {};
     var porChave = {}; notas.forEach(function (n) { if (!n.tipoDoc) porChave[n.ch] = n; });
@@ -497,8 +560,11 @@ var Fiscal = (function () {
       T.ibs = nt.t.vIBS; T.cbs = nt.t.vCBS;
 
       var semDifal = false;
+      var garantia = proprio && dir === 'S' && /garant|devolu|troca|defeit/i.test(nt.nat || '');
       nt.it.forEach(function (it) {
         var nat = natureza(it.cf);
+        // remessa do produto defeituoso ao fornecedor = devolução (RICMS/SP, art. 4º, IV; RC 26.649/2022)
+        if (garantia && /^[56]949$/.test(it.cf)) nat = 'devCompra';
         if (!proprio) {
           // Em nota de terceiro o CFOP é o do emitente: converte para a ótica do cliente
           if (dir === 'E') nat = nat === 'venda' ? 'compra' : nat === 'devCompra' ? 'devVenda' : nat === 'transfS' ? 'transfE' : 'outrasE';
@@ -570,7 +636,8 @@ var Fiscal = (function () {
           issue('erro', it, 'ICMS_CALC', 'ICMS destacado (' + money(it.v) + ') não confere com base × alíquota (' + money(calcIcms) + ').', Math.abs(calcIcms - it.v), ajC(dir === 'S' ? 'icmsD' : 'icmsC', calcIcms - it.v));
         }
 
-        if (dir === 'S' && proprio) {
+        if (dir === 'S' && proprio && nat === 'devCompra') auditarDevolucao(nt, it, receita, issue);
+        else if (dir === 'S' && proprio) {
           if (pos && seg && interna && !tribST && /^5(401|403|405)$/.test(it.cf) && (it.cst === '00' || it.cst === '20') && it.v > 0) {
             issue('alerta', it, 'CFOP_ST', 'ICMS correto (' + it.p + '% destacado), mas o CFOP ' + it.cf + ' é de ST. Corrigir para 5.102 por CC-e; não muda o imposto.', 0);
           } else if (pos && seg && interna && (tribST || /^5(401|403|405)$/.test(it.cf))) {

@@ -177,6 +177,13 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
   - PIS/COFINS em produto monofásico.
   - Monofásico vendido com CST diferente de 04 (por exemplo 07, isento): alerta para corrigir o cadastro do emissor.
   - Produto fora das listas de monofásico e alíquota zero vendido com CST 07, 08, 09, 49 ou 99 de PIS/COFINS (Lucro Real e Presumido): alerta, com o PIS/COFINS que seria devido se o produto for tributado.
+- **Devoluções e remessas em garantia ao fornecedor** (CFOP 5.202/6.202, 5.411/6.411 e 5.949/6.949 com natureza de garantia, devolução ou troca): a remessa do produto defeituoso pelo adquirente é devolução (RICMS/SP, art. 4º, IV; RC 26.649/2022) e deve reproduzir a nota de compra. O portal localiza a nota original (pela NF-e referenciada ou, nas notas antigas, pelo fornecedor e NCM) e aponta:
+  - devolução sem ICMS quando a compra teve ICMS destacado (erro quando a nota original está referenciada; alerta quando foi localizada só por fornecedor e NCM);
+  - alíquota diferente da original;
+  - compra com ST devolvida sem CST de ST, ou sem o ICMS próprio quando a compra teve CST 10/70; o ICMS-ST vai nas informações complementares e no total da nota (art. 127, § 5º; RC 33.446/2026 e RC 33.857/2026);
+  - CST de ST na devolução de compra tributada normalmente, e ICMS destacado quando a compra não teve;
+  - nota de devolução sem a NF-e original referenciada.
+  Na apuração, a remessa em garantia passa a ser tratada como devolução de compra: o ICMS destacado é débito e o crédito de PIS/COFINS da compra é estornado.
 - **Monofásicos e alíquota zero gerais da lei** (bebidas, higiene, lubrificantes, pneus, cesta básica) valem para qualquer segmento; a lista da empresa acrescenta os específicos, como as autopeças dos Anexos da Lei 10.485/2002.
 - **Fornecedor do Simples Nacional:** o crédito de ICMS é o valor informado em vCredICMSSN (LC 123/2006, art. 23).
 - **Estoque em 30/09/2026 com ST:** o crédito do ICMS-ST do estoque segue a Portaria CAT 28/2020 (Portaria SRE 34/2026, art. 2º) e não é calculado pelo portal.
