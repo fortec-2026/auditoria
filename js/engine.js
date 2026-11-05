@@ -422,6 +422,108 @@ var Fiscal = (function () {
       }
     }
 
+    /* Remessas sem venda: tratamento esperado pelo CFOP (RICMS/SP, versão vigente) */
+    var REM = {
+      '901': { t: 'sem', f: 'suspensão', cst: '50', l: 'RICMS/SP, art. 402', d: 'Remessa para industrialização' },
+      '902': { t: 'sem', f: 'suspensão', cst: '50', l: 'RICMS/SP, art. 402, § 1º', d: 'Retorno de mercadoria recebida para industrialização' },
+      '905': { t: 'sem', f: 'não incidência', cst: '41', l: 'RICMS/SP, art. 7º, I e II', d: 'Remessa para depósito fechado ou armazém geral', so5: 1 },
+      '906': { t: 'sem', f: 'não incidência', cst: '41', l: 'RICMS/SP, art. 7º, III', d: 'Retorno de depósito fechado ou armazém geral', so5: 1 },
+      '907': { t: 'sem', f: 'não incidência', cst: '41', l: 'RICMS/SP, art. 7º, III', d: 'Retorno simbólico de depósito ou armazém', so5: 1 },
+      '908': { t: 'sem', f: 'não incidência', cst: '41', l: 'Súmula 573 do STF', d: 'Remessa de bem por conta de contrato de comodato' },
+      '909': { t: 'sem', f: 'não incidência', cst: '41', l: 'Súmula 573 do STF', d: 'Retorno de bem recebido em comodato' },
+      '910': { t: 'trib', l: 'RICMS/SP, art. 37, § 1º, item 1 (bonificação); doação e brinde são tributados salvo isenção específica', d: 'Bonificação, doação ou brinde' },
+      '911': { t: 'amostra', f: 'isenção', cst: '40', l: 'RICMS/SP, Anexo I, art. 3º', d: 'Amostra grátis' },
+      '912': { t: 'sem', f: 'suspensão', cst: '50', l: 'RICMS/SP, art. 319; Portaria SRE 56/2022', d: 'Remessa para demonstração ou mostruário', prazo: 60 },
+      '913': { t: 'sem', f: 'suspensão', cst: '50', l: 'RICMS/SP, art. 319; Portaria SRE 56/2022', d: 'Retorno de demonstração ou mostruário' },
+      '914': { t: 'sem', f: 'isenção', cst: '40', l: 'RICMS/SP, Anexo I, art. 33 (vigente até 31/12/2026)', d: 'Remessa para exposição ou feira', prazo: 60 },
+      '915': { t: 'sem', f: 'não incidência', cst: '41', l: 'RICMS/SP, art. 7º, IX', d: 'Remessa para conserto ou reparo' },
+      '916': { t: 'sem', f: 'não incidência', cst: '41', l: 'RICMS/SP, art. 7º, X', d: 'Retorno de conserto ou reparo' },
+      '917': { t: 'trib', l: 'Ajuste SINIEF 2/1993 (consignação mercantil)', d: 'Remessa em consignação mercantil' },
+      '920': { t: 'sem', f: 'isenção', cst: '40', l: 'RICMS/SP, Anexo I, art. 82', d: 'Remessa de vasilhame ou sacaria' },
+      '921': { t: 'sem', f: 'isenção', cst: '40', l: 'RICMS/SP, Anexo I, art. 82, II', d: 'Devolução de vasilhame ou sacaria' },
+      '151': { t: 'transf', so6: 1, d: 'Transferência de produção' },
+      '152': { t: 'transf', so6: 1, d: 'Transferência de mercadoria' },
+      '155': { t: 'transf', so6: 1, d: 'Transferência de produção (ST)' },
+      '156': { t: 'transf', so6: 1, d: 'Transferência de mercadoria (ST)' }
+    };
+    function regraRemessa(cf) {
+      var r = REM[String(cf).slice(1)]; if (!r || !/^[56]/.test(cf)) return null;
+      if (r.so5 && cf.charAt(0) !== '5') return null;
+      if (r.so6 && cf.charAt(0) !== '6') return null;
+      return r;
+    }
+    // retornos de demonstração e exposição recebidos (para conferir o prazo de 60 dias)
+    var retornos = [], dtMax = '';
+    notas.forEach(function (n) {
+      if (n.tipoDoc) return; if (n.dt > dtMax) dtMax = n.dt;
+      var entrada = (n.eC === cnpj && n.tp === '0') || (n.dC === cnpj && n.eC !== cnpj);
+      if (!entrada) return;
+      var parteC = n.eC === cnpj ? n.dC : n.eC;
+      (n.it || []).forEach(function (i) { if (/(913|914)$/.test(i.cf)) retornos.push({ c: parteC, ncm: i.ncm, cp: i.cp, dt: n.dt, refs: n.refs || [] }); });
+    });
+    function diasEntre(a, b) { return Math.round((parseISO(b) - parseISO(a)) / 86400000); }
+    var CST_SEM = ['40', '41', '50', '51', '90'], CSOSN_SEM = ['102', '103', '300', '400', '900'];
+    function auditarRemessa(nt, it, r, receita, issue) {
+      var simples = regime === 'simples', cf = it.cf, cfF = cf.charAt(0) + '.' + cf.slice(1);
+      var interna = nt.idDest === '1' || (nt.eUF && nt.eUF === nt.dUF);
+      var stItem = ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(it.cst) >= 0;
+      /* PIS/COFINS: remessa não é receita */
+      if (regime !== 'simples' && (it.vP > 0 || it.vC > 0)) {
+        issue('alerta', it, 'REM_PC', r.d + ' (CFOP ' + cfF + ') com PIS/COFINS destacado (' + money(it.vP + it.vC) + '). Remessa sem venda não gera receita: em regra não há PIS/COFINS, e o CST adequado é 49 (outras operações de saída). Confira o cadastro da natureza de operação no emissor.', it.vP + it.vC);
+      }
+      if (r.t === 'sem') {
+        if (it.v > 0) {
+          issue('alerta', it, 'REM_ICMS', r.d + ' (CFOP ' + cfF + ') com ICMS destacado de ' + money(it.v) + '. Essa operação tem ' + r.f + ' do ICMS (' + r.l + '): a nota sai sem destaque, com ' + (simples ? 'CSOSN 400' : 'CST ' + r.cst) + '. Se o imposto foi destacado por engano, avalie a correção com o destinatário (o crédito dele também cai).', it.v, simples ? null : { c: { icmsD: -it.v } });
+        } else if (!simples && ['00', '20'].indexOf(it.cst) >= 0) {
+          issue('info', it, 'REM_CST', r.d + ' (CFOP ' + cfF + ') sem ICMS, mas com CST ' + it.cst + ' (tributado). O CST que descreve a operação é ' + r.cst + ' (' + r.f + '; ' + r.l + '). Não muda o imposto; corrija o cadastro da natureza de operação.', 0);
+        }
+        if (r.prazo) {
+          var dias = diasEntre(nt.dt, dtMax);
+          var volta = retornos.some(function (x) { return x.dt >= nt.dt && (x.refs.indexOf(nt.ch) >= 0 || (x.c === nt.dC && x.ncm === it.ncm)); });
+          if (!volta && dias > r.prazo) {
+            var aliqE = interna ? aliqInt : aliqInterestadual(it.o, nt.dUF);
+            issue('alerta', it, 'REM_PRAZO', r.d + ' de ' + nt.dt.split('-').reverse().join('/') + ' sem retorno nas notas importadas depois de ' + dias + ' dias (prazo de ' + r.prazo + ' dias; ' + r.l + (cf.slice(1) === '912' ? '; mostruário e treinamento: 180 dias' : '') + '). Se a mercadoria não voltou ou foi vendida, a ' + r.f + ' deixa de valer e o ICMS é devido desde a saída, com acréscimos: emita a nota de venda ou recolha o imposto.', receita * aliqE / 100);
+          }
+        }
+        return;
+      }
+      if (r.t === 'amostra') {
+        if (it.v > 0) issue('info', it, 'REM_AMOSTRA', 'Amostra grátis com ICMS destacado de ' + money(it.v) + '. Há isenção (RICMS/SP, Anexo I, art. 3º) quando a amostra tem valor diminuto, traz "Amostra Grátis" e não passa de 20% da menor embalagem de venda. Se atende às condições, a nota sai com CST 40 e sem ICMS; se não atende, a tributação está correta.', 0);
+        return;
+      }
+      if (r.t === 'trib') {
+        var stAinda = stItem && !(nt.dt >= corte && interna && isSeg(it.ncm, it.cest));
+        if (simples || stAinda || it.v > 0) {
+          if (!simples && it.v > 0 && !interna && nt.mod === '55') {
+            var espI = aliqInterestadual(it.o, nt.dUF);
+            if (it.p !== espI) issue('erro', it, 'ALIQ_INTER', 'Alíquota interestadual de ' + it.p + '% para ' + nt.dUF + ' (origem ' + it.o + ') em ' + r.d.toLowerCase() + ': esperado ' + espI + '%.', Math.abs(it.bc * (it.p - espI) / 100), { c: { icmsD: it.bc * (espI - it.p) / 100 } });
+          }
+          return;
+        }
+        var carga = interna ? aliqInt : aliqInterestadual(it.o, nt.dUF), fund = '';
+        if (interna && varejo && classif) {
+          var cI = cls(it);
+          if (cI && !cI.erro) {
+            if (cI.st.st === 'sim' || cI.icms.cst === '40' || cI.icms.cst === '60' || cI.icms.cond) return;
+            carga = cI.icms.carga; fund = cI.icms.regra ? ' (' + cI.icms.regra.l + ')' : '';
+          }
+        }
+        if (!carga) return;
+        var espV = (it.vp - it.vd + it.vf) * carga / 100;
+        issue('alerta', it, 'REM_TRIB', r.d + ' (CFOP ' + cfF + ') saiu com CST ' + (it.cst || '–') + ' sem ICMS próprio. Essa remessa é tributada normalmente (' + r.l + (stItem ? '; o produto saiu da ST em 01/10/2026' : '') + '): o esperado é destacar ' + carga + '%' + fund + ' sobre o valor da mercadoria, salvo isenção específica do produto.', espV, { c: { icmsD: espV } });
+        return;
+      }
+      if (r.t === 'transf') {
+        if (simples) return;
+        var espT = aliqInterestadual(it.o, nt.dUF);
+        if (!(it.v > 0) && !stItem) {
+          issue('alerta', it, 'REM_TRANSF', 'Transferência interestadual (CFOP ' + cfF + ') sem ICMS. Desde 2024 a transferência entre estabelecimentos do mesmo titular não tem incidência (STF, ADC 49; LC 204/2023), mas a transferência do crédito ao destino é obrigatória: ou se destaca o imposto como operação tributada (LC 87/1996, art. 12, § 5º, com a indicação nas informações complementares), ou se informa o crédito transferido, limitado à alíquota interestadual de ' + espT + '% (art. 12, § 4º; Convênio ICMS 109/2024; RC SEFAZ/SP 33.994/2026).', 0);
+        } else if (it.v > 0 && it.p !== espT) {
+          issue('alerta', it, 'REM_TRANSF', 'Transferência interestadual (CFOP ' + cfF + ') com ' + it.p + '%: o crédito transferido ou o imposto destacado deve usar a alíquota interestadual de ' + espT + '% (LC 87/1996, art. 12, §§ 4º e 5º; Convênio ICMS 109/2024).', Math.abs(it.bc * (it.p - espT) / 100), { c: { icmsD: it.bc * (espT - it.p) / 100 } });
+        }
+      }
+    }
+
     var res = { notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {}, servicos: {}, fretes: [] };
     var seen = {};
     var porChave = {}; notas.forEach(function (n) { if (!n.tipoDoc) porChave[n.ch] = n; });
@@ -636,7 +738,9 @@ var Fiscal = (function () {
           issue('erro', it, 'ICMS_CALC', 'ICMS destacado (' + money(it.v) + ') não confere com base × alíquota (' + money(calcIcms) + ').', Math.abs(calcIcms - it.v), ajC(dir === 'S' ? 'icmsD' : 'icmsC', calcIcms - it.v));
         }
 
+        var regRem = dir === 'S' && proprio && nat !== 'devCompra' && nt.tp === '1' ? regraRemessa(it.cf) : null;
         if (dir === 'S' && proprio && nat === 'devCompra') auditarDevolucao(nt, it, receita, issue);
+        else if (regRem) auditarRemessa(nt, it, regRem, receita, issue);
         else if (dir === 'S' && proprio) {
           if (pos && seg && interna && !tribST && /^5(401|403|405)$/.test(it.cf) && (it.cst === '00' || it.cst === '20') && it.v > 0) {
             issue('alerta', it, 'CFOP_ST', 'ICMS correto (' + it.p + '% destacado), mas o CFOP ' + it.cf + ' é de ST. Corrigir para 5.102 por CC-e; não muda o imposto.', 0);

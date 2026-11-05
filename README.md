@@ -184,6 +184,20 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
   - CST de ST na devolução de compra tributada normalmente, e ICMS destacado quando a compra não teve;
   - nota de devolução sem a NF-e original referenciada.
   Na apuração, a remessa em garantia passa a ser tratada como devolução de compra: o ICMS destacado é débito e o crédito de PIS/COFINS da compra é estornado.
+- **Remessas sem venda** (notas de saída emitidas pelo cliente): o portal confere o tratamento esperado pelo CFOP.
+  - Sem destaque de ICMS (alerta se destacou; aviso se o CST é tributado):
+    - industrialização 5.901/5.902 (suspensão, art. 402);
+    - depósito fechado e armazém geral internos 5.905 a 5.907 (não incidência, art. 7º, I a III);
+    - comodato 5.908/5.909 (Súmula 573 do STF);
+    - demonstração e mostruário 5.912/5.913 (suspensão, art. 319; Portaria SRE 56/2022);
+    - exposição ou feira 5.914 (isenção, Anexo I, art. 33, até 31/12/2026);
+    - conserto 5.915/5.916 (não incidência, art. 7º, IX e X);
+    - vasilhame e sacaria 5.920/5.921 (isenção, Anexo I, art. 82).
+  - Prazo de retorno: demonstração e exposição sem nota de retorno (CFOP x.913/x.914) depois de 60 dias geram alerta de ICMS devido.
+  - Tributadas (alerta se saiu sem ICMS próprio, com a alíquota do produto no varejo): bonificação, doação e brinde 5.910 (art. 37, § 1º, 1) e consignação 5.917 (Ajuste SINIEF 2/1993). Pneus e autopeças com CST 60 depois de 01/10/2026 entram aqui.
+  - Amostra grátis 5.911: aviso quando há ICMS destacado, para conferir as condições da isenção (Anexo I, art. 3º).
+  - Transferência interestadual 6.151/6.152/6.155/6.156: alerta sem ICMS ou com alíquota diferente da interestadual. A transferência do crédito é obrigatória (LC 87/1996, art. 12, §§ 4º e 5º; Convênio ICMS 109/2024; RC 33.994/2026).
+  - PIS/COFINS destacado em qualquer remessa: alerta (remessa não é receita; CST 49).
 - **Monofásicos e alíquota zero gerais da lei** (bebidas, higiene, lubrificantes, pneus, cesta básica) valem para qualquer segmento; a lista da empresa acrescenta os específicos, como as autopeças dos Anexos da Lei 10.485/2002.
 - **Fornecedor do Simples Nacional:** o crédito de ICMS é o valor informado em vCredICMSSN (LC 123/2006, art. 23).
 - **Estoque em 30/09/2026 com ST:** o crédito do ICMS-ST do estoque segue a Portaria CAT 28/2020 (Portaria SRE 34/2026, art. 2º) e não é calculado pelo portal.
