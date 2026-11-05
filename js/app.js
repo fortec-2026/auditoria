@@ -98,11 +98,11 @@ function nomeDe(notas, cnpj) { for (var i = 0; i < notas.length; i++) { if (nota
 /* ---------- espaço de trabalho ---------- */
 function montarEmpresa(e, d) {
   var canc = {}; d.canc.forEach(function (c) { canc[c.chave] = 1; });
-  var prodCad = {}; d.produtos.forEach(function (p) { prodCad[p.chave_produto] = { c: p.classe, ncm: p.ncm, x: p.descricao, em: p.atualizado_em }; });
+  var prodCad = {}; d.produtos.forEach(function (p) { prodCad[p.chave_produto] = { c: p.classe, ncm: p.ncm, x: p.descricao, em: p.atualizado_em, cli: !!p.pelo_cliente }; });
   var ncmCad = {}; d.ncm.forEach(function (r) { ncmCad[r.ncm_prefixo] = { c: r.classe, em: r.atualizado_em }; });
   var pub = {}; d.notas.forEach(function (n) { pub[n.chave] = n.publicada; });
   return { id: e.cnpj, meta: metaDe(e), notas: d.notas.map(function (n) { return n.dados; }), pub: pub, canc: canc, prodCad: prodCad, ncmCad: ncmCad,
-    hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova }; }).reverse(),
+    hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova, cli: !!h.pelo_cliente }; }).reverse(),
     acomp: (function () { var a = {}; (d.acomp || []).forEach(function (x) { a[x.chave] = { s: x.status, t: x.texto, em: x.atualizado_em }; }); return a; })() };
 }
 function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
@@ -804,7 +804,7 @@ function tabPendencias(pend) {
   if (!f.length) return h + '<div class="empty"><span class="pill ok">Nenhuma pendência</span><p class="note">Nada encontrado para este período e filtro.</p></div>';
   h += '<div class="tscroll"><table><thead><tr><th>Gravidade</th><th>Imposto</th><th>Nota</th><th>Emitente / destinatário</th><th>Item</th><th>O que corrigir</th><th class="r">Impacto est.</th><th>Acompanhamento</th></tr></thead><tbody>';
   f.slice(0, S.imprimindo ? 1e9 : 500).forEach(function (p) {
-    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' && !S.readonly ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
+    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   if (f.length > 500 && !S.imprimindo) h += '<p class="note">Mostrando 500 de ' + f.length + '. Use a busca ou os filtros.</p>';
@@ -842,9 +842,9 @@ async function classificarGrupo(tipo, chave, classe) {
   var e = S.emp, todos = Object.values(S.res.produtos);
   var alvo = todos.filter(function (p) { return (!S.fProd || S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fForn || p.fc === S.fForn) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]) && (tipo === 'ncm' ? p.ncm === chave : tipo === 'forn' ? p.fc === chave : nomeBase(p.x) === chave); });
   if (!alvo.length) return;
-  if (tipo === 'ncm') { var antes = S.porNcm; S.porNcm = true; await classificar(alvo[0].k, chave, classe); S.porNcm = antes; toast('NCM ' + chave + ' classificado como ' + nomeClasse(classe).toLowerCase() + '.'); return; }
+  if (tipo === 'ncm' && !S.readonly) { var antes = S.porNcm; S.porNcm = true; await classificar(alvo[0].k, chave, classe); S.porNcm = antes; toast('NCM ' + chave + ' classificado como ' + nomeClasse(classe).toLowerCase() + '.'); return; }
   var agora = new Date().toISOString(), copia = JSON.parse(JSON.stringify(e.prodCad)), nHist = e.hist.length;
-  alvo.forEach(function (p) { var a = e.prodCad[p.k]; e.prodCad[p.k] = { c: classe, em: agora, x: p.x || '', ncm: p.ncm || '' }; e.hist.push({ em: agora, alvo: 'produto', ref: p.k, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe }); });
+  alvo.forEach(function (p) { var a = e.prodCad[p.k]; e.prodCad[p.k] = { c: classe, em: agora, x: p.x || '', ncm: p.ncm || '', cli: S.readonly }; e.hist.push({ em: agora, alvo: 'produto', ref: p.k, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe, cli: S.readonly }); });
   recalcular(); renderMain();
   var msgG = (alvo.length === 1 ? '1 produto classificado' : alvo.length + ' produtos classificados') + ' como ' + nomeClasse(classe).toLowerCase() + '.';
   if (S.exemplo) { toast(msgG); return; }
@@ -855,12 +855,14 @@ async function classificarGrupo(tipo, chave, classe) {
 }
 function tabProdutos() {
   var todos = Object.values(S.res.produtos);
-  var cnt = function (c) { return todos.filter(function (p) { return c === 'todos' || p.classe === c; }).length; };
-  var f = todos.filter(function (p) { return (S.fProd === 'todos' || p.classe === S.fProd) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fNome || nomeBase(p.x) === S.fNome) && (!S.fForn || p.fc === S.fForn) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
+  var cnt = function (c) { return todos.filter(function (p) { return c === 'todos' || (c === 'cliente' ? ehCli(p) : p.classe === c); }).length; };
+  var f = todos.filter(function (p) { return (S.fProd === 'todos' || (S.fProd === 'cliente' ? ehCli(p) : p.classe === S.fProd)) && (!S.fNcm || p.ncm === S.fNcm) && (!S.fNome || nomeBase(p.x) === S.fNome) && (!S.fForn || p.fc === S.fForn) && bate(S.q, [p.x, p.cp, p.ncm, p.fn, p.fc]); });
   f.sort(function (a, b) { return (a.classe === 'pendente' ? 0 : 1) - (b.classe === 'pendente' ? 0 : 1) || b.v - a.v; });
   var grp = S.gProd || 'nenhum';
-  var h = '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. ' + ((S.emp.meta.segmento || 'autopecas') === 'autopecas' ? 'NCM de pneus e autopeças já vem sugerido como revenda.' : 'No varejo, toda compra vem sugerida como revenda; marque o que for uso e consumo ou ativo.') + ' A classificação fica no histórico e vale para as próximas importações.</p>';
-  h += '<div class="toolbar"><div class="chips" role="group" aria-label="Classificação">' + [['todos', 'Todos'], ['pendente', 'Sem classificação'], ['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']].map(function (c) { return '<button type="button" class="chip" data-fprod="' + c[0] + '" aria-pressed="' + (S.fProd === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt(c[0]) + ')</span></button>'; }).join('') + '</div>';
+  var nCli = cliPend();
+  var h = (!S.readonly && nCli ? '<div class="banner"><span class="grow"><b>' + nCli + (nCli === 1 ? ' produto classificado' : ' produtos classificados') + ' pelo cliente.</b> Confira e confirme; ao confirmar, a classificação passa a ser do escritório.</span><button class="btn" type="button" data-fprod="cliente">Ver</button><button class="btn primary" type="button" data-act="confirmarCli">Confirmar todos</button></div>' : '') +
+    (S.readonly ? '<p class="note"><b>Você pode classificar seus produtos.</b> Marque cada um (ou o grupo inteiro, agrupando por fornecedor, nome ou NCM) como revenda, insumo de serviço, uso e consumo ou ativo. A RG Fiscal confere cada classificação.</p>' : '') + '<p class="note">Produtos comprados de fornecedores. Revenda dá crédito de ICMS e, se o produto não for monofásico, de PIS/COFINS. As etiquetas mostram o que é monofásico (PIS/COFINS) e o que saiu da ST em 01/10 (ICMS). Insumo de serviço (peça aplicada na prestação do serviço) dá crédito de PIS/COFINS, mas não de ICMS. Uso e consumo e ativo saem do crédito de ICMS e de PIS/COFINS. ' + ((S.emp.meta.segmento || 'autopecas') === 'autopecas' ? 'NCM de pneus e autopeças já vem sugerido como revenda.' : 'No varejo, toda compra vem sugerida como revenda; marque o que for uso e consumo ou ativo.') + ' A classificação fica no histórico e vale para as próximas importações.</p>';
+  h += '<div class="toolbar"><div class="chips" role="group" aria-label="Classificação">' + [['todos', 'Todos'], ['pendente', 'Sem classificação'], ['revenda', 'Revenda'], ['insumo', 'Insumo de serviço'], ['uso', 'Uso e consumo'], ['ativo', 'Ativo']].concat(!S.readonly && nCli ? [['cliente', 'Pelo cliente']] : []).map(function (c) { return '<button type="button" class="chip" data-fprod="' + c[0] + '" aria-pressed="' + (S.fProd === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt(c[0]) + ')</span></button>'; }).join('') + '</div>';
   if (!S.readonly) h += '<label class="check" for="porNcm"><input type="checkbox" id="porNcm"' + (S.porNcm ? ' checked' : '') + '> Aplicar a todos os produtos do mesmo NCM</label>';
   h += '</div>';
   h += '<div class="toolbar"><div class="row" style="gap:8px;align-items:center"><span class="small">Agrupar</span><div class="seg" role="group" aria-label="Agrupar produtos">' + [['nenhum', 'Sem grupos'], ['ncm', 'Por NCM'], ['nome', 'Por nome'], ['forn', 'Por fornecedor']].map(function (g) { return '<button type="button" data-gprod="' + g[0] + '" aria-pressed="' + (grp === g[0]) + '">' + g[1] + '</button>'; }).join('') + '</div>' +
@@ -880,23 +882,35 @@ function tabProdutos() {
       if (p.grupo !== undefined) {
         var its = p.itens, pend = its.filter(function (x) { return x.classe === 'pendente'; }).length;
         h += '<tr class="grp-prod"><td colspan="4"><div class="grp-cab"><div><b>' + (grp === 'ncm' ? 'NCM <span class="mono">' + esc(p.grupo) + '</span>' : grp === 'forn' ? esc(its[0].fn) + ' <span class="small" style="font-weight:400">' + esc(fmtCnpj(p.grupo)) + '</span>' : esc(p.grupo)) + '</b> <span class="small">' + its.length + (its.length === 1 ? ' produto' : ' produtos') + ' · ' + m0(soma(its)) + (pend ? ' · ' + pend + ' sem classificação' : '') + '</span></div>' +
-          (S.readonly ? '' : '<div class="row" style="gap:6px;align-items:center"><span class="small">' + (grp === 'ncm' ? 'Classificar o NCM inteiro (vale também nas próximas compras):' : its.length === 1 ? 'Classificar como:' : 'Classificar os ' + its.length + ' como:') + '</span><div class="seg" role="group" aria-label="Classificar o grupo">' + CLASSES.map(function (c) { return '<button type="button" data-gclasse="' + c[0] + '" data-gtipo="' + grp + '" data-gchave="' + esc(p.grupo) + '">' + c[1] + '</button>'; }).join('') + '</div></div>') + '</div></td></tr>';
+          ('<div class="row" style="gap:6px;align-items:center"><span class="small">' + (grp === 'ncm' && !S.readonly ? 'Classificar o NCM inteiro (vale também nas próximas compras):' : its.length === 1 ? 'Classificar como:' : 'Classificar os ' + its.length + ' como:') + '</span><div class="seg" role="group" aria-label="Classificar o grupo">' + CLASSES.map(function (c) { return '<button type="button" data-gclasse="' + c[0] + '" data-gtipo="' + grp + '" data-gchave="' + esc(p.grupo) + '">' + c[1] + '</button>'; }).join('') + '</div></div>') + '</div></td></tr>';
         return;
       }
       if (mostrados++ >= (S.imprimindo ? 1e9 : 400)) return;
-      var ctrl = S.readonly ? (p.classe === 'pendente' ? '' : '<span class="pill ok">' + esc((CLASSES.filter(function (c) { return c[0] === p.classe; })[0] || [])[1] || p.classe) + '</span>')
-        : '<div class="seg" role="group" aria-label="Classificar">' + CLASSES.map(function (c) { return '<button type="button" data-classe="' + c[0] + '" data-pk="' + esc(p.k) + '" data-ncm="' + esc(p.ncm) + '" aria-pressed="' + (p.classe === c[0] && p.origem !== 'sugerido') + '">' + c[1] + '</button>'; }).join('') + '</div>';
-      var orig = p.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : '<span class="small">' + esc(ORIGEM[p.origem]) + '</span>';
-      var desf = !S.readonly && (p.origem === 'manual' || p.origem === 'ncm') ? ' <button type="button" class="link" data-desfazer="' + esc(p.k) + '" data-origem="' + p.origem + '" data-ncm="' + esc(p.ncm) + '">Desfazer</button>' : '';
+      var cadP = S.emp.prodCad[p.k], cliP = p.origem === 'manual' && cadP && cadP.cli;
+      var ctrl = '<div class="seg" role="group" aria-label="Classificar">' + CLASSES.map(function (c) { return '<button type="button" data-classe="' + c[0] + '" data-pk="' + esc(p.k) + '" data-ncm="' + esc(p.ncm) + '" aria-pressed="' + (p.classe === c[0] && p.origem !== 'sugerido') + '">' + c[1] + '</button>'; }).join('') + '</div>';
+      var orig = p.classe === 'pendente' ? '<span class="pill alerta">Sem classificação</span>' : cliP ? (S.readonly ? '<span class="small">Definido por você · a RG Fiscal confere</span>' : '<span class="pill alerta">Pelo cliente</span> <button type="button" class="link" data-confirmar="' + esc(p.k) + '">Confirmar</button>') : '<span class="small">' + esc(ORIGEM[p.origem]) + '</span>';
+      var desf = (!S.readonly && (p.origem === 'manual' || p.origem === 'ncm')) || (S.readonly && cliP) ? ' <button type="button" class="link" data-desfazer="' + esc(p.k) + '" data-origem="' + p.origem + '" data-ncm="' + esc(p.ncm) + '">Desfazer</button>' : '';
       h += '<tr><td>' + esc(p.x) + '<div class="small">Cód. ' + esc(p.cp || '–') + ' · <button type="button" class="link" data-fforn="' + esc(p.fc) + '" title="Ver só este fornecedor">' + esc(p.fn) + '</button></div></td><td class="mono" style="white-space:nowrap"><button type="button" class="link mono" data-fncm="' + esc(p.ncm) + '" title="Ver só este NCM">' + esc(p.ncm) + '</button>' + ((p.mono || p.monoCond || p.st) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">' + (p.mono ? '<span class="tag">Monofásico</span>' : p.monoCond ? '<span class="tag" title="Depende da destinação (Anexos I e II)">Monofásico?</span>' : '') + (p.st ? '<span class="tag">Saiu da ST</span>' : '') + '</div>' : '') + '</td><td class="r num">' + m0(p.v) + '<div class="small">' + p.n + ' ' + (p.n === 1 ? 'compra' : 'compras') + ' · última ' + brFull(p.ult) + '</div></td><td>' + ctrl + '<div style="margin-top:5px">' + orig + desf + '</div></td></tr>';
     });
     h += '</tbody></table></div>';
   }
   if (!S.readonly && S.emp.hist.length) {
-    h += '<details><summary>Histórico de classificação (' + S.emp.hist.length + ')</summary><div class="tscroll" style="margin-top:10px"><table><thead><tr><th>Quando</th><th>Alvo</th><th>Produto / NCM</th><th>De</th><th>Para</th></tr></thead><tbody>' +
-      S.emp.hist.slice().reverse().slice(0, 200).map(function (x) { return '<tr><td class="num" style="white-space:nowrap">' + new Date(x.em).toLocaleString('pt-BR') + '</td><td>' + (x.alvo === 'ncm' ? 'NCM' : 'Produto') + '</td><td>' + esc(x.x || x.ref) + '</td><td>' + esc(nomeClasse(x.de)) + '</td><td>' + esc(nomeClasse(x.para)) + '</td></tr>'; }).join('') + '</tbody></table></div></details>';
+    h += '<details><summary>Histórico de classificação (' + S.emp.hist.length + ')</summary><div class="tscroll" style="margin-top:10px"><table><thead><tr><th>Quando</th><th>Alvo</th><th>Produto / NCM</th><th>De</th><th>Para</th><th>Por</th></tr></thead><tbody>' +
+      S.emp.hist.slice().reverse().slice(0, 200).map(function (x) { return '<tr><td class="num" style="white-space:nowrap">' + new Date(x.em).toLocaleString('pt-BR') + '</td><td>' + (x.alvo === 'ncm' ? 'NCM' : 'Produto') + '</td><td>' + esc(x.x || x.ref) + '</td><td>' + esc(nomeClasse(x.de)) + '</td><td>' + esc(nomeClasse(x.para)) + '</td><td>' + (x.cli ? 'Cliente' : 'Escritório') + '</td></tr>'; }).join('') + '</tbody></table></div></details>';
   }
   return h;
+}
+function ehCli(p) { var c = S.emp.prodCad[p.k]; return p.origem === 'manual' && !!(c && c.cli); }
+function cliPend() { return S.res ? Object.values(S.res.produtos).filter(ehCli).length : 0; }
+async function confirmarCli(lista) {
+  var e = S.emp, alvo = lista || Object.values(S.res.produtos).filter(ehCli);
+  if (!alvo.length) return;
+  try {
+    for (var i = 0; i < alvo.length; i += 8) await Promise.all(alvo.slice(i, i + 8).map(function (p) { var c = e.prodCad[p.k]; return S.exemplo ? null : B.classificarProduto(e.id, p.k, p.ncm, c.x || ((p.x || '') + ' · ' + (p.fn || '')), c.c); }));
+    alvo.forEach(function (p) { e.prodCad[p.k].cli = false; });
+    if (S.fProd === 'cliente' && !cliPend()) S.fProd = 'todos';
+    renderMain(); toast(alvo.length === 1 ? 'Classificação confirmada.' : alvo.length + ' classificações confirmadas.');
+  } catch (err) { toast('Não foi possível confirmar: ' + erroTexto(err)); }
 }
 function nomeClasse(c) { return c ? ((CLASSES.filter(function (x) { return x[0] === c; })[0] || [])[1] || c) : '—'; }
 var CLASSES_SERV = [['insumo', 'Insumo de serviço'], ['uso', 'Sem crédito']];
@@ -1028,18 +1042,19 @@ async function publicar() {
 async function classificar(pk, ncm, classe) {
   var e = S.emp, agora = new Date().toISOString(), p = S.res.produtos[pk] || {};
   var antes = { prod: JSON.parse(JSON.stringify(e.prodCad)), ncm: JSON.parse(JSON.stringify(e.ncmCad)) };
-  if (S.porNcm && ncm) {
+  var porNcm = S.porNcm && !S.readonly;
+  if (porNcm && ncm) {
     var ant = e.ncmCad[ncm]; e.ncmCad[ncm] = { c: classe, em: agora };
     e.hist.push({ em: agora, alvo: 'ncm', ref: ncm, x: 'NCM ' + ncm, de: ant ? ant.c : null, para: classe });
     Object.keys(e.prodCad).forEach(function (k) { if (e.prodCad[k].ncm === ncm) delete e.prodCad[k]; });
   } else {
-    var a = e.prodCad[pk]; e.prodCad[pk] = { c: classe, em: agora, x: p.x || '', ncm: ncm || '' };
-    e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe });
+    var a = e.prodCad[pk]; e.prodCad[pk] = { c: classe, em: agora, x: p.x || '', ncm: ncm || '', cli: S.readonly };
+    e.hist.push({ em: agora, alvo: 'produto', ref: pk, x: (p.x || '') + ' · ' + (p.fn || ''), de: a ? a.c : null, para: classe, cli: S.readonly });
   }
   recalcular(); renderMain();
   if (S.exemplo) return;
   try {
-    if (S.porNcm && ncm) await B.classificarNcm(e.id, ncm, classe);
+    if (porNcm && ncm) await B.classificarNcm(e.id, ncm, classe);
     else await B.classificarProduto(e.id, pk, ncm, (p.x || '') + ' · ' + (p.fn || ''), classe);
   } catch (err) { e.prodCad = antes.prod; e.ncmCad = antes.ncm; e.hist.pop(); recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
 }
@@ -1066,7 +1081,7 @@ function passosTour() {
     simples ? null : { el: '.kpis-corr', t: 'Como deve ficar depois das correções', x: 'Os mesmos impostos depois de corrigir as notas com erro. O último card mostra o impacto: quanto os tributos aumentam ou diminuem com as correções.' },
     { el: '.tabs [data-tab="pendencias"]', t: 'O que corrigir', x: 'A lista de erros e alertas encontrados nas notas, com a explicação de cada um e o valor envolvido. Os itens que o escritório já tratou aparecem como resolvidos.' },
     { el: '.tabs [data-tab="notas"]', t: 'Todas as notas', x: 'Cada nota do período, com o resultado da conferência. Clique no número da nota para ver o documento completo e baixar o XML.' },
-    { el: '.tabs [data-tab="produtos"]', t: 'Classificação dos produtos', x: 'Cada produto comprado precisa estar classificado como revenda, insumo de serviço, uso e consumo ou ativo, porque é isso que define o crédito de ICMS, PIS e COFINS. O número em vermelho mostra quantos ainda estão sem classificação. ' + (S.readonly ? 'Se algum produto comprado não for para revenda (material de escritório, limpeza, ferramentas da loja), avise a RG Fiscal para que o cálculo saia correto.' : 'Classifique todos antes de publicar; dá para agrupar por NCM, nome ou fornecedor e classificar o grupo inteiro de uma vez.') },
+    { el: '.tabs [data-tab="produtos"]', t: 'Classificação dos produtos', x: 'Cada produto comprado precisa estar classificado como revenda, insumo de serviço, uso e consumo ou ativo, porque é isso que define o crédito de ICMS, PIS e COFINS. O número em vermelho mostra quantos ainda estão sem classificação. ' + (S.readonly ? 'Você mesmo pode classificar: agrupe por fornecedor, nome ou NCM e classifique o grupo inteiro de uma vez. Material de escritório, limpeza e ferramentas da loja são uso e consumo. A RG Fiscal confere cada classificação.' : 'Classifique todos antes de publicar; dá para agrupar por NCM, nome ou fornecedor e classificar o grupo inteiro de uma vez.') },
     { el: '[data-act="excel"]', t: 'Leve os dados com você', x: 'Baixe tudo em Excel ou imprima a tela. Os arquivos respeitam o período escolhido.' },
     { el: '[data-act="tour"]', t: 'Pronto!', x: 'Sempre que quiser rever este passo a passo, clique neste ícone. Se tiver dúvida, fale com a RG Fiscal.' }
   ].filter(Boolean);
@@ -1395,8 +1410,9 @@ document.addEventListener('click', function (ev) {
   if (d.ac) { S.editAc = d.ac; renderMain(); var fe = $('fAcomp'); if (fe) fe.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   if (d.modo) { S.modo = d.modo; render(); return; }
   if (d.login) { S.telaLogin = d.login; S.erro = ''; S.aviso = ''; render(); return; }
-  if (d.classe) { if (!S.readonly) classificar(d.pk, d.ncm, d.classe); return; }
-  if (d.gclasse) { if (!S.readonly) classificarGrupo(d.gtipo, d.gchave, d.gclasse); return; }
+  if (d.classe) { classificar(d.pk, d.ncm, d.classe); return; }
+  if (d.gclasse) { classificarGrupo(d.gtipo, d.gchave, d.gclasse); return; }
+  if (d.confirmar) { if (!S.readonly) confirmarCli([S.res.produtos[d.confirmar]]); return; }
   if (d.gprod) { S.gProd = d.gprod; renderMain(); return; }
   if (d.fncm) { S.fNcm = d.fncm; S.fNome = ''; renderMain(); return; }
   if (d.fforn) { S.fForn = d.fforn; renderMain(); return; }
@@ -1435,6 +1451,7 @@ document.addEventListener('click', function (ev) {
   }
   else if (a === 'cancelaEq') { S.confirmEquipe = null; render(); }
   else if (a === 'publicar') publicar();
+  else if (a === 'confirmarCli') { if (!S.readonly) confirmarCli(); }
   else if (a === 'irProdutos') { S.tab = 'produtos'; S.fProd = 'pendente'; renderMain(); }
   else if (a === 'aplicarMono') {
     var lista = $('mono').value.split(/\n+/).map(function (s) { return s.trim().replace(/\s+/g, ' '); }).filter(function (s) { return /^\d/.test(s); });

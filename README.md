@@ -220,3 +220,11 @@ vendor/jszip.min.js     leitura de .zip
 vendor/supabase.js      biblioteca do Supabase (v2.45.4)
 exemplos/               notas fictícias para teste
 ```
+
+## Classificação de produtos pelo cliente
+
+- O cliente pode classificar os produtos comprados: um por um ou o grupo inteiro (por fornecedor, nome ou NCM). No caso do NCM, a classificação vale para os produtos que aparecem, não vira regra do NCM.
+- Cada classificação feita pelo cliente fica marcada como "Pelo cliente". O cliente só pode desfazer as dele.
+- O escritório vê um aviso na aba Produtos, filtra por "Pelo cliente" e confirma uma a uma ou todas de uma vez. Ao confirmar, a classificação passa a ser do escritório.
+- O histórico mostra quem alterou (cliente ou escritório).
+- No banco: a coluna `produtos.pelo_cliente` é preenchida por trigger (o cliente não consegue marcar como escritório). O cliente grava e altera só nas empresas a que tem acesso (`tem_acesso`) e só exclui linhas marcadas como dele. Regras por NCM continuam só do escritório.
