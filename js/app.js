@@ -38,6 +38,7 @@ var I = {
   back: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18 9 12l6-6"/></svg>',
   zap: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 1.7 3.6 3.6 4.4l1.2-1.1 2 .9c-.2 1.2-1.2 1.9-2.4 1.8-3.2-.3-6-3.1-6.3-6.3C7 8 7.7 7 8.9 6.8l.9 2z"/></svg>',
   link: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  ok: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
   ajuda: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.9"/><path d="M12 17h.01"/></svg>',
   sol: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   lua: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
@@ -392,16 +393,17 @@ function kpi(nome, icone, d, c, extra) {
   return '<div class="card kpi"><div class="lbl"><span class="badge">' + icone + '</span>' + nome + '</div><div><div class="big num' + (saldo < 0 ? ' credor' : '') + '">' + m0(Math.abs(saldo)) + '</div><div class="state">' + (saldo >= 0 ? 'a recolher no período' : '<span class="credor">saldo credor no período</span>') + '</div></div>' +
     '<dl class="num"><dt>Débitos</dt><dd>' + m0(d) + '</dd><dt>Créditos</dt><dd>' + m0(c) + '</dd>' + (extra || '') + '</dl></div>';
 }
+function seloRevisao() { return '<span class="selo-rev" title="As regras de ICMS, ICMS-ST, PIS/COFINS e CBS/IBS usadas no portal são conferidas semanalmente com a legislação federal e de SP. Esta é a data da última revisão.">' + I.ok + 'Regras fiscais revisadas em ' + esc(Regras.REVISAO) + ' conforme a legislação vigente</span>'; }
 function renderHeaderSub() {
   var sub = $('subtitle'); if (!sub) return;
   var e = S.emp, nome = e.meta.nome || nomeDe(e.notas, e.meta.cnpj) || fmtCnpj(e.meta.cnpj);
   var tit = $('titEmp'); if (tit) tit.textContent = nome;
   var atualiz = S.readonly && e.meta.publicado ? '. Atualizado em ' + new Date(e.meta.publicado).toLocaleDateString('pt-BR') : '';
-  if (!S.res) { sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + ', ainda sem notas' + atualiz; return; }
+  if (!S.res) { sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + ', ainda sem notas' + atualiz + seloRevisao(); return; }
   var ds = diasSel(), lbl = 'Todo o período';
   if (S.periodo[0] === 'w') { var w = S.per.semanas.filter(function (x) { return 'w:' + x.ini === S.periodo; })[0]; lbl = 'Semana ' + w.num + ' de ' + mesNome(w.mes); }
   if (S.periodo[0] === 'm') lbl = mesNome(S.periodo.slice(2));
-  sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + '. <b>' + esc(lbl) + '</b>' + (ds.length ? ', de ' + brFull(ds[0]) + ' a ' + brFull(ds[ds.length - 1]) : '') + atualiz;
+  sub.innerHTML = 'CNPJ ' + esc(fmtCnpj(e.meta.cnpj)) + '. <b>' + esc(lbl) + '</b>' + (ds.length ? ', de ' + brFull(ds[0]) + ' a ' + brFull(ds[ds.length - 1]) : '') + atualiz + seloRevisao();
 }
 
 function renderMain() {

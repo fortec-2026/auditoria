@@ -2,7 +2,8 @@
    Cada regra: p = prefixos de NCM (sem pontos), x = prefixos excluídos, d = descrição, l = base legal, n = observação.
    A regra de prefixo mais longo vence. É orientação: o escritório revisa antes de valer para o cliente. */
 var Regras = (function () {
-  var REVISAO = 'out/2026';
+  // Data da última revisão das regras pela legislação vigente (atualizar a cada revisão aprovada)
+  var REVISAO = '05/11/2026';
   function R(o) { return o; }
 
   /* ---------- PIS/COFINS (revenda pelo comércio, Lucro Real ou Presumido) ---------- */

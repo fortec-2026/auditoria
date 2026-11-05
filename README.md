@@ -235,3 +235,8 @@ exemplos/               notas fictícias para teste
 - O escritório vê um aviso na aba Produtos, filtra por "Pelo cliente" e confirma uma a uma ou todas de uma vez. Ao confirmar, a classificação passa a ser do escritório.
 - O histórico mostra quem alterou (cliente ou escritório).
 - No banco: a coluna `produtos.pelo_cliente` é preenchida por trigger (o cliente não consegue marcar como escritório). O cliente grava e altera só nas empresas a que tem acesso (`tem_acesso`) e só exclui linhas marcadas como dele. Regras por NCM continuam só do escritório.
+
+## Selo de revisão das regras
+
+- O cabeçalho mostra "Regras fiscais revisadas em dd/mm/aaaa conforme a legislação vigente". A data vem de `REVISAO` em `js/regras.js` e também aparece na aba Classificação e no Excel.
+- Toda segunda-feira uma tarefa agendada consulta as fontes oficiais (SEFAZ-SP, Planalto, Receita Federal, CONFAZ, Portal da NF-e) e entrega um relatório com o que mudou e o que corrigir. Ela não altera o site: as correções, e a nova data do selo, só são aplicadas depois da aprovação do escritório.
