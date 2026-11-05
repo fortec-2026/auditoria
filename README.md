@@ -155,6 +155,9 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
 - **PIS/COFINS não cumulativo:** 1,65% e 7,6%. O ICMS fica fora da base do débito (Tema 69/STF) e da base do crédito (Lei 14.592/2023).
 - **Duas listas de NCM por empresa** (Escritório › Listas de NCM):
   - **Monofásicos de PIS/COFINS (Lei 10.485/2002):** só afeta o PIS/COFINS. Sem débito na revenda e sem crédito na compra.
+    - A lista padrão segue o texto vigente da lei: pneus e câmaras (art. 5º), todos os códigos do Anexo I e os 15 itens do Anexo II.
+    - Os itens do Anexo II (4009, 8431, 8408.90.90, 8412.21.10, 8412.21.90, 8412.31.10, 8413.60.19, 8414.80.19, 8414.90.39, 8432.90.00, 8481.10.00, 8481.20.90, 8481.80.92, 8483.60.1 e 8501.10.19) só são monofásicos quando a peça é própria para as máquinas e veículos indicados. Por isso ficam como condicionados: o CST da nota decide.
+    - Códigos com destaque Ex (4016.99.90 Ex 03 e 05; 7320.10.00 Ex 01; 8481.80.99 Ex 01 e 02; 8536.50.90 Ex 01) só valem quando a nota informa o Ex. O 8413.91.00 Ex 01 foi desdobrado na TIPI e fica como condicionado.
     - `NCM`: monofásico.
     - `NCM ex:03,05`: monofásico só nesses destaques Ex da TIPI (campo EXTIPI da nota).
     - `NCM ?`: depende da destinação; o portal segue o CST da nota (02 ou 04) e avisa para conferir.

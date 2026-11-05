@@ -116,7 +116,8 @@ var Regras = (function () {
 
     /* PIS/COFINS */
     var rpc = acha(PC, ncm);
-    if (o.mono && o.mono(ncm) && (!rpc || rpc.t !== 'zero')) rpc = { t: 'mono', d: 'Monofásico pela lista da empresa', l: 'Lei 10.485/2002 (lista de monofásicos da empresa)' };
+    var mE = o.mono ? o.mono(ncm) : '';
+    if (mE && (!rpc || rpc.t !== 'zero')) rpc = mE === 'cond' ? { t: 'mono', cond: true, d: 'Monofásico conforme a destinação', l: 'Lei 10.485/2002, art. 3º, II, e Anexo II', n: 'Só é monofásico quando a peça é própria para as máquinas e veículos indicados no item do Anexo II; se não for, a venda é tributada (CST 01).' } : { t: 'mono', d: 'Monofásico pela lista da empresa', l: 'Lei 10.485/2002 (art. 5º e Anexo I)' };
     var tpc = rpc ? rpc.t : 'normal';
     var pc = { trat: tpc, cst: CST_PC[tpc], regra: rpc, cond: !!(rpc && rpc.cond) };
     if (simples) {

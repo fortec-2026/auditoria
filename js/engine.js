@@ -4,19 +4,24 @@
 var Fiscal = (function () {
   'use strict';
 
-  /* Monofásicos de PIS/COFINS (Lei 10.485/2002, art. 5º e Anexos I e II), lista do escritório.
-     Formato de cada linha:  NCM (prefixo)            -> monofásico
+  /* Monofásicos de PIS/COFINS: pneus e câmaras (Lei 10.485/2002, art. 5º) e autopeças dos Anexos I e II (art. 3º, I e II),
+     conforme o texto vigente da lei no Planalto. Formato de cada linha:
+                             NCM (prefixo)            -> monofásico
                              NCM ex:03,05             -> monofásico só nesses destaques Ex da TIPI
-                             NCM ?                    -> depende da destinação: o CST da nota decide */
+                             NCM ?                    -> depende da destinação (Anexo II ou Ex sem correspondência): o CST da nota decide */
   var DEFAULT_MONO = [
-    '4011', '4013', '40161010', '6813', '70071100', '70072100', '70091000', '83012000', '83023000',
-    '84073390', '84073490', '840820', '840991', '840999', '841330', '84148021', '84148022', '841520',
-    '84212300', '84213100', '84314100', '84314200', '84339090', '850520', '850710', '8511',
-    '851220', '851240', '851290', '852721', '853910', '85443000', '870600', '8707', '8708',
-    '90318040', '9032892', '91040000', '94012000',
-    '848310', '84832000', '848330', '848340', '848350', '8483601', '90292010', '90299010',
-    '40169990 ex:03,05', '73201000 ex:01', '85365090 ex:01',
-    '4009 ?', '84136019 ?', '84812090 ?', '84818092 ?'
+    // art. 5º: pneus e câmaras de ar
+    '4011', '4013',
+    // Anexo I (aplicação pelo código)
+    '40161010', '40169990 ex:03,05', '6813', '70071100', '70072100', '70091000', '73201000 ex:01', '83012000', '83023000',
+    '84073390', '84073490', '840820', '840991', '840999', '841330', '841391 ?', '84148021', '84148022', '841520',
+    '84212300', '84213100', '84314100', '84314200', '84339090', '84818099 ex:01,02',
+    '848310', '84832000', '848330', '848340', '848350', '850520', '850710', '8511', '851220', '85123000', '851240', '851290',
+    '85272', '85365090 ex:01', '853910', '85443000', '870600', '8707', '8708',
+    '90292010', '90299010', '90303921', '90318040', '9032892', '91040000', '94012000',
+    // Anexo II (só quando próprio para as máquinas e veículos indicados em cada item)
+    '4009 ?', '8431 ?', '84089090 ?', '84122110 ?', '84122190 ?', '84123110 ?', '84136019 ?', '84148019 ?', '84149039 ?',
+    '84329000 ?', '84811000 ?', '84812090 ?', '84818092 ?', '8483601 ?', '85011019 ?'
   ];
   /* Pneumáticos (antigo Anexo VII, art. 310 do RICMS/SP) e autopeças (antigo Anexo XIV, art. 313-O) da Portaria CAT 68/2019,
      revogados pela Portaria SRE 34/2026, art. 1º, I: saem da ST em 01/10/2026 (estoque: Portaria CAT 28/2020).
@@ -801,7 +806,7 @@ var Fiscal = (function () {
             issue('alerta', it, 'MONO_CST_ERR', 'Produto ' + NOME_PC[trC] + ' (NCM ' + it.ncm + ') saiu com CST ' + it.cP + (DESC_CST[it.cP] ? ' (' + DESC_CST[it.cP] + ')' : '') + ' de PIS/COFINS. O correto na revenda é CST ' + cEsp + '. Não muda o valor do imposto, mas a nota fica inconsistente com a EFD-Contribuições: corrigir o cadastro do produto no emissor.', 0);
           } else if (regime !== 'simples' && nat === 'venda' && !mono && ['07', '08', '09', '49', '99'].indexOf(it.cP) >= 0) {
             var bT = Math.max(0, receita - it.v), DESC_CS = { '07': 'operação isenta', '08': 'sem incidência', '09': 'com suspensão', '49': 'outras operações de saída', '99': 'outras operações' };
-            issue('alerta', it, 'PC_CST_SAIDA', 'Venda com CST ' + it.cP + ' (' + DESC_CS[it.cP] + ') de PIS/COFINS, mas o NCM ' + it.ncm + ' não está nas listas de monofásicos nem de alíquota zero. Se o produto for tributado, o CST é 01, com PIS de ' + (PIS * 100).toLocaleString('pt-BR') + '% e COFINS de ' + (COF * 100).toLocaleString('pt-BR') + '% sobre a receita sem ICMS. Se for monofásico (confira os Anexos da Lei 10.485/2002), inclua o NCM na lista da empresa e use CST 04.', bT * (PIS + COF), { a: { pisD: -bT * PIS, cofD: -bT * COF } });
+            issue('alerta', it, 'PC_CST_SAIDA', 'Venda com CST ' + it.cP + ' (' + DESC_CS[it.cP] + ') de PIS/COFINS, mas o NCM ' + it.ncm + (monoR === 'cond' ? ' só é monofásico quando a peça é própria para as máquinas e veículos indicados no Anexo II da Lei 10.485/2002, e o CST da nota não indica isso. Se for, use CST 04. Se o produto for tributado,' : ' não está nas listas de monofásicos nem de alíquota zero. Se o produto for tributado,') + ' o CST é 01, com PIS de ' + (PIS * 100).toLocaleString('pt-BR') + '% e COFINS de ' + (COF * 100).toLocaleString('pt-BR') + '% sobre a receita sem ICMS. Se for monofásico (confira os Anexos da Lei 10.485/2002), inclua o NCM na lista da empresa e use CST 04.', bT * (PIS + COF), { a: { pisD: -bT * PIS, cofD: -bT * COF } });
           } else if (nat === 'venda' && !mono && (it.cP === '04' || it.cP === '06')) {
             issue('alerta', it, 'MONO_CST', 'CST ' + it.cP + ' de PIS/COFINS em NCM ' + it.ncm + ', que não está na lista de monofásicos. Conferir se o produto é monofásico.', receita * (PIS + COF), { a: { pisD: -Math.max(0, receita - it.v) * PIS, cofD: -Math.max(0, receita - it.v) * COF } });
           } else if (nat === 'venda' && !mono && it.cP === '01' && it.vP > 0) {
