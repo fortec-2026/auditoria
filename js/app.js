@@ -1457,8 +1457,11 @@ document.addEventListener('click', function (ev) {
     var lista = $('mono').value.split(/\n+/).map(function (s) { return s.trim().replace(/\s+/g, ' '); }).filter(function (s) { return /^\d/.test(s); });
     var stl = $('stl') ? $('stl').value.split(/\s+/).map(function (s) { return s.replace(/\D/g, ''); }).filter(Boolean) : S.emp.meta.st;
     var corte = $('corte') ? $('corte').value || '2026-10-01' : S.emp.meta.corte;
+    // igual à lista padrão: grava vazio para acompanhar as atualizações da legislação feitas no portal
+    if (stl.join(',') === F.DEFAULT_ST.join(',')) stl = [];
+    if (lista.join(',') === F.DEFAULT_MONO.join(',')) lista = [];
     S.emp.meta.mono = lista; S.emp.meta.st = stl; S.emp.meta.corte = corte; recalcular(); render();
-    var msg = (lista.length && stl.length) ? 'Análise recalculada.' : 'Lista vazia: a análise usa a lista padrão.';
+    var msg = (lista.length && stl.length) ? 'Análise recalculada.' : 'Análise recalculada com a lista padrão do portal.';
     if (S.exemplo) { toast(msg); return; }
     B.salvarEmpresa(S.emp.id, { ncm_monofasico: lista, ncm_st: stl, corte_st: corte }).then(function () { toast(msg + ' Salvo.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }

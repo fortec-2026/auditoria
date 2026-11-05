@@ -159,6 +159,10 @@ As situações "Corrigida" e "Conferida, sem ação" tiram a nota das contagens 
     - `NCM ex:03,05`: monofásico só nesses destaques Ex da TIPI (campo EXTIPI da nota).
     - `NCM ?`: depende da destinação; o portal segue o CST da nota (02 ou 04) e avisa para conferir.
   - **Saíram da ST em 01/10/2026:** só afeta o ICMS (pneus e autopeças, Portaria SRE 34/2026). Itens com CEST 01 ou 16 entram automaticamente.
+    - A lista padrão segue o texto oficial dos antigos Anexos VII (pneumáticos, câmaras de ar e protetores: 4011, 4012.90 e 4013) e XIV (autopeças, itens 1 a 127, com os NCMs desdobrados como no anexo) da Portaria CAT 68/2019, revogados pela Portaria SRE 34/2026, art. 1º, I. O item 112 (7314.50.00) está fora, porque foi revogado em 2022.
+    - Pneus recauchutados ou usados (4012.11, 4012.12 e 4012.20) não estavam no Anexo VII e não são tratados como ST.
+    - Vidros 7007.11.00 e 7007.21.00 (item 15) saíram da ST antes, em 01/01/2026 (Portaria SRE 64/2025): o portal usa essa data para eles.
+    - Quando a lista da empresa é igual à padrão, ela é gravada vazia e passa a acompanhar as atualizações do portal.
 - **Classificação de produtos comprados:**
   - Revenda: crédito de ICMS e de PIS/COFINS, este último só se o produto não for monofásico.
   - Insumo de serviço (peça aplicada na prestação do serviço): crédito de PIS/COFINS (art. 3º, II, das Leis 10.637/2002 e 10.833/2003), sem crédito de ICMS.

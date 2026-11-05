@@ -18,17 +18,27 @@ var Fiscal = (function () {
     '40169990 ex:03,05', '73201000 ex:01', '85365090 ex:01',
     '4009 ?', '84136019 ?', '84812090 ?', '84818092 ?'
   ];
-  /* Saíram da ST em SP em 01/10/2026 (Portaria SRE 34/2026: pneumáticos e autopeças).
+  /* Pneumáticos (antigo Anexo VII, art. 310 do RICMS/SP) e autopeças (antigo Anexo XIV, art. 313-O) da Portaria CAT 68/2019,
+     revogados pela Portaria SRE 34/2026, art. 1º, I: saem da ST em 01/10/2026 (estoque: Portaria CAT 28/2020).
+     Relação conforme o texto oficial dos anexos (itens 1 a 127 do Anexo XIV; item 112 revogado em 2022).
      Usado só nas regras de ICMS. Itens com CEST 01 (autopeças) ou 16 (pneus) também entram. */
   var DEFAULT_ST = [
-    '4011', '4012', '4013', '40091', '40092', '40093', '40094', '40103', '401610', '401693', '401699', '450490',
-    '6813', '700711', '700721', '700910', '732010', '732020', '830120', '830210', '830230',
-    '840731', '840732', '840733', '840734', '840820', '8409', '841319', '841330', '841350', '841360', '841370', '841381', '841391',
-    '841410', '841430', '841480', '841520', '842123', '842129', '842131', '842139', '843141', '843142', '843390',
-    '84812090', '84813000', '84818092', '84819090', '8482', '8483', '8484',
-    '850520', '850710', '8511', '8512', '852721', '853610', '853650', '853910', '853921', '853929', '854430',
-    '870600', '8707', '8708', '902610', '902620', '902690', '9029', '90318040', '903289', '9104', '940120'
+    '4011', '401290', '4013', '38151210', '38151290', '3917', '39181000', '39233000', '39263000', '40103', '59100000', '40169300',
+    '4823909', '40161010', '40169990', '57050000', '59039000', '59090000', '63061', '65061000', '6813', '70071100', '70072100', '70091000',
+    '70140000', '73110000', '7320', '7325', '780600', '80070090', '830120', '830160', '830170', '83021000', '83023000', '831000',
+    '84073', '840820', '84099', '84122', '841330', '84141000', '8414801', '8414802', '84139190', '84149010', '8414903', '841520',
+    '84212300', '84212990', '84219', '84241000', '84213100', '84213920', '84254200', '84311010', '8431492', '84339090', '84811000', '84812',
+    '84818092', '8482', '8483', '8484', '850520', '850710', '8511', '851220', '851240', '85129000', '85171213', '8518',
+    '851981', '8525501', '85256010', '85272100', '85272900', '85219090', '85291090', '853400', '853530', '853650', '85361000', '85362000',
+    '85364', '8538', '853910', '85392', '85442000', '85443000', '8707', '8708', '87141', '87169090', '902610', '902620',
+    '9029', '90303321', '90318040', '9032892', '91040000', '94012000', '94019090', '96138000', '4009', '45049000', '68129910', '48234000',
+    '39191000', '39199000', '84123110', '84131900', '84135090', '84138100', '84136019', '84137010', '84145910', '84145990', '84213990', '85011019',
+    '85013110', '85045000', '850720', '850730', '85123000', '9032898', '9032899', '90271000', '40081100', '56012219', '57032000', '57033000',
+    '59119000', '69039099', '70072900', '73151100', '84189900', '841950', '84249090', '84254910', '84314100', '85016100', '85311090', '90141000',
+    '90251990', '90259010', '902690', '90321010', '90321090', '90322000'
   ];
+  /* NCMs que saíram da ST antes da data geral: vidros (Anexo XIV, item 15), revogado pela Portaria SRE 64/2025 desde 01/01/2026 */
+  var CORTE_NCM = [['70071100', '2026-01-01'], ['70072100', '2026-01-01']];
 
   var SUL_SUDESTE_EXC_ES = ['SP', 'RJ', 'MG', 'PR', 'SC', 'RS'];
   var IMPORTADO = ['1', '2', '3', '8'];
@@ -345,6 +355,7 @@ var Fiscal = (function () {
       if (regime === 'simples') { T.pisD = 0; T.cofD = 0; T.pisC = 0; T.cofC = 0; T.icmsC = 0; T.icmsFrete = 0; T.pcFrete = 0; T.pcServ = 0; }
     }
     var CST_GRUPO = function (c) { c = String(c || ''); if (c.length === 3) return { '101': 'trib', '102': 'trib', '103': 'isento', '300': 'isento', '400': 'isento', '500': 'st', '900': 'trib', '201': 'st', '202': 'st', '203': 'st' }[c] || c; return { '00': 'trib', '20': 'red', '40': 'isento', '41': 'isento', '50': 'isento', '60': 'st', '10': 'st', '70': 'st', '30': 'st', '51': 'trib', '90': 'trib' }[c] || c; };
+    function corteDe(ncm) { ncm = String(ncm || ''); for (var i = 0; i < CORTE_NCM.length; i++) if (ncm.indexOf(CORTE_NCM[i][0]) === 0 && CORTE_NCM[i][1] < corte) return CORTE_NCM[i][1]; return corte; }
     var stLista = makeMatcher(cfg.st && cfg.st.length ? cfg.st : DEFAULT_ST);
     // NCMs que vieram com CEST de autopeças (01) ou pneus (16) em qualquer nota entram no segmento
     var stAprendido = {};
@@ -492,7 +503,7 @@ var Fiscal = (function () {
         return;
       }
       if (r.t === 'trib') {
-        var stAinda = stItem && !(nt.dt >= corte && interna && isSeg(it.ncm, it.cest));
+        var stAinda = stItem && !(nt.dt >= corteDe(it.ncm) && interna && isSeg(it.ncm, it.cest));
         if (simples || stAinda || it.v > 0) {
           if (!simples && it.v > 0 && !interna && nt.mod === '55') {
             var espI = aliqInterestadual(it.o, nt.dUF);
@@ -664,6 +675,7 @@ var Fiscal = (function () {
       var semDifal = false;
       var garantia = proprio && dir === 'S' && /garant|devolu|troca|defeit/i.test(nt.nat || '');
       nt.it.forEach(function (it) {
+        var pos = nt.dt >= corteDe(it.ncm);
         var nat = natureza(it.cf);
         // remessa do produto defeituoso ao fornecedor = devolução (RICMS/SP, art. 4º, IV; RC 26.649/2022)
         if (garantia && /^[56]949$/.test(it.cf)) nat = 'devCompra';
@@ -849,7 +861,7 @@ var Fiscal = (function () {
       ['icmsD', 'icmsC', 'icmsUso', 'ciap', 'pisD', 'pisC', 'cofD', 'cofC', 'vendas', 'compras', 'compOut', 'compIns', 'stE', 'pisDest', 'cofDest', 'rMono', 'rZero', 'rSTpc', 'rSTicms'].forEach(function (k) { T[k] = r2(T[k]); });
 
       var fatos = [], todosMono = nt.it.length && nt.it.every(function (i) { return monoDe(i); });
-      var stAntes = !pos && nt.it.some(function (i) { return isSeg(i.ncm, i.cest) && ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(i.cst) >= 0; });
+      var stAntes = nt.it.some(function (i) { return nt.dt < corteDe(i.ncm) && isSeg(i.ncm, i.cest) && ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(i.cst) >= 0; });
       if (dir === 'E') {
         if (T.icmsC > 0) fatos.push('crédito de ICMS ' + money(T.icmsC));
         else if (stAntes) fatos.push('ST antes de 01/10: imposto já recolhido, sem crédito de ICMS');
