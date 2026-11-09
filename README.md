@@ -102,7 +102,7 @@ A aba **Classificação fiscal** mostra, por NCM, o tratamento de PIS/COFINS, IC
 
 - **PIS/COFINS:** monofásicos (Lei 13.097/2015, bebidas frias; Lei 10.147/2000, farmacêuticos e higiene; Lei 10.485/2002, autopeças e pneus, pela lista da empresa), ST de cigarros e alíquota zero (Lei 10.925/2004, art. 1º; Lei 10.865/2004, art. 28).
 - **ICMS/SP:** isenções (hortifrutigranjeiros, ovos, arroz e feijão para consumidor final), cesta básica com carga de 7% (Anexo II, art. 3º), alíquotas de 12%, 20%, 25% e 30% e o adicional do FECOEP.
-- **ICMS-ST em SP:** segmentos que continuam na ST (bebidas do Anexo III, cigarros, parte dos alimentícios conforme o CEST, materiais de construção) e os que saíram em 2026.
+- **ICMS-ST em SP:** segmentos que continuam na ST (bebidas do Anexo III, cigarros, parte dos alimentícios conforme o CEST) e os que saíram em 2026. Materiais de construção (Anexo XVII), margarinas e cremes vegetais (Anexo XVI, itens 25 a 27) e tomates preparados (item 39) seguem na ST até 31/01/2027 e saem em 01/02/2027 (Portaria SRE 52/2026; estoque pela Portaria CAT 28/2020).
 - **CBS/IBS:** Cesta Básica Nacional (Anexo I), hortícolas, frutas e ovos (Anexo XV), alimentos com redução de 60% (Anexo VII) e higiene e limpeza (Anexo VIII) da LC 214/2025.
 
 A aba tem uma consulta por NCM (com destino, tipo de comprador e regime) e a lista dos produtos vendidos e comprados no período. Nos vendidos, compara o CST e a carga de ICMS que saíram nas notas com o esperado e marca **Divergente**, **Conferir** (o benefício depende da descrição do produto) ou **Confere**. O regime escolhido fica salvo por empresa no navegador. O Excel traz a aba "Classificação fiscal".

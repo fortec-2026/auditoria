@@ -3,7 +3,7 @@
    A regra de prefixo mais longo vence. É orientação: o escritório revisa antes de valer para o cliente. */
 var Regras = (function () {
   // Data da última revisão das regras pela legislação vigente (atualizar a cada revisão aprovada)
-  var REVISAO = '05/11/2026';
+  var REVISAO = '09/11/2026';
   function R(o) { return o; }
 
   /* ---------- PIS/COFINS (revenda pelo comércio, Lucro Real ou Presumido) ---------- */
@@ -91,6 +91,9 @@ var Regras = (function () {
     R({ st: 'nao', p: ['38151210', '38151290', '3917', '39181000', '39233000', '39263000', '40103', '59100000', '40169300', '4823909', '40161010', '40169990', '57050000', '59039000', '59090000', '63061', '65061000', '6813', '70091000', '70140000', '73110000', '7320', '7325', '780600', '80070090', '830120', '830160', '830170', '83021000', '83023000', '831000', '84073', '840820', '84099', '84122', '841330', '84141000', '8414801', '8414802', '84139190', '84149010', '8414903', '841520', '84212300', '84212990', '84219', '84241000', '84213100', '84213920', '84254200', '84311010', '8431492', '84339090', '84811000', '84812', '84818092', '8482', '8483', '8484', '850520', '850710', '8511', '851220', '851240', '85129000', '85171213', '8518', '851981', '8525501', '85256010', '85272100', '85272900', '85219090', '85291090', '853400', '853530', '853650', '85361000', '85362000', '85364', '8538', '853910', '85392', '85442000', '85443000', '8707', '8708', '87141', '87169090', '902610', '902620', '9029', '90303321', '90318040', '9032892', '91040000', '94012000', '94019090', '96138000', '4009', '45049000', '68129910', '48234000', '39191000', '39199000', '84123110', '84131900', '84135090', '84138100', '84136019', '84137010', '84145910', '84145990', '84213990', '85011019', '85013110', '85045000', '850720', '850730', '85123000', '9032898', '9032899', '90271000', '40081100', '56012219', '57032000', '57033000', '59119000', '69039099', '70072900', '73151100', '84189900', '841950', '84249090', '84254910', '84314100', '85016100', '85311090', '90141000', '90251990', '90259010', '902690', '90321010', '90321090', '90322000'], desde: '01/10/2026', d: 'Autopeças (antigo Anexo XIV da Portaria CAT 68/2019), quando destinadas a veículos', l: 'Portaria SRE 34/2026, art. 1º, I' }),
     R({ st: 'nao', p: ['70071100', '70072100'], desde: '01/01/2026', d: 'Vidros para veículos (Anexo XIV, item 15)', l: 'Portaria SRE 64/2025' }),
     R({ st: 'nao', p: ['8507', '3208', '3209', '3210', '8205', '8536', '8544'], desde: '01/10/2026', d: 'Baterias, tintas, ferramentas e materiais elétricos', l: 'Portaria SRE 34/2026' }),
+    // Saem da ST em 01/02/2027 (Portaria SRE 52/2026, art. 1º, I, "a"); até 31/01/2027 seguem na ST
+    R({ st: 'sim', ate: '31/01/2027', cests: ['1702600', '1702700', '1702702'], p: ['151710', '151790'], d: 'Margarina e creme vegetal (Anexo XVI, itens 25 a 27)', l: 'Portaria CAT 68/2019, Anexo XVI, itens 25, 26 e 27', n: 'Só em recipiente de até 1 kg, exceto embalagem individual de até 10 g (CEST 17.026.00, 17.027.00 ou 17.027.02). Sai da ST em 01/02/2027 (Portaria SRE 52/2026).' }),
+    R({ st: 'sim', ate: '31/01/2027', cests: ['1704000'], p: ['2002'], d: 'Tomates preparados ou conservados (Anexo XVI, item 39)', l: 'Portaria CAT 68/2019, Anexo XVI, item 39', n: 'Exceto em vinagre ou ácido acético, em embalagem de até 1 kg (CEST 17.040.00). Sai da ST em 01/02/2027 (Portaria SRE 52/2026).' }),
     R({ st: 'cest', p: ['1704', '1806', '1901', '1904', '1905', '2103', '2104', '2106', '0402', '1602', '2007', '2008', '2001', '2005'], d: 'Produtos alimentícios', l: 'Portaria CAT 68/2019 (alimentícios) e Portaria SRE 74/2025', n: 'Parte dos alimentícios saiu da ST em 01/01/2026. Depende do CEST do produto.' })
   ];
   // CESTs de alimentícios que saíram da ST em 01/01/2026 (Portaria SRE 74/2025)
@@ -136,11 +139,19 @@ var Regras = (function () {
     /* ICMS */
     var ri = acha(ICMS, ncm), rst = acha(ST, ncm), icms = { regra: ri, cond: !!(ri && ri.cond) };
     var st = { regra: rst, st: rst ? rst.st : 'nao' };
+    var hoje = o.data ? new Date(o.data) : new Date(), fimSRE52 = new Date(2027, 1, 1);
+    if (rst && rst.ate) {
+      if (hoje >= fimSRE52) { st.st = 'nao'; st.regra = { st: 'nao', desde: '01/02/2027', d: rst.d, l: 'Portaria SRE 52/2026, art. 1º, I, "a"' }; }
+      else if (cest && rst.cests && rst.cests.indexOf(cest) < 0) { st.st = 'nao'; st.regra = { st: 'nao', d: rst.d + ': CEST fora dos itens da ST (embalagem acima de 1 kg ou individual de até 10 g)', l: rst.l }; }
+    }
     if (st.st === 'cest') {
       if (/^17/.test(cest)) st.st = CEST_ALIM_FORA.indexOf(cest) >= 0 ? 'nao' : 'sim';
       else if (cest) st.st = 'nao';
     }
-    if (/^10/.test(cest) && st.st === 'nao' && !rst) { st.st = 'sim'; st.regra = { d: 'Materiais de construção', l: 'Portaria CAT 68/2019, Anexo XVII', n: 'Segmento que segue na ST em SP; confira o CEST.' }; }
+    if (/^10/.test(cest) && st.st === 'nao' && !rst) {
+      if (hoje < fimSRE52) { st.st = 'sim'; st.regra = { d: 'Materiais de construção', l: 'Portaria CAT 68/2019, Anexo XVII', n: 'Na ST até 31/01/2027; sai em 01/02/2027 (Portaria SRE 52/2026). O estoque segue a Portaria CAT 28/2020.' }; }
+      else st.regra = { st: 'nao', desde: '01/02/2027', d: 'Materiais de construção (antigo Anexo XVII da Portaria CAT 68/2019)', l: 'Portaria SRE 52/2026, art. 1º, I, "b"' };
+    }
     if (interna) {
       if (st.st === 'sim') {
         icms.titulo = 'Substituição tributária: ICMS já recolhido na compra';
