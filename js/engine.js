@@ -117,6 +117,8 @@ var Fiscal = (function () {
       dN: dest ? txt(dest, 'xNome').slice(0, 60) : '',
       dUF: dest ? txt(ender(dest), 'UF') : '',
       dIE: dest ? txt(dest, 'indIEDest') : '',
+      dIEn: dest ? txt(dest, 'IE') : '',
+      indF: txt(ide, 'indFinal'),
       st: prot ? txt(prot, 'cStat') : '',
       t: {
         vNF: num(txt(tot, 'vNF')), vProd: num(txt(tot, 'vProd')), vICMS: num(txt(tot, 'vICMS')),
@@ -145,7 +147,8 @@ var Fiscal = (function () {
       var pis = firstElementChild(first(imp, 'PIS'));
       var cof = firstElementChild(first(imp, 'COFINS'));
       var ipi = first(imp, 'IPI'), ibscbs = first(imp, 'IBSCBS');
-      if (first(imp, 'ICMSUFDest')) difal = true;
+      var ufD = first(imp, 'ICMSUFDest');
+      if (ufD) difal = true;
       var cst = icms ? (txt(icms, 'CST') || txt(icms, 'CSOSN')) : '';
       nota.it.push({
         k: num(det.getAttribute('nItem')) || (i + 1),
@@ -171,7 +174,8 @@ var Fiscal = (function () {
         cIbs: ibscbs ? txt(ibscbs, 'CST') : '', ctIbs: ibscbs ? txt(ibscbs, 'cClassTrib') : '',
         vp: num(txt(prod, 'vProd')),
         vd: num(txt(prod, 'vDesc')),
-        vf: num(txt(prod, 'vFrete')) + num(txt(prod, 'vSeg')) + num(txt(prod, 'vOutro'))
+        vf: num(txt(prod, 'vFrete')) + num(txt(prod, 'vSeg')) + num(txt(prod, 'vOutro')),
+        uD: ufD ? { b: num(txt(ufD, 'vBCUFDest')), p: num(txt(ufD, 'pICMSUFDest')), i: num(txt(ufD, 'pICMSInter')), f: num(txt(ufD, 'pFCPUFDest')), v: num(txt(ufD, 'vICMSUFDest')), vf: num(txt(ufD, 'vFCPUFDest')) } : null
       });
     }
     nota.dif = difal;

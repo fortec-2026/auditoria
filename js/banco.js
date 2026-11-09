@@ -55,9 +55,10 @@ var Banco = (function () {
       todos(function () { return sb.from('produtos').select('chave_produto,ncm,descricao,classe,atualizado_em').eq('empresa_cnpj', cnpj).order('chave_produto'); }),
       todos(function () { return sb.from('ncm_regras').select('ncm_prefixo,classe,atualizado_em').eq('empresa_cnpj', cnpj).order('ncm_prefixo'); }),
       comHistorico ? ok(await sb.from('classificacao_historico').select('*').eq('empresa_cnpj', cnpj).order('alterado_em', { ascending: false }).limit(300)) : [],
-      todos(function () { return sb.from('acompanhamento').select('chave,status,texto,atualizado_em').eq('empresa_cnpj', cnpj).order('chave'); })
+      todos(function () { return sb.from('acompanhamento').select('chave,status,texto,atualizado_em').eq('empresa_cnpj', cnpj).order('chave'); }),
+      todos(function () { return sb.from('difal_destinatarios').select('documento,tipo').eq('empresa_cnpj', cnpj).order('documento'); }).catch(function () { return []; })
     ]);
-    return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4], acomp: r[5] };
+    return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4], acomp: r[5], difal: r[6] };
   }
   // pub: mapa chave -> publicada; reimportar o mesmo documento não tira do ar o que já foi publicado
   async function salvarNotas(cnpj, notas, aoProgresso, pub) {
@@ -74,6 +75,7 @@ var Banco = (function () {
     if (!chaves.length) return;
     ok(await sb.from('cancelamentos').upsert(chaves.map(function (c) { return { chave: c, empresa_cnpj: cnpj }; }), { onConflict: 'chave' }));
   }
+  async function salvarDifalTipo(cnpj, doc, tipo) { return ok(await sb.from('difal_destinatarios').upsert({ empresa_cnpj: cnpj, documento: doc, tipo: tipo }, { onConflict: 'empresa_cnpj,documento' })); }
   async function publicar(cnpj) { return ok(await sb.rpc('publicar_empresa', { p_cnpj: cnpj })); }
   async function excluirPeriodo(cnpj, ini, fim) { return ok(await sb.rpc('excluir_periodo', { p_cnpj: cnpj, p_ini: ini, p_fim: fim })); }
 
@@ -136,7 +138,7 @@ var Banco = (function () {
 
   return { sessao: sessao, entrar: entrar, criarConta: criarConta, sair: sair, esqueciSenha: esqueciSenha, novaSenha: novaSenha, aoMudarSessao: aoMudarSessao, perfil: perfil,
     empresas: empresas, contarNotas: contarNotas, garantirEmpresa: garantirEmpresa, salvarEmpresa: salvarEmpresa, apagarEmpresa: apagarEmpresa,
-    carregar: carregar, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar, excluirPeriodo: excluirPeriodo,
+    carregar: carregar, salvarDifalTipo: salvarDifalTipo, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar, excluirPeriodo: excluirPeriodo,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
     acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
     equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe,

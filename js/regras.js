@@ -194,5 +194,36 @@ var Regras = (function () {
   }
   function fmt(v) { return (Math.round(v * 100) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 }); }
 
-  return { classificar: classificar, REVISAO: REVISAO, CST_PC: CST_PC };
+  /* ---------- DIFAL ----------
+     Alíquota interna modal (padrão) de cada UF em vigor em nov/2026 e o FCP geral, quando existe.
+     Produtos específicos podem ter alíquota ou FCP diferente na UF de destino: por isso tudo é editável na tela. */
+  var DIFAL_UF = {
+    AC: [19, 0], AL: [20.5, 0, 'Lei AL 9.776/2025, a partir de 01/04/2026'], AM: [20, 0], AP: [18, 0], BA: [20.5, 0], CE: [20, 0], DF: [20, 0], ES: [17, 0],
+    GO: [19, 0], MA: [23, 0], MG: [18, 0], MS: [17, 0], MT: [17, 0], PA: [19, 0], PB: [20, 0], PE: [20.5, 0], PI: [22.5, 0], PR: [19.5, 0],
+    RJ: [20, 2, '20% + 2% de FECP (Lei RJ 2.657/1996)'], RN: [20, 0], RO: [19.5, 0], RR: [20, 0], RS: [17, 0], SC: [17, 0], SE: [19, 1, '19% + 1% de FECOEP'], SP: [18, 0], TO: [20, 0]
+  };
+  var SUL_SUDESTE = ['MG', 'PR', 'RJ', 'RS', 'SC', 'SP'];
+  // alíquota interestadual de SP para a UF de destino (Resolução do Senado 22/1989 e 13/2012)
+  function interDeSP(uf, origem) { if (/^[1238]$/.test(String(origem || ''))) return 4; return SUL_SUDESTE.indexOf(uf) >= 0 ? 12 : 7; }
+  function r2(x) { return Math.round((x + 1e-9) * 100) / 100; }
+  /* Saída para consumidor final não contribuinte de outra UF (EC 87/2015; LC 87/1996, art. 4º, § 2º, II, b, e art. 13, IX, na redação da LC 190/2022; Convênio ICMS 236/2021).
+     base 'unica': DIFAL = V × (interna − inter).  base 'dupla' (exigida por algumas UFs em lei própria): BC = V × (1 − inter) / (1 − interna); DIFAL = BC × interna − V × inter. FCP = base × %FCP. */
+  function difalSaida(v, interna, inter, fcp, base) {
+    if (!(v > 0) || interna <= inter) return { bc: v, difal: 0, fcp: r2(v * (fcp || 0) / 100), total: r2(v * (fcp || 0) / 100) };
+    var bc = base === 'dupla' ? v * (1 - inter / 100) / (1 - (interna + (fcp || 0)) / 100) : v;
+    var dif = base === 'dupla' ? bc * interna / 100 - v * inter / 100 : v * (interna - inter) / 100;
+    var f = bc * (fcp || 0) / 100;
+    return { bc: r2(bc), difal: r2(dif), fcp: r2(f), total: r2(dif + f) };
+  }
+  /* Entrada em SP de mercadoria de outra UF.
+     Regime normal, uso e consumo ou ativo: base dupla (RICMS/SP, art. 2º, XIV, e art. 37, VI e § 11, Decreto 66.559/2022): BC = (V − ICMS da origem) / (1 − interna); DIFAL = BC × interna − ICMS da origem.
+     Simples Nacional, qualquer destinação (revenda, industrialização, uso e consumo ou ativo), sem ST: V × (interna − inter) (RICMS/SP, art. 115, XV-A, a, e § 8º; LC 123/2006, art. 13, § 1º, XIII, h). */
+  function difalEntrada(v, interna, inter, simples, icmsOrig) {
+    if (!(v > 0) || interna <= inter) return { bc: v, difal: 0 };
+    if (simples) return { bc: r2(v), difal: r2(v * (interna - inter) / 100) };
+    var io = icmsOrig != null && icmsOrig > 0 ? icmsOrig : v * inter / 100;
+    var bc = (v - io) / (1 - interna / 100);
+    return { bc: r2(bc), difal: r2(bc * interna / 100 - io) };
+  }
+  return { classificar: classificar, REVISAO: REVISAO, CST_PC: CST_PC, DIFAL_UF: DIFAL_UF, interDeSP: interDeSP, difalSaida: difalSaida, difalEntrada: difalEntrada };
 })();

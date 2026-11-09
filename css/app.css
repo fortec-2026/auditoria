@@ -380,3 +380,19 @@ tbody tr.grp-prod:hover td{background:var(--surface-2)}
 .mais-teste-c{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;padding:6px 2px}
 .mais-teste-c>div:first-child{max-width:560px}
 @media print{.achado .ach-cta{display:none}}
+/* DIFAL */
+.sec-tit{font-size:17px;margin:22px 0 8px}
+.difal-kpis{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 12px}
+.difal-kpis .kpi{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);min-width:220px;flex:1}
+.difal-kpis .kpi b{font-family:var(--f-display);font-size:22px}
+.difal-sel{max-width:260px;font-size:13px}
+.difal-det{margin:12px 0}
+.difal-det>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.sim-difal{margin-top:22px;padding:18px 20px}
+.sim-campos{gap:12px;flex-wrap:wrap;align-items:flex-end}
+.sim-campos .field{min-width:160px;flex:1}
+.sim-res{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:14px 0 6px;padding:12px 16px;border-radius:12px;background:color-mix(in srgb,var(--ciano-vivo) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--ciano) 35%,var(--line))}
+.sim-res b{display:block;font-family:var(--f-display);font-size:26px}
+.sim-res>.small{flex:1;min-width:240px}
+.aliq-uf input{width:80px}
+@media (max-width:640px){.difal-sel{max-width:100%}}

@@ -249,3 +249,22 @@ exemplos/               notas fictícias para teste
 - **Passo a passo de vendas:** na demo, o tour tem 5 passos (o dinheiro em jogo, cada erro explicado, antes e depois e o convite para o teste).
 - **Prévia no WhatsApp:** `og.png` (1200×630) e as tags Open Graph no `index.html`.
 - **Dados fictícios do mercadinho:** `exemplos/notas-mercadinho.zip` (NFC-e diárias de set. e out./2026 e compras de três fornecedores), com erros típicos: arroz tributado a 18% (isento), sabão em pó como ST depois de 01/08/2026, shampoo com PIS/COFINS em setembro (monofásico).
+
+## DIFAL
+
+Aba **DIFAL** no painel (escritório e cliente), também no Excel (abas "DIFAL vendas" e "DIFAL compras").
+
+- **Vendas para outros estados** (NF-e própria, CFOP de venda, destino fora de SP):
+  - O tipo do comprador vem do XML: indicador de IE 9, sem IE ou CPF é tratado como consumidor final não contribuinte; contribuinte com indicador de consumidor final é uso e consumo; o resto é revenda.
+  - Quem usa o portal pode trocar o tipo de cada comprador. A escolha fica salva por comprador na tabela `difal_destinatarios`, com RLS por `tem_acesso`. Na demo e no teste grátis fica só na tela.
+  - Para não contribuinte: DIFAL = valor × (alíquota interna do destino − interestadual) + FCP, com base única (EC 87/2015; LC 87/1996, art. 13, IX, na redação da LC 190/2022; Convênio ICMS 236/2021). Os estados que exigem base dupla por lei própria podem ser marcados na tabela de alíquotas.
+  - Compara com o grupo ICMSUFDest da nota e avisa quando falta ou diverge.
+  - Totais por estado, para a GNRE.
+- **Compras de outros estados** (DIFAL devido a SP):
+  - Simples Nacional: todas as compras sem ST, para qualquer destinação; valor × (interna − interestadual), vencimento no último dia do 2º mês seguinte (RICMS/SP, art. 115, XV-A, a, e § 8º; LC 123/2006, art. 13, § 1º, XIII, h).
+  - Regime normal: só uso e consumo ou ativo (classificação da aba Produtos), com base dupla (RICMS/SP, art. 2º, XIV, e art. 37, VI e § 11), na apuração do mês.
+  - Itens comprados com ICMS-ST ficam fora.
+- **Simulador**: estado, tipo do comprador, valor e origem; mostra o cálculo.
+- **Alíquotas internas por UF**: `Regras.DIFAL_UF` em `js/regras.js` (modal de cada estado + FCP geral). Editáveis na tela, salvas no navegador. Para mudar o padrão de todos, altere a tabela no código (a revisão semanal confere).
+
+O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest de cada item. Notas importadas antes disso aparecem sem o valor do DIFAL da nota (só "sim", quando havia o grupo).

@@ -109,7 +109,8 @@ function montarEmpresa(e, d) {
   var pub = {}; d.notas.forEach(function (n) { pub[n.chave] = n.publicada; });
   return { id: e.cnpj, meta: metaDe(e), notas: d.notas.map(function (n) { return n.dados; }), pub: pub, canc: canc, prodCad: prodCad, ncmCad: ncmCad,
     hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova, cli: !!h.pelo_cliente }; }).reverse(),
-    acomp: (function () { var a = {}; (d.acomp || []).forEach(function (x) { a[x.chave] = { s: x.status, t: x.texto, em: x.atualizado_em }; }); return a; })() };
+    acomp: (function () { var a = {}; (d.acomp || []).forEach(function (x) { a[x.chave] = { s: x.status, t: x.texto, em: x.atualizado_em }; }); return a; })(),
+    difal: (function () { var a = {}; (d.difal || []).forEach(function (x) { a[x.documento] = x.tipo; }); return a; })() };
 }
 function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
 function pendentesPublicar() { if (!S.emp || S.exemplo) return 0; var n = 0; for (var k in S.emp.pub) if (!S.emp.pub[k]) n++; return n; }
@@ -488,7 +489,7 @@ function renderMain() {
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
   var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
-    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['reforma', 'IBS/CBS 2026', '']];
+    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['difal', 'DIFAL', ''], ['reforma', 'IBS/CBS 2026', '']];
   h += '<div class="card painel-abas"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
   if (S.tab === 'apuracao') h += tabApuracao(ds, T);
   else if (S.tab === 'comparativo') h += tabComparativo(ds, T);
@@ -497,6 +498,7 @@ function renderMain() {
   else if (S.tab === 'produtos') h += tabProdutos();
   else if (S.tab === 'classif') h += tabClassif(ds);
   else if (S.tab === 'servicos') h += tabServicos(ds, T);
+  else if (S.tab === 'difal') h += tabDifal(ds);
   else h += tabReforma(ds, T);
   h += '</div></div>';
   h += '<p class="legal">' + textoLegal() + '</p>';
@@ -1043,6 +1045,163 @@ async function classificarServ(pk, classe) {
   catch (err) { if (a) e.prodCad[pk] = a; else delete e.prodCad[pk]; e.hist.pop(); recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
 }
 
+/* ---------- DIFAL ---------- */
+var DIFAL_TIPOS = [['nao_contribuinte', 'Consumidor final não contribuinte'], ['uso_consumo', 'Contribuinte: uso, consumo ou ativo'], ['revenda', 'Contribuinte: revenda ou industrialização']];
+var ST_CSTS = ['10', '30', '60', '70', '201', '202', '203', '500'];
+function difalCfg() {
+  if (!S.difalUF) { var c = {}; try { c = JSON.parse(ls('pf.difalUF') || '{}') || {}; } catch (e) { c = {}; } S.difalUF = c; }
+  return S.difalUF;
+}
+function ufCfg(uf) {
+  var d = Regras.DIFAL_UF[uf] || [18, 0], c = difalCfg()[uf] || {};
+  return { a: c.a != null ? c.a : d[0], f: c.f != null ? c.f : d[1], b: c.b || 'unica', nota: d[2] || '', editado: c.a != null || c.f != null || !!c.b };
+}
+function tipoPadrao(n) {
+  if (n.dIE === '9' || (!n.dIEn && n.dIE !== '1') || (String(n.dC || '').length === 11 && n.dIE !== '1')) return 'nao_contribuinte';
+  if (n.indF === '1') return 'uso_consumo';
+  return 'revenda';
+}
+function difalTipo(n) { var t = (S.emp.difal || {})[n.dC]; return t || tipoPadrao(n); }
+function cargaInternaSP(it) {
+  var c = classifDe(it.ncm, it.cest, 'revenda', 'SP', true, /^[1238]$/.test(it.o));
+  if (!c || !c.icms) return 18;
+  if (typeof c.icms.carga === 'number') return c.icms.carga;
+  if (c.icms.regra && c.icms.regra.red) return c.icms.regra.red;
+  if (c.icms.regra && /isento/i.test(c.icms.regra.t || '')) return 0;
+  return 18;
+}
+function mesSeguinte(ym, k) { var p = ym.split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1 + k + 1, 0)); return d.toISOString().slice(0, 10); }
+function difalDados(ds) {
+  var e = S.emp, cnpj = e.meta.cnpj, simples = regimeEmp() === 'simples';
+  var saidas = [], entradas = [], semClasse = 0, comST = 0;
+  e.notas.forEach(function (n) {
+    if (n.tipoDoc || ds.indexOf(n.dt) < 0 || (e.canc && e.canc[n.ch])) return;
+    if (n.eC === cnpj && n.tp === '1' && n.mod === '55' && n.dUF && n.dUF !== 'SP' && n.dUF !== 'EX') {
+      var its = (n.it || []).filter(function (it) { return F.natureza(it.cf) === 'venda'; });
+      if (!its.length) return;
+      var tipo = difalTipo(n), cfg = ufCfg(n.dUF), v = 0, calc = 0, fcp = 0, temUD = false, naNota = 0, inter = null;
+      its.forEach(function (it) {
+        var vi = it.vp - it.vd + it.vf + (it.vIPI || 0); v += vi;
+        var ii = Regras.interDeSP(n.dUF, it.o); inter = inter === null ? ii : (inter === ii ? inter : 'var');
+        if (tipo === 'nao_contribuinte') { var r = Regras.difalSaida(vi, cfg.a, ii, cfg.f, cfg.b); calc += r.difal; fcp += r.fcp; }
+        if (it.uD) { temUD = true; naNota += (it.uD.v || 0) + (it.uD.vf || 0); }
+      });
+      saidas.push({ n: n, tipo: tipo, padrao: tipoPadrao(n), uf: n.dUF, cfg: cfg, v: v, inter: inter, difal: calc, fcp: fcp, total: calc + fcp, naNota: temUD ? naNota : (n.dif ? null : 0) });
+    } else if (n.dC === cnpj && n.eC !== cnpj && n.tp === '1' && n.eUF && n.eUF !== 'SP') {
+      (n.it || []).forEach(function (it) {
+        if (F.natureza(it.cf) !== 'venda') return;
+        if ((it.vst || 0) > 0 || ST_CSTS.indexOf(it.cst) >= 0) { comST++; return; }
+        var pr = S.res.produtos[F.chaveProduto(n.eC, it)], classe = pr ? pr.classe : 'pendente';
+        if (!simples && classe !== 'uso' && classe !== 'ativo') { if (classe === 'pendente') semClasse++; return; }
+        var vi = it.vp - it.vd + it.vf + (it.vIPI || 0);
+        var inter = it.p > 0 ? it.p : (/^[1238]$/.test(it.o) ? 4 : 12);
+        var interna = (classe === 'uso' || classe === 'ativo') ? 18 : cargaInternaSP(it);
+        var r = Regras.difalEntrada(vi, interna, inter, simples, it.v);
+        entradas.push({ n: n, it: it, classe: classe, v: vi, inter: inter, interna: interna, bc: r.bc, difal: r.difal });
+      });
+    }
+  });
+  return { saidas: saidas, entradas: entradas, semClasse: semClasse, comST: comST, simples: simples };
+}
+function tabDifal(ds) {
+  var D = difalDados(ds), h = '';
+  h += '<p class="note">O DIFAL é a diferença entre a alíquota interna do estado de destino e a alíquota interestadual. Aqui aparecem as duas situações em que ele pesa no bolso da empresa: a venda para consumidor final de outro estado e a compra de outro estado. Os valores são estimativas a partir dos XMLs; as alíquotas de cada estado podem ser ajustadas no fim da página.</p>';
+
+  /* vendas */
+  var nc = D.saidas.filter(function (x) { return x.tipo === 'nao_contribuinte'; });
+  var aPagar = nc.reduce(function (a, x) { return a + x.total; }, 0);
+  var porUF = {}; nc.forEach(function (x) { var u = porUF[x.uf] = porUF[x.uf] || { v: 0, d: 0, f: 0, n: 0 }; u.v += x.v; u.d += x.difal; u.f += x.fcp; u.n++; });
+  h += '<h3 class="sec-tit">Vendas para outros estados</h3>';
+  if (!D.saidas.length) h += '<p class="note">Nenhuma venda para outro estado no período.</p>';
+  else {
+    h += '<div class="difal-kpis"><div class="kpi"><span class="small">DIFAL a recolher pela empresa</span><b class="num">' + m0(aPagar) + '</b><span class="small">' + nc.length + (nc.length === 1 ? ' venda' : ' vendas') + ' para consumidor final não contribuinte</span></div>' +
+      '<div class="kpi"><span class="small">Vendas para contribuintes</span><b class="num">' + (D.saidas.length - nc.length) + '</b><span class="small">sem DIFAL para a empresa (quando é uso e consumo, quem paga é o comprador no estado dele)</span></div></div>';
+    if (Object.keys(porUF).length) {
+      h += '<div class="tscroll"><table><thead><tr><th>Estado</th><th class="r">Vendas</th><th class="r">Valor</th><th class="r">Alíquota interna</th><th class="r">DIFAL</th><th class="r">FCP</th><th class="r">Total a recolher</th></tr></thead><tbody>' +
+        Object.keys(porUF).sort().map(function (uf) { var u = porUF[uf], c = ufCfg(uf); return '<tr><td>' + uf + '</td><td class="r num">' + u.n + '</td><td class="r num">' + m0(u.v) + '</td><td class="r num">' + String(c.a).replace('.', ',') + '%' + (c.b === 'dupla' ? ' · base dupla' : '') + '</td><td class="r num">' + m0(u.d) + '</td><td class="r num">' + m0(u.f) + '</td><td class="r num"><b>' + m0(u.d + u.f) + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
+      h += '<p class="note">Sem inscrição estadual no estado de destino, o DIFAL é pago por GNRE antes da saída da mercadoria, uma guia por nota. Com inscrição no destino, entra na apuração mensal daquele estado. Base legal: EC 87/2015; LC 87/1996, na redação da LC 190/2022; Convênio ICMS 236/2021.</p>';
+    }
+    h += '<p class="note"><b>Nem sempre o XML diz quem é o comprador.</b> O tipo abaixo vem da nota (indicador de IE e de consumidor final). Se você sabe que o cliente é outro tipo, troque na lista: o cálculo muda na hora e a escolha fica salva para aquele comprador.</p>';
+    h += '<div class="tscroll"><table class="difal-tab"><thead><tr><th>Nota</th><th>Comprador</th><th>Tipo do comprador</th><th class="r">Valor</th><th class="r">Alíq. destino / inter.</th><th class="r">DIFAL + FCP</th><th class="r">Na nota</th><th>Situação</th></tr></thead><tbody>';
+    D.saidas.sort(function (a, b) { return a.n.dt < b.n.dt ? -1 : 1; }).forEach(function (x) {
+      var n = x.n, sit, cls = '';
+      if (x.tipo !== 'nao_contribuinte') { sit = x.tipo === 'uso_consumo' ? 'O comprador recolhe o DIFAL no estado dele' : 'Sem DIFAL (revenda)'; }
+      else if (x.naNota === null) { sit = 'DIFAL informado na nota'; }
+      else if (!x.naNota && x.total > 0.005) { sit = 'Nota sem o grupo do DIFAL: confira se a GNRE foi paga'; cls = 'pill alerta'; }
+      else if (Math.abs(x.naNota - x.total) > 0.05 * Math.max(1, x.total) + 0.5) { sit = 'Diferente do calculado (' + m0(x.naNota - x.total) + ')'; cls = 'pill alerta'; }
+      else sit = 'Confere';
+      h += '<tr><td><button type="button" class="link" data-ver="' + esc(n.ch) + '">Nº ' + esc(n.n) + '</button><div class="small">' + brFull(n.dt) + '</div></td>' +
+        '<td>' + esc(n.dN || '—') + '<div class="small">' + esc(fmtCnpj(n.dC)) + ' · ' + esc(n.dUF) + '</div></td>' +
+        '<td><select class="difal-sel" data-difal-doc="' + esc(n.dC) + '" aria-label="Tipo do comprador">' + DIFAL_TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (x.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>' + (x.tipo !== x.padrao ? '<div class="small">Alterado (a nota indica: ' + DIFAL_TIPOS.filter(function (t) { return t[0] === x.padrao; })[0][1].toLowerCase() + ')</div>' : '') + '</td>' +
+        '<td class="r num">' + m0(x.v) + '</td><td class="r num">' + String(x.cfg.a).replace('.', ',') + '% / ' + (x.inter === 'var' ? 'várias' : x.inter + '%') + '</td>' +
+        '<td class="r num">' + (x.tipo === 'nao_contribuinte' ? m0(x.total) : '—') + '</td><td class="r num">' + (x.naNota === null ? 'sim' : x.naNota ? m0(x.naNota) : '—') + '</td>' +
+        '<td>' + (cls ? '<span class="' + cls + '">' + esc(sit) + '</span>' : '<span class="small">' + esc(sit) + '</span>') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  /* compras */
+  h += '<h3 class="sec-tit">Compras de outros estados</h3>';
+  h += '<p class="note">' + (D.simples
+    ? 'No Simples Nacional, toda compra de outro estado sem substituição tributária paga a diferença entre a alíquota interna de SP e a interestadual, seja para revenda, industrialização, uso e consumo ou ativo. O valor é recolhido em guia própria até o último dia do segundo mês seguinte ao da entrada (RICMS/SP, art. 115, XV-A, a, e § 8º; LC 123/2006, art. 13, § 1º, XIII, h).'
+    : 'No regime normal, o DIFAL é devido nas compras de outros estados para uso e consumo ou ativo imobilizado, com base dupla (RICMS/SP, art. 2º, XIV, e art. 37, VI e § 11). Entra como débito na apuração do ICMS do mês da entrada. Compras para revenda não pagam DIFAL. O portal usa a classificação da aba Produtos.') + '</p>';
+  if (!D.entradas.length) h += '<p class="note">Nenhuma compra de outro estado com DIFAL no período.</p>';
+  else {
+    var meses = {}; D.entradas.forEach(function (x) { var m = x.n.dt.slice(0, 7); var o = meses[m] = meses[m] || { v: 0, d: 0, n: {} }; o.v += x.v; o.d += x.difal; o.n[x.n.ch] = 1; });
+    var totE = D.entradas.reduce(function (a, x) { return a + x.difal; }, 0);
+    h += '<div class="difal-kpis"><div class="kpi"><span class="small">DIFAL a recolher para SP</span><b class="num">' + m0(totE) + '</b><span class="small">' + D.entradas.length + (D.entradas.length === 1 ? ' item comprado' : ' itens comprados') + ' de outros estados</span></div></div>';
+    h += '<div class="tscroll"><table><thead><tr><th>Mês da entrada</th><th class="r">Notas</th><th class="r">Valor das compras</th><th class="r">DIFAL</th><th>' + (D.simples ? 'Vencimento' : 'Recolhimento') + '</th></tr></thead><tbody>' +
+      Object.keys(meses).sort().map(function (m) { var o = meses[m]; return '<tr><td style="text-transform:capitalize">' + esc(mesNome(m)) + '</td><td class="r num">' + Object.keys(o.n).length + '</td><td class="r num">' + m0(o.v) + '</td><td class="r num"><b>' + m0(o.d) + '</b></td><td>' + (D.simples ? brFull(mesSeguinte(m, 2)) + ' (guia de recolhimentos especiais)' : 'Na apuração de ' + mesNome(m)) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '<details class="difal-det"><summary>Ver os itens</summary><div class="tscroll"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Produto</th><th>Uso</th><th class="r">Valor</th><th class="r">Inter. / interna</th><th class="r">DIFAL</th></tr></thead><tbody>' +
+      D.entradas.map(function (x) { return '<tr><td><button type="button" class="link" data-ver="' + esc(x.n.ch) + '">Nº ' + esc(x.n.n) + '</button><div class="small">' + brFull(x.n.dt) + '</div></td><td>' + esc(x.n.eN) + '<div class="small">' + esc(x.n.eUF) + '</div></td><td>' + esc(x.it.x) + '<div class="small mono">NCM ' + esc(x.it.ncm) + '</div></td><td>' + esc(nomeClasse(x.classe)) + '</td><td class="r num">' + m0(x.v) + '</td><td class="r num">' + x.inter + '% / ' + String(x.interna).replace('.', ',') + '%</td><td class="r num">' + m0(x.difal) + '</td></tr>'; }).join('') + '</tbody></table></div></details>';
+  }
+  var obs = [];
+  if (D.comST) obs.push(D.comST + (D.comST === 1 ? ' item comprado com ICMS-ST ficou fora: ' : ' itens comprados com ICMS-ST ficaram fora: ') + 'nesses casos o DIFAL vem embutido na ST cobrada pelo fornecedor.');
+  if (!D.simples && D.semClasse) obs.push(D.semClasse + (D.semClasse === 1 ? ' item de outro estado está sem classificação' : ' itens de outros estados estão sem classificação') + ' na aba Produtos. Classifique como uso e consumo ou ativo o que não for revenda para o DIFAL entrar na conta.');
+  if (obs.length) h += '<p class="note">' + obs.join(' ') + '</p>';
+
+  h += simuladorDifal();
+  h += tabelaAliqUF();
+  return h;
+}
+function simResultado() {
+  var q = S.sim, cfg = ufCfg(q.uf), v = parseFloat(String(q.v).replace(/\./g, '').replace(',', '.')) || 0, inter = Regras.interDeSP(q.uf, q.o);
+  var res = '';
+  if (v > 0) {
+    if (q.tipo === 'nao_contribuinte') {
+      var r = Regras.difalSaida(v, cfg.a, inter, cfg.f, cfg.b);
+      res = '<div class="sim-res"><div><span class="small">DIFAL que a empresa paga para ' + q.uf + '</span><b class="num">' + m0(r.total) + '</b></div><div class="small">' +
+        (cfg.b === 'dupla' ? 'Base dupla: ' + m0(r.bc) + ' × ' + String(cfg.a).replace('.', ',') + '% − ' + m0(v) + ' × ' + inter + '%' : m0(v) + ' × (' + String(cfg.a).replace('.', ',') + '% − ' + inter + '%)') + ' = ' + m0(r.difal) + (r.fcp ? ' + FCP de ' + String(cfg.f).replace('.', ',') + '% = ' + m0(r.fcp) : '') + '. O ICMS de SP na nota fica em ' + inter + '% (' + m0(v * inter / 100) + ').</div></div>';
+    } else if (q.tipo === 'uso_consumo') res = '<div class="sim-res"><div><span class="small">DIFAL para a empresa</span><b class="num">' + m0(0) + '</b></div><div class="small">A nota sai com ' + inter + '% para ' + q.uf + '. Como o comprador é contribuinte e vai usar ou consumir a mercadoria, ele mesmo recolhe o DIFAL no estado dele (cerca de ' + m0(v * Math.max(0, cfg.a - inter) / 100) + ', pela regra de ' + q.uf + ').</div></div>';
+    else res = '<div class="sim-res"><div><span class="small">DIFAL</span><b class="num">' + m0(0) + '</b></div><div class="small">Revenda ou industrialização: não há DIFAL. A nota sai com ' + inter + '%. Confira se ' + q.uf + ' exige ICMS-ST ou antecipação para o produto.</div></div>';
+  }
+  return res || '<p class="small">Preencha o valor para ver o cálculo.</p>';
+}
+function simuladorDifal() {
+  var q = S.sim || (S.sim = { uf: 'MG', tipo: 'nao_contribuinte', v: '', o: '0' }), cfg = ufCfg(q.uf);
+  return '<div class="card sim-difal"><h3 class="sec-tit" style="margin-top:0">Simulador de DIFAL</h3><p class="note">Para saber antes de vender quanto de DIFAL a venda vai custar.</p><div class="row sim-campos">' +
+    '<div class="field"><label for="simUF">Estado do comprador</label><select id="simUF">' + Object.keys(Regras.DIFAL_UF).filter(function (u) { return u !== 'SP'; }).map(function (u) { return '<option' + (u === q.uf ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="simTipo">Quem compra</label><select id="simTipo">' + DIFAL_TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (q.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="simV">Valor da venda (R$)</label><input id="simV" inputmode="decimal" value="' + esc(q.v) + '" placeholder="1.000,00"></div>' +
+    '<div class="field"><label for="simO">Origem da mercadoria</label><select id="simO"><option value="0"' + (q.o === '0' ? ' selected' : '') + '>Nacional</option><option value="1"' + (q.o !== '0' ? ' selected' : '') + '>Importada (4%)</option></select></div></div>' +
+    '<div id="simSaida">' + simResultado() + '</div><p class="small">Alíquota interna usada para ' + q.uf + ': ' + String(cfg.a).replace('.', ',') + '%' + (cfg.f ? ' + FCP ' + String(cfg.f).replace('.', ',') + '%' : '') + (cfg.nota ? ' (' + esc(cfg.nota) + ')' : '') + '. Produtos com alíquota própria no estado de destino mudam o resultado: ajuste na tabela abaixo.</p></div>';
+}
+function tabelaAliqUF() {
+  var h = '<details class="difal-det" id="detAliq"' + (S.aliqAberto ? ' open' : '') + '><summary>Alíquotas internas por estado usadas no cálculo (editar)</summary><p class="note">Alíquota modal (padrão) de cada estado em ' + esc(Regras.REVISAO) + '. Produtos com alíquota ou FCP próprio no destino, ou estados que exigem base dupla também na venda a não contribuinte, podem ser ajustados aqui. O ajuste fica salvo neste navegador.</p>' +
+    '<div class="tscroll"><table class="aliq-uf"><thead><tr><th>UF</th><th>Alíquota interna (%)</th><th>FCP (%)</th><th>Base na venda a não contribuinte</th><th></th></tr></thead><tbody>';
+  Object.keys(Regras.DIFAL_UF).filter(function (u) { return u !== 'SP'; }).forEach(function (u) {
+    var c = ufCfg(u);
+    h += '<tr><td>' + u + '</td><td><input class="aliq-in" data-uf="' + u + '" data-k="a" inputmode="decimal" value="' + String(c.a).replace('.', ',') + '" aria-label="Alíquota interna de ' + u + '"></td><td><input class="aliq-in" data-uf="' + u + '" data-k="f" inputmode="decimal" value="' + String(c.f).replace('.', ',') + '" aria-label="FCP de ' + u + '"></td>' +
+      '<td><select class="aliq-in" data-uf="' + u + '" data-k="b" aria-label="Base de ' + u + '"><option value="unica"' + (c.b !== 'dupla' ? ' selected' : '') + '>Única</option><option value="dupla"' + (c.b === 'dupla' ? ' selected' : '') + '>Dupla</option></select></td><td>' + (c.editado ? '<button type="button" class="link" data-difal-reset="' + u + '">Voltar ao padrão</button>' : '<span class="small">' + esc(c.nota) + '</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div></details>';
+}
+async function mudarTipoDifal(doc, tipo) {
+  var e = S.emp; e.difal = e.difal || {}; e.difal[doc] = tipo; renderMain();
+  if (S.exemplo) return;
+  try { await B.salvarDifalTipo(e.id, doc, tipo); toast('Tipo do comprador salvo.'); }
+  catch (err) { toast('Não foi possível salvar: ' + erroTexto(err)); }
+}
 function tabReforma(ds, T) {
   var h = '<p class="note">Em 2026 a CBS (0,9%) e o IBS (0,1%) são destacados nas notas em caráter de teste. Os valores vêm do grupo IBS/CBS dos XMLs e são informativos: não alteram a apuração de ICMS, PIS e COFINS.</p>';
   h += '<div class="tscroll"><table><thead><tr><th>Mês</th><th class="r">CBS destacada</th><th class="r">IBS destacado</th><th class="r">Notas</th></tr></thead><tbody>';
@@ -1324,6 +1483,12 @@ async function baixarExcel() {
     abas.push({ nome: 'Pendências', titulo: tit, cols: [{ t: 'Gravidade', w: 10 }, { t: 'Imposto', w: 14 }, { t: 'Origem', w: 11 }, { t: 'Data', w: 11, f: 'data' }, { t: 'Número', w: 10 }, { t: 'Chave', w: 47 }, { t: 'Emitente / destinatário', w: 32 }, { t: 'Item', w: 6, f: 'int' }, { t: 'NCM', w: 10 }, { t: 'Produto', w: 36 }, { t: 'Ocorrência', w: 30 }, { t: 'O que corrigir', w: 70 }, { t: 'Impacto estimado', w: 14, f: 'din' }, { t: 'Situação', w: 18 }, { t: 'Anotação', w: 40 }],
       rows: pendT.slice().sort(function (a, b) { return ord[a.sev] - ord[b.sev] || (a.dt < b.dt ? -1 : 1); }).map(function (p) { var a = acompDe(p.ch); return [{ erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev], IMP_LBL[impDe(p)], p.quem === 'cliente' ? 'Cliente' : 'Fornecedor', p.dt, String(p.n), p.ch, p.parte || 'Consumidor final', p.item || '', p.ncm || '', p.x || '', COD_TIT[p.cod] || p.cod, p.msg, p.imp || 0, a ? SIT[a.s] : 'Em aberto', a ? a.t || '' : '']; }) });
 
+    // DIFAL
+    var DF = difalDados(ds), tipoNome = function (t) { return (DIFAL_TIPOS.filter(function (x) { return x[0] === t; })[0] || [])[1] || t; };
+    if (DF.saidas.length) abas.push({ nome: 'DIFAL vendas', titulo: tit + ' · vendas para outros estados', cols: [{ t: 'Data', w: 11, f: 'data' }, { t: 'Número', w: 10 }, { t: 'Chave', w: 47 }, { t: 'Comprador', w: 34 }, { t: 'CNPJ/CPF', w: 19 }, { t: 'UF', w: 5 }, { t: 'Tipo do comprador', w: 36 }, { t: 'Valor', w: 14, f: 'din' }, { t: 'Alíq. interna destino %', w: 10, f: 'pct' }, { t: 'DIFAL', w: 13, f: 'din' }, { t: 'FCP', w: 11, f: 'din' }, { t: 'Total a recolher', w: 14, f: 'din' }, { t: 'Informado na nota', w: 14, f: 'din' }],
+      rows: DF.saidas.map(function (x) { var nc = x.tipo === 'nao_contribuinte'; return [x.n.dt, x.n.n, x.n.ch, x.n.dN, fmtCnpj(x.n.dC), x.uf, tipoNome(x.tipo), x.v, x.cfg.a, nc ? x.difal : 0, nc ? x.fcp : 0, nc ? x.total : 0, x.naNota === null ? '' : x.naNota]; }) });
+    if (DF.entradas.length) abas.push({ nome: 'DIFAL compras', titulo: tit + ' · compras de outros estados (DIFAL devido a SP)', cols: [{ t: 'Data', w: 11, f: 'data' }, { t: 'Número', w: 10 }, { t: 'Chave', w: 47 }, { t: 'Fornecedor', w: 34 }, { t: 'UF', w: 5 }, { t: 'Produto', w: 38 }, { t: 'NCM', w: 10 }, { t: 'Uso', w: 16 }, { t: 'Valor', w: 13, f: 'din' }, { t: 'Alíq. inter. %', w: 9, f: 'pct' }, { t: 'Alíq. interna SP %', w: 9, f: 'pct' }, { t: 'Base', w: 13, f: 'din' }, { t: 'DIFAL', w: 13, f: 'din' }],
+      rows: DF.entradas.map(function (x) { return [x.n.dt, x.n.n, x.n.ch, x.n.eN, x.n.eUF, x.it.x, x.it.ncm, nomeClasse(x.classe), x.v, x.inter, x.interna, x.bc, x.difal]; }) });
     // Produtos
     var prods = Object.values(S.res.produtos).sort(function (a, b) { return b.v - a.v; });
     abas.push({ nome: 'Produtos', titulo: nome + ' · CNPJ ' + fmtCnpj(cnpj) + ' · produtos comprados (todas as notas)', cols: [{ t: 'Produto', w: 44 }, { t: 'Código', w: 12 }, { t: 'Fornecedor', w: 34 }, { t: 'CNPJ fornecedor', w: 19 }, { t: 'NCM', w: 10 }, { t: 'Monofásico PIS/COFINS', w: 12 }, { t: 'Saiu da ST', w: 9 }, { t: 'Compras', w: 14, f: 'din' }, { t: 'Nº de compras', w: 9, f: 'int' }, { t: 'Última compra', w: 12, f: 'data' }, { t: 'Classificação', w: 18 }, { t: 'Origem da classificação', w: 32 }],
@@ -1495,6 +1660,7 @@ document.addEventListener('click', function (ev) {
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
+  if (d.difalReset) { var cfR = difalCfg(); delete cfR[d.difalReset]; ls('pf.difalUF', JSON.stringify(cfR)); S.aliqAberto = true; renderMain(); return; }
   if (d.apv) { S.apVisao = d.apv; renderMain(); return; }
   if (d.cmpal) { S.cmpAlertas = d.cmpal === 'true'; renderMain(); return; }
   if (d.fcls) { S.fCls = d.fcls; if (d.fcls === 'compra' && S.fClsDiv === 'div') S.fClsDiv = 'todos'; renderMain(); return; }
@@ -1618,7 +1784,7 @@ document.addEventListener('submit', async function (ev) {
     catch (e) { toast('Não foi possível liberar: ' + erroTexto(e)); }
   }
 });
-document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S.q = ev.target.value.trim(); renderMain(); } });
+document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S.q = ev.target.value.trim(); renderMain(); } else if (ev.target.id === 'simV') { S.sim.v = ev.target.value; var o = $('simSaida'); if (o) o.innerHTML = simResultado(); } });
 document.addEventListener('change', function (ev) {
   var t = ev.target;
   if (t.id === 'porNcm') { S.porNcm = t.checked; return; }
@@ -1628,6 +1794,13 @@ document.addEventListener('change', function (ev) {
   if (t.id === 'files') { importar(lista); t.value = ''; }
   else if (t.id === 'arqNova') { importarNova(lista); t.value = ''; }
   else if (t.id === 'arqTeste') { testarArquivos(lista); t.value = ''; }
+  else if (t.dataset && t.dataset.difalDoc !== undefined) { mudarTipoDifal(t.dataset.difalDoc, t.value); }
+  else if (t.id === 'simUF' || t.id === 'simTipo' || t.id === 'simO') { S.sim = S.sim || {}; S.sim[{ simUF: 'uf', simTipo: 'tipo', simO: 'o' }[t.id]] = t.value; renderMain(); }
+  else if (t.classList && t.classList.contains('aliq-in')) {
+    var cf = difalCfg(), u = t.dataset.uf, k = t.dataset.k; cf[u] = cf[u] || {};
+    if (k === 'b') cf[u].b = t.value === 'dupla' ? 'dupla' : null; else { var nv = parseFloat(String(t.value).replace(',', '.')); if (isFinite(nv) && nv >= 0 && nv < 40) cf[u][k] = nv; }
+    ls('pf.difalUF', JSON.stringify(cf)); S.aliqAberto = true; renderMain();
+  }
   else if (t.id === 'tSeg' || t.id === 'tReg') { S.testeCfg = { seg: $('tSeg').value, reg: $('tReg').value }; }
   else if (t.id === 'nome' && S.emp && !S.exemplo) {
     var nm = t.value.trim(); S.emp.meta.nome = nm;
