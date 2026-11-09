@@ -56,7 +56,7 @@ var Banco = (function () {
       todos(function () { return sb.from('ncm_regras').select('ncm_prefixo,classe,atualizado_em').eq('empresa_cnpj', cnpj).order('ncm_prefixo'); }),
       comHistorico ? ok(await sb.from('classificacao_historico').select('*').eq('empresa_cnpj', cnpj).order('alterado_em', { ascending: false }).limit(300)) : [],
       todos(function () { return sb.from('acompanhamento').select('chave,status,texto,atualizado_em').eq('empresa_cnpj', cnpj).order('chave'); }),
-      todos(function () { return sb.from('difal_destinatarios').select('documento,tipo').eq('empresa_cnpj', cnpj).order('documento'); }).catch(function () { return []; })
+      todos(function () { return sb.from('difal_destinatarios').select('documento,tipo,pelo_cliente').eq('empresa_cnpj', cnpj).order('documento'); }).catch(function () { return []; })
     ]);
     return { notas: r[0], canc: r[1], produtos: r[2], ncm: r[3], hist: r[4], acomp: r[5], difal: r[6] };
   }

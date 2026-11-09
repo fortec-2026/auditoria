@@ -257,6 +257,7 @@ Aba **DIFAL** no painel (escritório e cliente), também no Excel (abas "DIFAL v
 - **Vendas para outros estados** (NF-e própria, CFOP de venda, destino fora de SP):
   - O tipo do comprador vem do XML: indicador de IE 9, sem IE ou CPF é tratado como consumidor final não contribuinte; contribuinte com indicador de consumidor final é uso e consumo; o resto é revenda.
   - Quem usa o portal pode trocar o tipo de cada comprador. A escolha fica salva por comprador na tabela `difal_destinatarios`, com RLS por `tem_acesso`. Na demo e no teste grátis fica só na tela.
+  - Quando o cliente troca o tipo, a linha fica marcada como "Pelo cliente" (coluna `pelo_cliente`, preenchida por trigger) e o escritório vê um aviso para confirmar uma a uma ou todas.
   - Para não contribuinte: DIFAL = valor × (alíquota interna do destino − interestadual) + FCP, com base única (EC 87/2015; LC 87/1996, art. 13, IX, na redação da LC 190/2022; Convênio ICMS 236/2021). Os estados que exigem base dupla por lei própria podem ser marcados na tabela de alíquotas.
   - Compara com o grupo ICMSUFDest da nota e avisa quando falta ou diverge.
   - Totais por estado, para a GNRE.

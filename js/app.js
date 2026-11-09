@@ -110,7 +110,8 @@ function montarEmpresa(e, d) {
   return { id: e.cnpj, meta: metaDe(e), notas: d.notas.map(function (n) { return n.dados; }), pub: pub, canc: canc, prodCad: prodCad, ncmCad: ncmCad,
     hist: d.hist.map(function (h) { return { em: h.alterado_em, alvo: h.alvo, ref: h.referencia, x: h.descricao, de: h.classe_anterior, para: h.classe_nova, cli: !!h.pelo_cliente }; }).reverse(),
     acomp: (function () { var a = {}; (d.acomp || []).forEach(function (x) { a[x.chave] = { s: x.status, t: x.texto, em: x.atualizado_em }; }); return a; })(),
-    difal: (function () { var a = {}; (d.difal || []).forEach(function (x) { a[x.documento] = x.tipo; }); return a; })() };
+    difal: (function () { var a = {}; (d.difal || []).forEach(function (x) { a[x.documento] = x.tipo; }); return a; })(),
+    difalCli: (function () { var a = {}; (d.difal || []).forEach(function (x) { if (x.pelo_cliente) a[x.documento] = 1; }); return a; })() };
 }
 function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
 function pendentesPublicar() { if (!S.emp || S.exemplo) return 0; var n = 0; for (var k in S.emp.pub) if (!S.emp.pub[k]) n++; return n; }
@@ -1121,6 +1122,9 @@ function tabDifal(ds) {
         Object.keys(porUF).sort().map(function (uf) { var u = porUF[uf], c = ufCfg(uf); return '<tr><td>' + uf + '</td><td class="r num">' + u.n + '</td><td class="r num">' + m0(u.v) + '</td><td class="r num">' + String(c.a).replace('.', ',') + '%' + (c.b === 'dupla' ? ' · base dupla' : '') + '</td><td class="r num">' + m0(u.d) + '</td><td class="r num">' + m0(u.f) + '</td><td class="r num"><b>' + m0(u.d + u.f) + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
       h += '<p class="note">Sem inscrição estadual no estado de destino, o DIFAL é pago por GNRE antes da saída da mercadoria, uma guia por nota. Com inscrição no destino, entra na apuração mensal daquele estado. Base legal: EC 87/2015; LC 87/1996, na redação da LC 190/2022; Convênio ICMS 236/2021.</p>';
     }
+    var cliDocs = {}; D.saidas.forEach(function (x) { if ((S.emp.difalCli || {})[x.n.dC]) cliDocs[x.n.dC] = 1; });
+    var nCliD = Object.keys(cliDocs).length;
+    if (!S.readonly && nCliD) h += '<div class="banner"><span class="grow"><b>' + nCliD + (nCliD === 1 ? ' comprador teve o tipo alterado' : ' compradores tiveram o tipo alterado') + ' pelo cliente.</b> Confira e confirme; ao confirmar, a escolha passa a ser do escritório.</span><button class="btn primary" type="button" data-act="confirmarDifal">Confirmar todos</button></div>';
     h += '<p class="note"><b>Nem sempre o XML diz quem é o comprador.</b> O tipo abaixo vem da nota (indicador de IE e de consumidor final). Se você sabe que o cliente é outro tipo, troque na lista: o cálculo muda na hora e a escolha fica salva para aquele comprador.</p>';
     h += '<div class="tscroll"><table class="difal-tab"><thead><tr><th>Nota</th><th>Comprador</th><th>Tipo do comprador</th><th class="r">Valor</th><th class="r">Alíq. destino / inter.</th><th class="r">DIFAL + FCP</th><th class="r">Na nota</th><th>Situação</th></tr></thead><tbody>';
     D.saidas.sort(function (a, b) { return a.n.dt < b.n.dt ? -1 : 1; }).forEach(function (x) {
@@ -1132,7 +1136,7 @@ function tabDifal(ds) {
       else sit = 'Confere';
       h += '<tr><td><button type="button" class="link" data-ver="' + esc(n.ch) + '">Nº ' + esc(n.n) + '</button><div class="small">' + brFull(n.dt) + '</div></td>' +
         '<td>' + esc(n.dN || '—') + '<div class="small">' + esc(fmtCnpj(n.dC)) + ' · ' + esc(n.dUF) + '</div></td>' +
-        '<td><select class="difal-sel" data-difal-doc="' + esc(n.dC) + '" aria-label="Tipo do comprador">' + DIFAL_TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (x.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>' + (x.tipo !== x.padrao ? '<div class="small">Alterado (a nota indica: ' + DIFAL_TIPOS.filter(function (t) { return t[0] === x.padrao; })[0][1].toLowerCase() + ')</div>' : '') + '</td>' +
+        '<td><select class="difal-sel" data-difal-doc="' + esc(n.dC) + '" aria-label="Tipo do comprador">' + DIFAL_TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (x.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>' + ((S.emp.difalCli || {})[n.dC] ? (S.readonly ? '<div class="small">Definido por você · a RG Fiscal confere</div>' : '<div><span class="pill alerta">Pelo cliente</span> <button type="button" class="link" data-difal-conf="' + esc(n.dC) + '">Confirmar</button></div>') : '') + (x.tipo !== x.padrao ? '<div class="small">Alterado (a nota indica: ' + DIFAL_TIPOS.filter(function (t) { return t[0] === x.padrao; })[0][1].toLowerCase() + ')</div>' : '') + '</td>' +
         '<td class="r num">' + m0(x.v) + '</td><td class="r num">' + String(x.cfg.a).replace('.', ',') + '% / ' + (x.inter === 'var' ? 'várias' : x.inter + '%') + '</td>' +
         '<td class="r num">' + (x.tipo === 'nao_contribuinte' ? m0(x.total) : '—') + '</td><td class="r num">' + (x.naNota === null ? 'sim' : x.naNota ? m0(x.naNota) : '—') + '</td>' +
         '<td>' + (cls ? '<span class="' + cls + '">' + esc(sit) + '</span>' : '<span class="small">' + esc(sit) + '</span>') + '</td></tr>';
@@ -1196,8 +1200,16 @@ function tabelaAliqUF() {
   });
   return h + '</tbody></table></div></details>';
 }
+async function confirmarDifal(docs) {
+  var e = S.emp; docs = docs || Object.keys(e.difalCli || {});
+  try {
+    for (var i = 0; i < docs.length; i++) if (!S.exemplo) await B.salvarDifalTipo(e.id, docs[i], e.difal[docs[i]]);
+    docs.forEach(function (d) { delete e.difalCli[d]; });
+    renderMain(); toast(docs.length === 1 ? 'Tipo do comprador confirmado.' : docs.length + ' tipos confirmados.');
+  } catch (err) { toast('Não foi possível confirmar: ' + erroTexto(err)); }
+}
 async function mudarTipoDifal(doc, tipo) {
-  var e = S.emp; e.difal = e.difal || {}; e.difal[doc] = tipo; renderMain();
+  var e = S.emp; e.difal = e.difal || {}; e.difal[doc] = tipo; e.difalCli = e.difalCli || {}; if (S.readonly) e.difalCli[doc] = 1; else delete e.difalCli[doc]; renderMain();
   if (S.exemplo) return;
   try { await B.salvarDifalTipo(e.id, doc, tipo); toast('Tipo do comprador salvo.'); }
   catch (err) { toast('Não foi possível salvar: ' + erroTexto(err)); }
@@ -1660,6 +1672,7 @@ document.addEventListener('click', function (ev) {
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
+  if (d.difalConf) { if (!S.readonly) confirmarDifal([d.difalConf]); return; }
   if (d.difalReset) { var cfR = difalCfg(); delete cfR[d.difalReset]; ls('pf.difalUF', JSON.stringify(cfR)); S.aliqAberto = true; renderMain(); return; }
   if (d.apv) { S.apVisao = d.apv; renderMain(); return; }
   if (d.cmpal) { S.cmpAlertas = d.cmpal === 'true'; renderMain(); return; }
@@ -1713,6 +1726,7 @@ document.addEventListener('click', function (ev) {
   else if (a === 'cancelaEq') { S.confirmEquipe = null; render(); }
   else if (a === 'publicar') publicar();
   else if (a === 'confirmarCli') { if (!S.readonly) confirmarCli(); }
+  else if (a === 'confirmarDifal') { if (!S.readonly) confirmarDifal(); }
   else if (a === 'irProdutos') { S.tab = 'produtos'; S.fProd = 'pendente'; renderMain(); }
   else if (a === 'aplicarMono') {
     var lista = $('mono').value.split(/\n+/).map(function (s) { return s.trim().replace(/\s+/g, ' '); }).filter(function (s) { return /^\d/.test(s); });
