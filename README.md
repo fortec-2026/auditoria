@@ -283,3 +283,13 @@ O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest
 - Cosméticos e perfumaria (33.03 a 33.07, exceto 33.06; 3401.11.90, exceto o Ex 01; 3401.20.10; 9603.21.00) são monofásicos (Lei 10.147/2000, art. 1º, I, "b", na redação da Lei 12.839/2013).
 - ICMS a 25% (RICMS/SP, art. 55): perfumes e cosméticos (3303, 3304, 3305 e 3307, exceto xampus 3305.10 e desodorantes 3307.20, que são 18%; 3304.99.90 fica como "conferir" por causa dos protetores solares), peleteria (4303), raquetes e bolas de tênis e tacos e bolas de golfe.
 - Uso e consumo do comércio (sacolas, cabides, limpeza) não dá crédito de PIS/COFINS; classifique na aba Produtos.
+- Calçados (64) e bolsas e artigos de couro (41, 42, 3926.20.00) só têm redução de base na saída do fabricante (carga de 12% e 7%; RICMS/SP, Anexo II, art. 30, até 31/12/2026), nunca para consumidor final ou Simples. O varejista vende a 18%.
+- Cosméticos e higiene (3303 a 3307, 3401, 4818 e 9603.2): carga de 12% só na saída de fabricante ou atacadista para contribuinte fora do Simples (Anexo II, art. 34). Na venda do varejo: 25% ou 18%, conforme o art. 55.
+
+## ST de eletrônicos (Portaria CAT 68/2019, Anexo XXII)
+
+- Itens que seguem na ST (impressoras, informática, mouses e teclados, monitores, telefonia, som, ar-condicionado, climatizadores, iluminação 9405 etc.) ficam como "depende do CEST": com CEST 21.xxx é ST; com outro CEST, não.
+- Saíram da ST em 01/08/2026 (Portaria SRE 19/2026): lavadoras e secadoras, aspiradores, eletroportáteis, ferros, fornos elétricos, coifas, lavadoras de pressão, furadeiras e balanças domésticas.
+- Saíram em 01/10/2026 (Portaria SRE 34/2026): refrigeradores, freezers, adegas e lava-louças.
+- Saem em 01/02/2027 (Portaria SRE 52/2026): fogões, micro-ondas, partes de lavadoras, barbeadores, purificadores de água e secadores de cabelo.
+- Informática da Resolução SF 31/2008: 12% (RICMS/SP, art. 54, V), marcado como "conferir". O complemento de 1,3% (§ 7º) foi revogado em 15/01/2023.
