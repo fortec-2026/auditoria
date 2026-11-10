@@ -337,6 +337,21 @@ var Fiscal = (function () {
   function addTot(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; }
 
   // notas: array de notas; cfg: {cnpj, corte, mono[], segmento[], aliqInterna}
+  /* Reduções de base de cálculo de SP reconhecidas na conferência das compras.
+     Máquinas e implementos agrícolas do Anexo II do Convênio ICMS 52/91 (inclui peças e partes das posições 8201, 8432, 8433 e 8436, e tratores agrícolas):
+     carga de 5,6% nas operações internas (RICMS/SP, Anexo II, art. 12, IV), benefício vigente até 31/12/2026 (Decreto 70.589/2026).
+     Máquinas e equipamentos industriais do Anexo I do mesmo convênio: 8,8% (art. 12, II). */
+  var RED_AGRO = ['8201', '8432', '8433', '8436', '870191', '870192', '870193', '870194', '870195', '871620'];
+  function cargaEfetiva(it) { var v = (it.vp || 0) - (it.vd || 0) + (it.vf || 0); return v > 0 ? Math.round(it.v / v * 10000) / 100 : 0; }
+  function fmtPct(x) { return String(Math.round(x * 100) / 100).replace('.', ',') + '%'; }
+  function reducaoConhecida(it, dt, carga) {
+    var ncm = String(it.ncm || ''), vig = !dt || dt <= '2026-12-31';
+    if (vig && RED_AGRO.some(function (p) { return ncm.indexOf(p) === 0; }) && (it.cst !== '20' || Math.abs(carga - 5.6) <= 0.1))
+      return { carga: 5.6, d: 'redução de base para carga de 5,6% (máquinas e implementos agrícolas, inclusive peças e partes, do Anexo II do Convênio ICMS 52/91)', l: 'RICMS/SP, Anexo II, art. 12, IV, até 31/12/2026' };
+    if (vig && /^84|^85|^90/.test(ncm) && it.cst === '20' && Math.abs(carga - 8.8) <= 0.1)
+      return { carga: 8.8, d: 'redução de base para carga de 8,8% (máquinas e equipamentos industriais do Anexo I do Convênio ICMS 52/91)', l: 'RICMS/SP, Anexo II, art. 12, II, até 31/12/2026' };
+    return null;
+  }
   function analisar(notas, cfg) {
     cfg = cfg || {};
     var cnpj = String(cfg.cnpj || '').replace(/\D/g, '');
@@ -831,8 +846,16 @@ var Fiscal = (function () {
               issue('erro', it, 'ICMS_ZERO_FORN', 'CST ' + it.cst + ' (tributado) sem ICMS destacado, CFOP ' + it.cf + '. Deveria ter ' + aliqInt + '% destacado; sem destaque não há crédito.', receita * aliqInt / 100, ajC('icmsC', receita * aliqInt / 100));
             } else if ((it.cst === '00' || it.cst === '20') && CFOP_ST.test(it.cf) && it.p === aliqInt) {
               issue('alerta', it, 'CFOP_FORN', 'Tributação correta (ICMS ' + it.p + '% destacado, crédito aproveitável); só o CFOP ' + it.cf + ' é de ST. Pedir ao fornecedor CC-e para o CFOP 5.102 e a correção do cadastro.', 0);
-            } else if ((it.cst === '00' || it.cst === '20') && it.p && it.p !== aliqInt) {
-              issue('alerta', it, 'ALIQ_FORN', 'Fornecedor aplicou ' + it.p + '% em operação interna (geral de SP: ' + aliqInt + '%).', Math.abs(it.bc * (aliqInt - it.p) / 100), ajC('icmsC', it.bc * (aliqInt - it.p) / 100));
+            } else if ((it.cst === '00' || it.cst === '20') && it.p && (it.p !== aliqInt || it.cst === '20')) {
+              var cargaF = cargaEfetiva(it), redF = reducaoConhecida(it, nt.dt, cargaF);
+              if (redF) {
+                if (it.cst === '20') { /* redução de base prevista na legislação de SP: tributação correta */ }
+                else issue('info', it, 'ALIQ_FORN', 'Fornecedor usou ' + it.p + '% sem redução de base (CST ' + it.cst + '). Para este produto há ' + redF.d + ' (' + redF.l + '); confira se o destaque deveria ser menor.', 0);
+              } else if (it.cst === '20') {
+                if (Math.abs(cargaF - aliqInt) > 0.15) issue('alerta', it, 'ALIQ_FORN', 'Fornecedor reduziu a base de cálculo (CST 20): carga efetiva de ' + fmtPct(cargaF) + ' sobre o valor do item, com alíquota de ' + it.p + '%. O portal não reconheceu um benefício de SP para o NCM ' + it.ncm + ' com essa carga: confirme com o fornecedor qual dispositivo do Anexo II do RICMS/SP ele aplicou.', 0);
+              } else {
+                issue('alerta', it, 'ALIQ_FORN', 'Fornecedor aplicou ' + it.p + '% em operação interna (geral de SP: ' + aliqInt + '%). Confira se o produto tem alíquota própria (RICMS/SP, art. 54) ou peça a correção.', Math.abs(it.bc * (aliqInt - it.p) / 100), ajC('icmsC', it.bc * (aliqInt - it.p) / 100));
+              }
             }
           }
           if (!interna && nt.mod === '55' && it.p > 0) {

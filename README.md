@@ -269,3 +269,9 @@ Aba **DIFAL** no painel (escritório e cliente), também no Excel (abas "DIFAL v
 - **Alíquotas internas por UF**: `Regras.DIFAL_UF` em `js/regras.js` (modal de cada estado + FCP geral). Editáveis na tela, salvas no navegador. Para mudar o padrão de todos, altere a tabela no código (a revisão semanal confere).
 
 O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest de cada item. Notas importadas antes disso aparecem sem o valor do DIFAL da nota (só "sim", quando havia o grupo).
+
+## Reduções de base na compra (alíquota do fornecedor)
+
+- Compras internas com CST 20 têm a carga efetiva conferida (ICMS ÷ valor do item), não só a alíquota.
+- Máquinas e implementos agrícolas do Anexo II do Convênio ICMS 52/91, inclusive peças e partes das posições 8201, 8432, 8433 e 8436, tratores agrícolas e reboques agrícolas: carga de 5,6% é aceita como correta (RICMS/SP, Anexo II, art. 12, IV; benefício vigente até 31/12/2026, Decreto 70.589/2026). Carga de 8,8% em máquinas industriais (art. 12, II) também.
+- CST 20 com carga que o portal não reconhece gera alerta sem impacto, pedindo a confirmação do dispositivo. CST 00 com alíquota diferente de 18% continua como alerta.
