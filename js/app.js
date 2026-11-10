@@ -6,6 +6,7 @@ var MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agos
 var EXEMPLO_URL = 'exemplos/notas-exemplo.zip';
 var DEMOS = {
   pneus: { url: EXEMPLO_URL, cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', segmento: 'autopecas', regime: 'real', ramo: 'uma revendedora de pneus e autopeças', rot: 'Pneus e autopeças' },
+  moda: { url: 'exemplos/notas-moda.zip', cnpj: '87654321000144', nome: 'Passo Certo Calçados e Moda Exemplo Ltda (fictícia)', segmento: 'moda', regime: 'real', ramo: 'uma loja de calçados, roupas e acessórios', rot: 'Calçados e moda' },
   mercado: { url: 'exemplos/notas-mercadinho.zip', cnpj: '98765432000155', nome: 'Mercadinho Bom Preço Exemplo Ltda (fictícia)', segmento: 'varejo', regime: 'presumido', ramo: 'um mercadinho', rot: 'Mercadinho' }
 };
 var WA_TESTE = 'Olá! Testei o portal da RG Fiscal com as notas da minha empresa e quero receber o relatório completo.';
@@ -231,7 +232,8 @@ var LOGO = '<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1"
   [0, 2.4, 3.6, 6, 8.4, 9.6, 12, 13.2, 15.6, 18, 19.2, 21.6].map(function (x, i) { return '<rect x="' + (9 + x) + '" y="28" width="' + (i % 3 === 1 ? 0.8 : 1.4) + '" height="4.5" fill="var(--logo-bar)"/>'; }).join('') + '</svg>';
 function WA(n, msg) { return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg || 'Olá! Vi a demonstração do portal da RG Fiscal e quero saber como funciona para a minha empresa.'); }
 function botoesWA(msg, cls) { return '<a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516981505852', msg) + '">' + I.zap + 'Cassiano</a><a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516993392325', msg) + '">' + I.zap + 'Vinicius</a>'; }
-function linkDemo(k) { return location.origin + location.pathname + (k === 'teste' ? '#teste' : k === 'mercado' ? '#demo-mercado' : '#demo'); }
+function hashDemo(k) { return k === 'mercado' ? '#demo-mercado' : k === 'moda' ? '#demo-moda' : '#demo'; }
+function linkDemo(k) { return location.origin + location.pathname + (k === 'teste' ? '#teste' : hashDemo(k)); }
 function faixa(conteudo, extra) { return '<div class="faixa' + (extra ? ' ' + extra : '') + '">' + conteudo + '</div>'; }
 function temaAtual() { var t = document.documentElement.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
 function nav(extra) {
@@ -269,7 +271,7 @@ function vListaCliente() {
 function vEscritorio() {
   var h = faixa(nav() + '<header class="top"><div><h1>Empresas</h1><div class="sub">Área do escritório. O cliente só vê o que for publicado.</div></div>' +
     '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Link da demo: pneus</button><button class="btn" type="button" data-act="copiarDemo" data-k="mercado">' + I.link + 'Link da demo: mercadinho</button><button class="btn" type="button" data-act="copiarDemo" data-k="teste">' + I.link + 'Link do teste grátis</button></div></header>');
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Link da demo: pneus</button><button class="btn" type="button" data-act="copiarDemo" data-k="mercado">' + I.link + 'Link da demo: mercadinho</button><button class="btn" type="button" data-act="copiarDemo" data-k="moda">' + I.link + 'Link da demo: moda</button><button class="btn" type="button" data-act="copiarDemo" data-k="teste">' + I.link + 'Link do teste grátis</button></div></header>');
   if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
   if (S.empresas.length) {
     h += '<div class="empresas">' + S.empresas.map(function (e) {
@@ -617,7 +619,7 @@ function tabApuracao(ds, T) {
 var UFS = ['SP', 'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'TO'];
 var REGIMES = [['real', 'Lucro Real'], ['presumido', 'Lucro Presumido'], ['simples', 'Simples Nacional']];
 function regimeEmp() { return (S.emp && S.emp.meta.regime) || 'real'; }
-var SEGMENTOS = [['autopecas', 'Pneus e autopeças'], ['varejo', 'Varejo de alimentos (mercadinho)'], ['outros', 'Outros (comércio em geral)']];
+var SEGMENTOS = [['autopecas', 'Pneus e autopeças'], ['varejo', 'Varejo de alimentos (mercadinho)'], ['moda', 'Calçados, vestuário e acessórios'], ['outros', 'Outros (comércio em geral)']];
 function monoEmp() {
   if (!S._monoFn || S._monoFnDe !== S.emp) { var f = F.makeMono(cfgAtual().mono); S._monoFn = function (n) { return f(n) === 'mono'; }; S._monoFnDe = S.emp; }
   return S._monoFn;
@@ -762,7 +764,7 @@ function vTeste() {
   var h = faixa(nav(navR) + '<div class="faixa-login"><h1>Teste grátis com as notas da sua empresa</h1><p>Envie os XMLs de um mês e veja em segundos os erros nas notas, o imposto pago a mais e os créditos que ficaram para trás.</p></div>', 'alta');
   h += '<div class="card teste-card">';
   h += '<div class="teste-passo"><span class="teste-n">1</span><div><h2>Conte o ramo e o regime</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
-    '<div class="field"><label for="tSeg">Ramo</label><select id="tSeg">' + [['autopecas', 'Pneus e autopeças'], ['varejo', 'Mercadinho, supermercado ou varejo'], ['outros', 'Outro comércio']].map(function (o) { return '<option value="' + o[0] + '"' + (t.seg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="tSeg">Ramo</label><select id="tSeg">' + [['autopecas', 'Pneus e autopeças'], ['varejo', 'Mercadinho, supermercado ou varejo de alimentos'], ['moda', 'Calçados, roupas, bolsas e acessórios'], ['outros', 'Outro comércio']].map(function (o) { return '<option value="' + o[0] + '"' + (t.seg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="tReg">Regime</label><select id="tReg">' + [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real']].map(function (o) { return '<option value="' + o[0] + '"' + (t.reg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div></div></div>';
   h += '<div class="teste-passo"><span class="teste-n">2</span><div style="flex:1;min-width:0"><h2>Envie os XMLs</h2><p class="note">Use um mês já fechado, por exemplo setembro: o que aparecer de imposto pago a mais pode ser recuperado. Inclua as notas de venda (NF-e e NFC-e) e as de compra; um arquivo .zip serve.</p>' +
     (S.testeLendo ? '<div class="drop"><b>Lendo ' + S.testeLendo + '…</b><span class="small">Isso leva alguns segundos.</span></div>'
@@ -1660,7 +1662,7 @@ document.addEventListener('click', function (ev) { if (S.ver && ev.target && ev.
 document.addEventListener('click', function (ev) {
   var b = ev.target.closest('button'); if (!b) return;
   var d = b.dataset;
-  if (d.demo) { if (d.demo === S.demoTipo && S.emp) return; S.demoTipo = d.demo; try { history.replaceState(null, '', location.pathname + location.search + (d.demo === 'mercado' ? '#demo-mercado' : '#demo')); } catch (e) {} S.periodo = 'all'; S.tab = 'apuracao'; carregarExemplo(d.demo); return; }
+  if (d.demo) { if (d.demo === S.demoTipo && S.emp) return; S.demoTipo = d.demo; try { history.replaceState(null, '', location.pathname + location.search + hashDemo(d.demo)); } catch (e) {} S.periodo = 'all'; S.tab = 'apuracao'; carregarExemplo(d.demo); return; }
   if (d.per) { S.periodo = d.per; renderMain(); return; }
   if (d.grupo) { S.grupo = d.grupo; S.periodo = 'all'; renderMain(); return; }
   if (d.det) { S.det = d.det; renderMain(); return; }
@@ -1701,7 +1703,7 @@ document.addEventListener('click', function (ev) {
   var a = d.act;
   if (a === 'exemplo') carregarExemplo('pneus');
   else if (a === 'teste') abrirTeste();
-  else if (a === 'verDemo') { S.demo = true; S.teste = false; S.demoTipo = S.demoTipo || 'pneus'; try { history.replaceState(null, '', location.pathname + location.search + (S.demoTipo === 'mercado' ? '#demo-mercado' : '#demo')); } catch (e) {} S.view = 'carregando'; render(); carregarExemplo(); }
+  else if (a === 'verDemo') { S.demo = true; S.teste = false; S.demoTipo = S.demoTipo || 'pneus'; try { history.replaceState(null, '', location.pathname + location.search + hashDemo(S.demoTipo)); } catch (e) {} S.view = 'carregando'; render(); carregarExemplo(); }
   if (a === 'copiarDemo') { var url = linkDemo(b.dataset.k); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copiado: ' + url); }).catch(function () { window.prompt('Copie o link de demonstração:', url); }); return; }
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario || S.demo) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }
@@ -1851,6 +1853,6 @@ B.aoMudarSessao(function (evento) {
   if (evento === 'PASSWORD_RECOVERY') { S.view = 'recuperar'; render(); }
 });
 if (/^#teste\b/.test(location.hash)) { abrirTeste(); }
-else if (/^#demo\b/.test(location.hash)) { S.demo = true; S.demoTipo = /^#demo-mercado/.test(location.hash) ? 'mercado' : 'pneus'; S.view = 'carregando'; render(); carregarExemplo(); }
+else if (/^#demo\b/.test(location.hash)) { S.demo = true; S.demoTipo = /^#demo-mercado/.test(location.hash) ? 'mercado' : /^#demo-moda/.test(location.hash) ? 'moda' : 'pneus'; S.view = 'carregando'; render(); carregarExemplo(); }
 else { render(); iniciar(); }
 })();

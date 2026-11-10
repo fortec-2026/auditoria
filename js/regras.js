@@ -12,7 +12,9 @@ var Regras = (function () {
     R({ t: 'mono', p: ['2201', '2202', '2203', '21069010'], x: ['220299'], d: 'Bebidas frias (água, refrigerante, chá pronto, energético, isotônico, cerveja)', l: 'Lei 13.097/2015, arts. 14 e 28', n: 'Bebidas à base de leite, soja ou cacau e néctares de frutas ficam fora. Na revenda, alíquota zero; há quem use CST 06.' }),
     R({ t: 'mono', p: ['220299'], d: 'Outras bebidas não alcoólicas', l: 'Lei 13.097/2015, art. 14', n: 'Monofásico só para energéticos, isotônicos, chás e refrescos prontos. Bebida láctea, de soja ou de cacau e néctar seguem a tributação normal (bebida/composto lácteo tem alíquota zero: Lei 10.925, art. 1º, XI).', cond: true }),
     R({ t: 'mono', p: ['3001', '3003', '3004', '300215', '300610'], d: 'Produtos farmacêuticos', l: 'Lei 10.147/2000, art. 1º, I, "a", e art. 2º', n: 'Confira se o medicamento está na lista positiva, negativa ou neutra.' }),
-    R({ t: 'mono', p: ['3303', '3304', '3305', '3307', '340111', '340120', '96032100'], d: 'Perfumaria, toucador e higiene pessoal', l: 'Lei 10.147/2000, art. 1º, I, "b", e art. 2º' }),
+    R({ t: 'mono', p: ['3303', '3304', '3305', '3307', '34011190', '34012010', '96032100'], d: 'Perfumaria, toucador e higiene pessoal', l: 'Lei 10.147/2000, art. 1º, I, "b", e art. 2º', n: 'A posição 33.06 (higiene bucal) está fora. No 3401.11.90, o Ex 01 também está fora.' }),
+    // Regra geral, sem monofásico: vestuário, calçados e acessórios (comércio varejista de moda)
+    R({ t: 'normal', p: ['61', '62', '64', '4202', '4203', '6504', '6505', '7113', '7117', '9101', '9102', '9113', '9503', '9506'], d: 'Vestuário, calçados, bolsas, artigos de viagem, chapéus e bonés, bijuterias, relógios, brinquedos e artigos esportivos', l: 'Leis 10.637/2002 e 10.833/2003 (Lucro Real) ou Lei 9.718/1998 (Lucro Presumido)', n: 'Esses produtos não são monofásicos: a venda é tributada (CST 01) e, no Lucro Real, a compra para revenda gera crédito (sem o ICMS destacado na base, Lei 14.592/2023).' }),
     R({ t: 'mono', p: ['271019', '2711'], d: 'Lubrificantes e GLP', l: 'Lei 9.990/2000 e Lei 10.865/2004', cond: true, n: 'Só lubrificantes (2710.19.3) e GLP; outros derivados conferir.' }),
     R({ t: 'mono', p: ['4011', '4013'], d: 'Pneus e câmaras de ar', l: 'Lei 10.485/2002, art. 5º' }),
     // Substituição tributária de PIS/COFINS
@@ -71,7 +73,10 @@ var Regras = (function () {
     R({ t: 'aliq', a: 12, p: ['330610', '96032100'], d: 'Creme dental e escova de dente', l: 'RICMS/SP, art. 54, XVIII' }),
     R({ t: 'aliq', a: 20, fecoep: 2, p: ['2203'], d: 'Cerveja e chope', l: 'RICMS/SP, art. 54-A; adicional de 2% (FECOEP), art. 56-C' }),
     R({ t: 'aliq', a: 25, p: ['2204', '2205', '2208'], d: 'Vinhos e destilados', l: 'RICMS/SP, art. 55, II' }),
-    R({ t: 'aliq', a: 25, p: ['3303', '3304', '3305', '3307'], d: 'Perfumes e cosméticos', l: 'RICMS/SP, art. 55, IV', cond: true, n: 'Protetores solares e alguns itens específicos ficam a 18%.' }),
+    R({ t: 'aliq', a: 25, p: ['3303', '3304', '3305', '3307'], x: ['330510', '330720', '33049990'], d: 'Perfumes e cosméticos', l: 'RICMS/SP, art. 55, IV', n: 'Xampus (3305.10) e desodorantes (3307.20) ficam fora e seguem 18%.' }),
+    R({ t: 'aliq', a: 25, p: ['33049990'], d: 'Outros produtos de beleza e cuidados da pele', l: 'RICMS/SP, art. 55, IV', cond: true, n: 'Protetores solares e bronzeadores, que também usam esse NCM, ficam fora e seguem 18%.' }),
+    R({ t: 'aliq', a: 25, p: ['4303'], d: 'Peleteria e suas obras (artigos de pele)', l: 'RICMS/SP, art. 55, V' }),
+    R({ t: 'aliq', a: 25, p: ['950631', '950632', '950651', '950661'], d: 'Tacos e bolas de golfe, raquetes e bolas de tênis', l: 'RICMS/SP, art. 55, XIX, XX, XXII e XXIII' }),
     R({ t: 'aliq', a: 30, fecoep: 2, p: ['24'], d: 'Fumo e cigarros', l: 'RICMS/SP, art. 55-A; adicional de 2% (FECOEP), art. 56-C' })
   ];
 

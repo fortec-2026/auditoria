@@ -275,3 +275,11 @@ O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest
 - Compras internas com CST 20 têm a carga efetiva conferida (ICMS ÷ valor do item), não só a alíquota.
 - Máquinas e implementos agrícolas do Anexo II do Convênio ICMS 52/91, inclusive peças e partes das posições 8201, 8432, 8433 e 8436, tratores agrícolas e reboques agrícolas: carga de 5,6% é aceita como correta (RICMS/SP, Anexo II, art. 12, IV; benefício vigente até 31/12/2026, Decreto 70.589/2026). Carga de 8,8% em máquinas industriais (art. 12, II) também.
 - CST 20 com carga que o portal não reconhece gera alerta sem impacto, pedindo a confirmação do dispositivo. CST 00 com alíquota diferente de 18% continua como alerta.
+
+## Ramo: calçados, vestuário e acessórios
+
+- Segmento `moda` (escritório, teste grátis e demo `#demo-moda`, empresa fictícia no Lucro Real). Usa a mesma conferência por NCM do varejo.
+- PIS/COFINS: vestuário (61, 62), calçados (64), bolsas e artigos de viagem (4202), vestuário de couro (4203), chapéus e bonés (6504, 6505), joias e bijuterias (7113, 7117), relógios (9101, 9102, 9113), brinquedos (9503) e artigos esportivos (9506) são tributados (CST 01). Venda desses itens com CST 04 ou 06 é erro.
+- Cosméticos e perfumaria (33.03 a 33.07, exceto 33.06; 3401.11.90, exceto o Ex 01; 3401.20.10; 9603.21.00) são monofásicos (Lei 10.147/2000, art. 1º, I, "b", na redação da Lei 12.839/2013).
+- ICMS a 25% (RICMS/SP, art. 55): perfumes e cosméticos (3303, 3304, 3305 e 3307, exceto xampus 3305.10 e desodorantes 3307.20, que são 18%; 3304.99.90 fica como "conferir" por causa dos protetores solares), peleteria (4303), raquetes e bolas de tênis e tacos e bolas de golfe.
+- Uso e consumo do comércio (sacolas, cabides, limpeza) não dá crédito de PIS/COFINS; classifique na aba Produtos.
