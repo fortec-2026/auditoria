@@ -733,6 +733,11 @@ var Fiscal = (function () {
         var tribST = ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(it.cst) >= 0;
         var credIcms = dir === 'E' && !(!pos && seg && tribST) && ['uso', 'ativo', 'insumo'].indexOf(nat) < 0;
         var ajC = function (campo, v) { if (campo === 'icmsC' && !credIcms) return null; var o = {}; o[campo] = v; return { c: o }; };
+        /* NF de entrada emitida pela própria empresa na compra de pessoa física (sem inscrição): não há ICMS cobrado anteriormente, logo não há crédito.
+           A nota documenta a entrada (RICMS/SP, art. 136, I, "a", e art. 138) sem destaque; crédito só do imposto anteriormente cobrado (arts. 59 e 61). */
+        if (dir === 'E' && proprio && nt.tp === '0' && credIcms && it.v > 0 && nat !== 'devVenda' && !nt.dIEn && (String(nt.dC || '').length === 11 || nt.dIE === '9')) {
+          issue('erro', it, 'ENT_PF_CRED', 'Nota de entrada emitida pela empresa na compra de pessoa física (' + (nt.dN || 'sem nome') + '), com ICMS de ' + money(it.v) + ' destacado. A pessoa física não recolheu ICMS, então não há imposto anteriormente cobrado para creditar (RICMS/SP, arts. 59 e 61). A nota de entrada serve para documentar a mercadoria recebida (art. 136, I, "a", e art. 138; RC 5.239/2015, pneus usados) e deve sair sem destaque de ICMS e ser escriturada sem crédito. Se o crédito já foi lançado, estorne. Compra de pessoa física também não gera crédito de PIS/COFINS (Leis 10.637/2002 e 10.833/2003, art. 3º, § 3º, I).', it.v, ajC('icmsC', -it.v));
+        }
 
         /* ICMS */
         if (dir === 'S') {
@@ -761,6 +766,7 @@ var Fiscal = (function () {
         } else if (dir === 'E' && nat === 'compra') {
           T.compras += receita + it.vIPI;
           if (mono) res.mono.compras += receita;
+          else if (proprio && nt.tp === '0' && String(nt.dC || '').length === 11) { /* compra de pessoa física: sem crédito de PIS/COFINS (Leis 10.637/2002 e 10.833/2003, art. 3º, § 3º, I) */ }
           else { var bc = Math.max(0, receita + it.vIPI - it.v); T.pisC += bc * PIS; T.cofC += bc * COF; }
         } else if (dir === 'E' && nat === 'insumo') {
           // insumo da prestação de serviço: crédito de PIS/COFINS (art. 3º, II), sem crédito de ICMS

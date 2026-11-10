@@ -293,3 +293,9 @@ O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest
 - Saíram em 01/10/2026 (Portaria SRE 34/2026): refrigeradores, freezers, adegas e lava-louças.
 - Saem em 01/02/2027 (Portaria SRE 52/2026): fogões, micro-ondas, partes de lavadoras, barbeadores, purificadores de água e secadores de cabelo.
 - Informática da Resolução SF 31/2008: 12% (RICMS/SP, art. 54, V), marcado como "conferir". O complemento de 1,3% (§ 7º) foi revogado em 15/01/2023.
+
+## Compra de pessoa física (NF de entrada própria)
+
+- Nota de entrada emitida pela empresa (tpNF 0) para pessoa física sem inscrição (CPF ou indicador de IE 9), fora das devoluções de venda: ICMS destacado gera erro `ENT_PF_CRED`, e o "após correções" estorna o crédito. A nota documenta a entrada (RICMS/SP, art. 136, I, "a", e art. 138; RC 5.239/2015) sem destaque, e só há crédito do imposto anteriormente cobrado (arts. 59 e 61).
+- Essas compras também não geram crédito de PIS/COFINS (Leis 10.637/2002 e 10.833/2003, art. 3º, § 3º, I).
+- Devolução feita por consumidor pessoa física (CFOP 1.202/1.411) não entra nessa regra.
