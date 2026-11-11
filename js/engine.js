@@ -454,7 +454,7 @@ var Fiscal = (function () {
       var nPR = '(RICMS/PR, Anexo IX, ' + (/^401[123]/.test(it.ncm) ? 'Seção XXI, art. 116' : 'Seção V, art. 28') + ')';
       if (dir === 'E' && seg && nat === 'compra') {
         var c = stPR(nt, it, interna);
-        var reg = { ch: nt.ch, n: nt.n, dt: nt.dt, forn: nt.eN, fc: nt.eC, uf: nt.eUF, x: it.x, ncm: it.ncm, cest: it.cest, cst: it.cst, base: c.base, icms: c.propria, inter: c.inter, mva: c.mva, mvaAj: c.mvaAj, bcST: c.bcST, stDev: c.st, stRet: it.vst || 0, dif: 0 };
+        var reg = { ch: nt.ch, n: nt.n, dt: nt.dt, ie: nt.dIEn || '', forn: nt.eN, fc: nt.eC, uf: nt.eUF, x: it.x, ncm: it.ncm, cest: it.cest, cst: it.cst, base: c.base, icms: c.propria, inter: c.inter, mva: c.mva, mvaAj: c.mvaAj, bcST: c.bcST, stDev: c.st, stRet: it.vst || 0, dif: 0 };
         if ((it.vst || 0) > 0.009) {
           reg.dif = Math.max(0, c.st - it.vst);
           if (reg.dif > Math.max(1, c.st * 0.03)) issue('alerta', it, 'PR_ST_MENOR', 'ICMS-ST retido de ' + money(it.vst) + ', abaixo do calculado pela MVA ' + (interna ? 'original' : 'ajustada') + ' de ' + String(c.mvaAj).replace('.', ',') + '% (' + c.mvaD + '): ST devida de ' + money(c.st) + ' ' + nPR + '. A diferença de ' + money(reg.dif) + ' é do fornecedor substituto; confira a base de cálculo da nota (preço sugerido ou MVA).', reg.dif);

@@ -326,3 +326,4 @@ No cadastro (aba do escritório, bloco do ramo) escolha **Estado da empresa = Pa
 
   Elas devem ser conferidas quando sair uma nova resolução da SEFA.
 - As conferências específicas de São Paulo ficam desligadas: crédito de pessoa física, remessas, devoluções, cadastro do varejo e DIFAL de compras.
+- **Preparar guia**: em cada mês e em cada nota da aba ST Paraná, mostra os dados da GR-PR prontos para copiar (código de receita 122-8, marcado como "a confirmar"; CNPJ; IE; referência; valor; vencimento; informações complementares com a chave da NF-e) e o link para a emissão no site da Receita Estadual do PR. A guia em si é emitida no site oficial.

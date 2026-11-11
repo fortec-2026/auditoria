@@ -1066,18 +1066,52 @@ function tabSTPR(ds) {
   h += '<div class="difal-kpis"><div class="kpi"><span class="small">Antecipação a recolher (compras sem ST)</span><b class="num">' + m0(antec) + '</b><span class="small">' + semRet.length + (semRet.length === 1 ? ' item' : ' itens') + ' comprados sem retenção</span></div>' +
     '<div class="kpi"><span class="small">ST retida pelos fornecedores</span><b class="num">' + m0(ret) + '</b><span class="small">' + comRet.length + (comRet.length === 1 ? ' item' : ' itens') + (menor > 0.5 ? ' · retida a menor: ' + m0(menor) : '') + '</span></div></div>';
   var meses = {}; semRet.forEach(function (x) { var m = x.dt.slice(0, 7); var o = meses[m] = meses[m] || { v: 0, st: 0, n: {} }; o.v += x.base; o.st += x.dif; o.n[x.ch] = 1; });
-  if (Object.keys(meses).length) h += '<div class="tscroll"><table><thead><tr><th>Mês da entrada</th><th class="r">Notas sem ST</th><th class="r">Valor dos itens</th><th class="r">Antecipação</th></tr></thead><tbody>' +
-    Object.keys(meses).sort().map(function (m) { var o = meses[m]; return '<tr><td style="text-transform:capitalize">' + esc(mesNome(m)) + '</td><td class="r num">' + Object.keys(o.n).length + '</td><td class="r num">' + m0(o.v) + '</td><td class="r num"><b>' + m0(o.st) + '</b></td></tr>'; }).join('') + '</tbody></table></div>' +
+  if (Object.keys(meses).length) h += '<div class="tscroll"><table><thead><tr><th>Mês da entrada</th><th class="r">Notas sem ST</th><th class="r">Valor dos itens</th><th class="r">Antecipação</th><th></th></tr></thead><tbody>' +
+    Object.keys(meses).sort().map(function (m) { var o = meses[m]; return '<tr><td style="text-transform:capitalize">' + esc(mesNome(m)) + '</td><td class="r num">' + Object.keys(o.n).length + '</td><td class="r num">' + m0(o.v) + '</td><td class="r num"><b>' + m0(o.st) + '</b></td><td class="r"><button type="button" class="btn sm" data-act="guiaPR" data-k="m:' + m + '">Preparar guia</button></td></tr>'; }).join('') + '</tbody></table></div><div id="guiaPR"></div>' +
     '<p class="note">A antecipação vence na entrada da mercadoria no Paraná (art. 74, VII, "a"), salvo prazo diferente concedido em regime especial (Anexo IX, art. 11, § 6º). A nota de compra entra sem crédito do ICMS próprio, que já foi abatido no cálculo, e a venda sai com CST 60, sem destaque.</p>';
   h += '<div class="tscroll"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Produto</th><th class="r">Valor</th><th class="r">ICMS da nota</th><th class="r">MVA</th><th class="r">Base da ST</th><th class="r">ST devida</th><th class="r">ST retida</th><th class="r">A recolher</th></tr></thead><tbody>' +
     L.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; }).map(function (x) {
       return '<tr><td><button type="button" class="link" data-ver="' + esc(x.ch) + '">Nº ' + esc(x.n) + '</button><div class="small">' + brFull(x.dt) + '</div></td><td>' + esc(x.forn) + '<div class="small">' + esc(x.uf || '') + '</div></td><td>' + esc(x.x) + '<div class="small mono">NCM ' + esc(x.ncm) + (x.cest ? ' · CEST ' + esc(x.cest) : '') + '</div></td>' +
         '<td class="r num">' + m0(x.base) + '</td><td class="r num">' + m0(x.icms) + '<div class="small">' + x.inter + '%</div></td><td class="r num">' + String(x.mvaAj).replace('.', ',') + '%' + (x.mvaAj !== x.mva ? '<div class="small">original ' + String(x.mva).replace('.', ',') + '%</div>' : '') + '</td>' +
-        '<td class="r num">' + m0(x.bcST) + '</td><td class="r num">' + m0(x.stDev) + '</td><td class="r num">' + (x.stRet > 0.009 ? m0(x.stRet) : '—') + '</td><td class="r num"><b>' + (x.dif > 0.009 ? m0(x.dif) : '—') + '</b></td></tr>';
+        '<td class="r num">' + m0(x.bcST) + '</td><td class="r num">' + m0(x.stDev) + '</td><td class="r num">' + (x.stRet > 0.009 ? m0(x.stRet) : '—') + '</td><td class="r num"><b>' + (x.dif > 0.009 ? m0(x.dif) : '—') + '</b>' + (x.dif > 0.009 && !(x.stRet > 0.009) ? '<div><button type="button" class="link" data-act="guiaPR" data-k="n:' + esc(x.ch) + '">Preparar guia</button></div>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   h += '<p class="note">A ST só vale para peças de uso automotivo (NCM e descrição do Anexo IX); confira os itens de NCM genérico. A MVA de autopeças é 71,78%; a de 36,56% vale só para compras de montadora com contrato de fidelidade ou de fabricante de máquinas agrícolas e rodoviárias com distribuição exclusiva. Base: valor do item com IPI, frete e despesas; ST = base × ' + '19,5% − ICMS da nota.</p>';
   return h;
 }
+/* ---------- Guia GR-PR (antecipação da ST no Paraná) ---------- */
+var GRPR_URL = 'https://www.fazenda.pr.gov.br/servicos/Cidadao/Guias-para-pagamento/Emitir-GR-PR-QJoRBYow';
+var GRPR_COD = '122-8';
+function guiaPR(k) {
+  var L = (S.res.stPR || []).filter(function (x) { return !(x.stRet > 0.009) && x.dif > 0.009; });
+  var mes = k.slice(0, 2) === 'm:', alvo = k.slice(2);
+  var its = L.filter(function (x) { return mes ? x.dt.slice(0, 7) === alvo : x.ch === alvo; });
+  if (!its.length) return '';
+  var notas = {}; its.forEach(function (x) { var o = notas[x.ch] = notas[x.ch] || { n: x.n, dt: x.dt, forn: x.forn, uf: x.uf, v: 0, ie: x.ie }; o.v += x.dif; });
+  var chs = Object.keys(notas).sort(function (a, b) { return notas[a].dt < notas[b].dt ? -1 : 1; });
+  var tot = its.reduce(function (a, x) { return a + x.dif; }, 0), ie = (its.filter(function (x) { return x.ie; })[0] || {}).ie || '';
+  var dt0 = notas[chs[0]].dt, ref = dt0.slice(5, 7) + '/' + dt0.slice(0, 4);
+  function lin(rot, val, obs) {
+    return '<tr><td>' + rot + (obs ? '<div class="small">' + obs + '</div>' : '') + '</td><td class="mono"><b>' + esc(val || '—') + '</b></td><td class="r">' + (val ? '<button type="button" class="btn sm" data-act="copiarTxt" data-t="' + esc(val) + '">Copiar</button>' : '') + '</td></tr>';
+  }
+  function valor(v) { return v.toFixed(2).replace('.', ','); }
+  var info = chs.length === 1 ? 'ICMS-ST antecipação na entrada - RICMS/PR Anexo IX art. 11 - NF-e ' + notas[chs[0]].n + ' chave ' + chs[0] : 'ICMS-ST antecipação na entrada - RICMS/PR Anexo IX art. 11 - NF-e ' + chs.map(function (c) { return notas[c].n; }).join(', ');
+  var h = '<div class="card" style="margin:14px 0;padding:14px 16px;border:2px solid var(--accent, #2563eb);border-radius:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">Dados para a GR-PR ' + (mes ? 'de ' + esc(mesNome(alvo)) : 'da nota nº ' + esc(notas[chs[0]].n)) + '</h3><button type="button" class="link" data-act="fecharGuiaPR">Fechar</button></div>' +
+    '<p class="note" style="background:#fff7e0;border-left:4px solid #d4a000;padding:8px 10px"><b>Código de receita a confirmar.</b> O ' + GRPR_COD + ' (Recolhimento antecipado, Entradas de outros estados) é o indicado nas instruções de preenchimento da GR-PR da Receita Estadual, mas confirme com a Receita Estadual antes de pagar.</p>' +
+    '<div class="tscroll"><table><tbody>' +
+    lin('Código de receita', GRPR_COD, 'a confirmar') +
+    lin('CNPJ', fmtCnpj(S.emp.meta.cnpj)) +
+    lin('Inscrição estadual', ie, ie ? '' : 'não veio na nota de compra; use a IE da empresa') +
+    lin('Referência (mês/ano)', ref) +
+    lin('Valor', valor(tot)) +
+    lin('Vencimento', chs.length === 1 ? brFull(notas[chs[0]].dt) : '', 'na entrada da mercadoria no Paraná (art. 74, VII, "a"); a data acima é a emissão da nota, ajuste para a data da entrada') +
+    lin('Informações complementares', info) +
+    '</tbody></table></div>';
+  if (chs.length > 1) h += '<p class="note"><b>Sem regime especial, a ST vence a cada entrada:</b> o normal é uma guia por nota. Uma guia única do mês só vale se a empresa tiver prazo concedido em regime especial (Anexo IX, art. 11, § 6º). Notas do mês:</p><div class="tscroll"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th class="r">A recolher</th><th></th></tr></thead><tbody>' +
+    chs.map(function (c) { var o = notas[c]; return '<tr><td>Nº ' + esc(o.n) + '<div class="small">' + brFull(o.dt) + '</div></td><td>' + esc(o.forn) + ' · ' + esc(o.uf || '') + '</td><td class="r num">' + m0(o.v) + '</td><td class="r"><button type="button" class="link" data-act="guiaPR" data-k="n:' + esc(c) + '">Guia desta nota</button></td></tr>'; }).join('') + '</tbody></table></div>';
+  h += '<p style="margin-top:12px"><a class="btn" href="' + GRPR_URL + '" target="_blank" rel="noopener">Abrir a emissão da GR-PR (Receita Estadual do PR)</a></p><p class="small">A guia é emitida no site da Receita Estadual do Paraná; aqui só preparamos os dados. Confira os valores antes de pagar.</p></div>';
+  return h;
+}
+
 /* ---------- DIFAL ---------- */
 var DIFAL_TIPOS = [['nao_contribuinte', 'Consumidor final não contribuinte'], ['uso_consumo', 'Contribuinte: uso, consumo ou ativo'], ['revenda', 'Contribuinte: revenda ou industrialização']];
 var ST_CSTS = ['10', '30', '60', '70', '201', '202', '203', '500'];
@@ -1735,6 +1769,9 @@ document.addEventListener('click', function (ev) {
   if (a === 'exemplo') carregarExemplo('pneus');
   else if (a === 'teste') abrirTeste();
   else if (a === 'verDemo') { S.demo = true; S.teste = false; S.demoTipo = S.demoTipo || 'pneus'; try { history.replaceState(null, '', location.pathname + location.search + hashDemo(S.demoTipo)); } catch (e) {} S.view = 'carregando'; render(); carregarExemplo(); }
+  if (a === 'guiaPR') { var g = document.getElementById('guiaPR'); if (g) { g.innerHTML = guiaPR(b.dataset.k); g.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
+  if (a === 'fecharGuiaPR') { var g2 = document.getElementById('guiaPR'); if (g2) g2.innerHTML = ''; return; }
+  if (a === 'copiarTxt') { var t = b.dataset.t; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Copiado: ' + t.slice(0, 60)); }).catch(function () { window.prompt('Copie:', t); }); return; }
   if (a === 'copiarDemo') { var url = linkDemo(b.dataset.k); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copiado: ' + url); }).catch(function () { window.prompt('Copie o link de demonstração:', url); }); return; }
   else if (a === 'sair') { B.sair().then(function () { S.usuario = null; S.emp = null; S.empresas = []; S.view = 'login'; S.telaLogin = 'entrar'; render(); }); }
   else if (a === 'inicio' || a === 'voltar') { if (S.usuario || S.demo) voltarEmpresas(); else { S.emp = null; S.exemplo = false; S.view = 'login'; render(); } }

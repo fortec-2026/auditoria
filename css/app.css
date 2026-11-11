@@ -396,3 +396,4 @@ tbody tr.grp-prod:hover td{background:var(--surface-2)}
 .sim-res>.small{flex:1;min-width:240px}
 .aliq-uf input{width:80px}
 @media (max-width:640px){.difal-sel{max-width:100%}}
+.btn.sm{padding:4px 10px;font-size:.85em;border-radius:8px}
