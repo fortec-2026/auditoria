@@ -242,12 +242,12 @@ function nav(extra) {
   var tema = '<button class="btn ghost tema" type="button" data-act="tema" aria-label="' + (escuro ? 'Usar tema claro' : 'Usar tema escuro') + '" title="' + (escuro ? 'Tema claro' : 'Tema escuro') + '">' + (escuro ? I.sol : I.lua) + '</button>';
   var ajuda = S.view === 'painel' ? '<button class="btn ghost tema" type="button" data-act="tour" aria-label="Como usar o portal" title="Como usar o portal">' + I.ajuda + '</button>' : '';
   var quem = ajuda + tema + (S.usuario ? '<span class="small">' + esc(S.usuario.email) + '</span><button class="btn ghost" type="button" data-act="sair">Sair</button>' : '');
-  return '<nav class="nav"><button type="button" class="brand" data-act="inicio" aria-label="RG Fiscal, início">' + LOGO + '<span class="brand-t"><b>RG Fiscal</b><span>Reis &amp; Godói Consultoria Tributária</span></span></button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
+  return '<nav class="nav"><button type="button" class="brand" data-act="inicio" aria-label="RG Fiscal, início">' + LOGO + '<span class="brand-t"><b>RG Fiscal</b><span>Conferência de documentos fiscais</span></span></button><div class="nav-r">' + (extra || '') + quem + '</div></nav>';
 }
 
 function vLogin() {
   var criar = S.telaLogin === 'criar', esq = S.telaLogin === 'esqueci';
-  var h = faixa(nav() + '<div class="faixa-login"><h1>Portal do cliente</h1><p>Suas notas fiscais conferidas, a apuração de ICMS, PIS e COFINS e o que precisa ser corrigido, num lugar só.</p></div>', 'alta');
+  var h = faixa(nav() + '<div class="faixa-login"><h1>Portal do cliente</h1><p>Suas notas fiscais conferidas, o resumo de ICMS, PIS e COFINS e o que precisa ser corrigido, num lugar só.</p></div>', 'alta');
   h += '<div class="card gate"><h2>' + (criar ? 'Criar conta' : esq ? 'Esqueci a senha' : 'Entrar') + '</h2>';
   h += '<p class="note">' + (criar ? 'Cadastre seu e-mail e uma senha. O escritório libera o acesso à sua empresa depois.' : esq ? 'Enviaremos um link para você definir uma nova senha.' : 'Use o e-mail e a senha que a RG Fiscal enviou para você.') + '</p>';
   h += '<form id="fLogin" class="row" style="flex-direction:column;align-items:stretch"><div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required value="' + esc(S.emailDigitado || '') + '"></div>';
@@ -265,7 +265,7 @@ function vRecuperar() {
     (S.erro ? '<div class="banner">' + esc(S.erro) + '</div>' : '') + '<button class="btn primary" type="submit">Salvar nova senha</button></form></div>';
 }
 function vListaCliente() {
-  var h = faixa(nav() + '<header class="top"><div><h1>Suas empresas</h1><div class="sub">Escolha a empresa para ver a apuração e as notas.</div></div></header>');
+  var h = faixa(nav() + '<header class="top"><div><h1>Suas empresas</h1><div class="sub">Escolha a empresa para ver o resumo e as notas.</div></div></header>');
   if (!S.empresas.length) return h + '<div class="card"><div class="empty"><h2>Acesso ainda não liberado</h2><p class="note">Sua conta foi criada, mas o escritório ainda não vinculou nenhuma empresa a ela. Avise o escritório com o e-mail ' + esc(S.usuario.email) + '.</p></div></div>';
   return h + '<div class="empresas">' + S.empresas.map(function (e) { return '<button type="button" class="card emp" data-abrir="' + esc(e.cnpj) + '"><span class="eyebrow">' + esc(fmtCnpj(e.cnpj)) + '</span><h3>' + esc(e.razao_social || 'Empresa') + '</h3><span class="small">' + (e.publicado_em ? 'Atualizado em ' + new Date(e.publicado_em).toLocaleDateString('pt-BR') : 'Aguardando a primeira publicação') + '</span></button>'; }).join('') + '</div>';
 }
@@ -327,7 +327,7 @@ function renderOffice() {
     '<div class="field"><label for="ufm">Estado da empresa</label><select id="ufm">' + [['SP', 'São Paulo'], ['PR', 'Paraná']].map(function (x) { return '<option value="' + x[0] + '"' + ((m.uf || 'SP') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="regm">Regime tributário</label><select id="regm">' + REGIMES.map(function (x) { return '<option value="' + x[0] + '"' + ((m.regime || 'real') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     '<button class="btn" type="button" data-act="salvarSeg">Salvar e recalcular</button></div>';
-  h += '<p class="note">' + (auto ? 'Pneus e autopeças: PIS/COFINS pela lista de monofásicos abaixo (Lei 10.485/2002) e auditoria da saída da ST em 01/10/2026.' : 'PIS/COFINS pelas regras da aba Classificação fiscal (monofásicos, alíquota zero da cesta básica e ST), mais a lista abaixo. Produtos comprados entram como revenda. As notas de venda são conferidas com o ICMS esperado de cada produto em SP, e as diferenças viram pendências.') +
+  h += '<p class="note">' + (auto ? 'Pneus e autopeças: PIS/COFINS pela lista de monofásicos abaixo (Lei 10.485/2002) e conferência da saída da ST em 01/10/2026.' : 'PIS/COFINS pelas regras da aba Classificação fiscal (monofásicos, alíquota zero da cesta básica e ST), mais a lista abaixo. Produtos comprados entram como revenda. As notas de venda são conferidas com o ICMS esperado de cada produto em SP, e as diferenças viram pendências.') +
     ((m.regime || 'real') === 'presumido' ? ' Lucro Presumido: PIS 0,65% e COFINS 3% cumulativos, sem créditos.' : (m.regime || 'real') === 'simples' ? ' Simples Nacional: o painel mostra a receita separada para o PGDAS-D (monofásica, ST e tributada), sem débito e crédito.' : ' Lucro Real: PIS 1,65% e COFINS 7,6% não cumulativos, com créditos.') + '</p>';
   h += '<details><summary>' + (auto ? 'Listas de NCM: monofásicos e saída da ST' : 'Monofásicos adicionais da empresa') + '</summary><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">' +
     '<div class="field"><label for="mono">' + (auto ? 'Monofásicos de PIS/COFINS (Lei 10.485/2002) — só afeta PIS/COFINS' : 'Monofásicos além das regras gerais (ex.: autopeças da Lei 10.485/2002)') + '</label><textarea id="mono" spellcheck="false">' + esc(mono) + '</textarea></div>' +
@@ -426,7 +426,7 @@ function renderMain() {
   renderHeaderSub();
   var el = $('main'); if (!el) return;
   if (!S.res) {
-    el.innerHTML = '<div class="card"><div class="empty"><h2>Sem notas ainda</h2><p class="note">Importe os XMLs na área do escritório para ver a apuração e as pendências.</p>' + (S.readonly ? '' : '<button class="btn primary" type="button" data-modo="escritorio">Importar XMLs</button>') + '</div></div>';
+    el.innerHTML = '<div class="card"><div class="empty"><h2>Sem notas ainda</h2><p class="note">Importe os XMLs na área do escritório para ver o resumo e as pendências.</p>' + (S.readonly ? '' : '<button class="btn primary" type="button" data-modo="escritorio">Importar XMLs</button>') + '</div></div>';
     return;
   }
   var ds = diasSel(), T = F.somaDias(S.res.dias, ds);
@@ -493,7 +493,7 @@ function renderMain() {
   }
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
-  var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
+  var tabs = [['apuracao', 'Resumo', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
     ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['difal', 'DIFAL', ''], ['stpr', 'ST Paraná', ''], ['reforma', 'IBS/CBS 2026', '']];
   if (ufEmp() !== 'PR') tabs = tabs.filter(function (t) { return t[0] !== 'stpr'; });
   else tabs = tabs.map(function (t) { return t[0] === 'stpr' ? ['stpr', 'ST Paraná', (function () { var q = (S.res.stPR || []).filter(function (x) { return ds.indexOf(x.dt) >= 0 && !(x.stRet > 0.009) && x.dif > 0.009; }).length; return q ? '<span class="count err">' + q + '</span>' : ''; })()] : t; });
@@ -617,7 +617,7 @@ function tabApuracao(ds, T) {
     h += '<tr><td style="white-space:nowrap;text-transform:' + (S.det === 'mes' ? 'capitalize' : 'none') + '">' + esc(r.lbl) + '<div class="small">' + (t.nS + t.nSP) + ((t.nS + t.nSP) === 1 ? ' saída · ' : ' saídas · ') + (t.nE + t.nST + t.nCT) + ((t.nE + t.nST + t.nCT) === 1 ? ' entrada' : ' entradas') + '</div></td><td class="r num">' + m0(t.vendas) + '</td><td class="r num">' + m0(t.compras + t.compOut + t.compIns) + (t.compIns ? '<div class="small">insumo ' + m0(t.compIns) + '</div>' : '') + (t.compOut ? '<div class="small">uso/ativo ' + m0(t.compOut) + '</div>' : '') + '</td><td class="r num">' + m0(t.icmsD) + '</td><td class="r num">' + m0(t.icmsC) + '</td>' + saldoCell(t.icmsD - t.icmsC) + '<td class="r num">' + m0(t.pisD) + '</td><td class="r num">' + m0(t.pisC) + '</td>' + saldoCell(t.pisD - t.pisC) + '<td class="r num">' + m0(t.cofD) + '</td><td class="r num">' + m0(t.cofC) + '</td>' + saldoCell(t.cofD - t.cofC) + '</tr>';
   });
   h += '</tbody><tfoot><tr><td>Total</td><td class="r num">' + m0(T.vendas) + '</td><td class="r num">' + m0(T.compras + T.compOut + T.compIns) + '</td><td class="r num">' + m0(T.icmsD) + '</td><td class="r num">' + m0(T.icmsC) + '</td>' + saldoCell(T.icmsD - T.icmsC) + '<td class="r num">' + m0(T.pisD) + '</td><td class="r num">' + m0(T.pisC) + '</td>' + saldoCell(T.pisD - T.pisC) + '<td class="r num">' + m0(T.cofD) + '</td><td class="r num">' + m0(T.cofC) + '</td>' + saldoCell(T.cofD - T.cofC) + '</tr></tfoot></table></div>';
-  h += '<p class="note">' + (regimeEmp() === 'simples' ? 'Simples Nacional: PIS e COFINS vão no DAS; os valores de ICMS são os destacados nas notas. ' : S.apVisao === 'corr' ? 'Após as correções: a apuração como fica depois de corrigir as pendências (' + (S.cmpAlertas ? 'erros e alertas' : 'só os erros') + '; mude no topo do painel). ' : 'Como emitidas: ICMS destacado nas notas e PIS/COFINS como as notas foram emitidas, inclusive os erros. ') + 'Produtos monofásicos não geram débito nem crédito. Entradas com ST antes de 01/10/2026 não geram crédito nota a nota: o imposto foi encerrado na retenção. O ICMS-ST das mercadorias em estoque em 30/09/2026 pode ser creditado pelo levantamento do estoque (Portaria SRE 34/2026, art. 2º, e Portaria CAT 28/2020); esse crédito não aparece aqui e deve ser lançado à parte. Compras de fornecedor do Simples entram com o crédito informado no campo próprio da nota (vCredICMSSN, LC 123/2006, art. 23). Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
+  h += '<p class="note">' + (regimeEmp() === 'simples' ? 'Simples Nacional: PIS e COFINS vão no DAS; os valores de ICMS são os destacados nas notas. ' : S.apVisao === 'corr' ? 'Após as correções: os valores como ficam depois de corrigir as pendências (' + (S.cmpAlertas ? 'erros e alertas' : 'só os erros') + '; mude no topo do painel). ' : 'Como emitidas: ICMS destacado nas notas e PIS/COFINS como as notas foram emitidas, inclusive os erros. ') + 'Produtos monofásicos não geram débito nem crédito. Entradas com ST antes de 01/10/2026 não geram crédito nota a nota: o imposto foi encerrado na retenção. O ICMS-ST das mercadorias em estoque em 30/09/2026 pode ser creditado pelo levantamento do estoque (Portaria SRE 34/2026, art. 2º, e Portaria CAT 28/2020); esse crédito não aparece aqui e deve ser lançado à parte. Compras de fornecedor do Simples entram com o crédito informado no campo próprio da nota (vCredICMSSN, LC 123/2006, art. 23). Uso e consumo, insumo de serviço e ativo ficam fora do crédito de ICMS (ativo segue o CIAP, 1/48 por mês); insumo de serviço gera crédito de PIS/COFINS.</p>';
   return h;
 }
 
@@ -756,12 +756,12 @@ function cardAchado(ds, T, erros, alertas) {
   var h = '<div class="card achado"><div class="ach-main"><span class="eyebrow">' + (S.teste ? 'O que encontramos nas suas notas' : 'O que o portal encontrou nesta empresa') + '</span>' +
     '<div class="ach-big num">' + m0(total) + '</div><p>em tributos a corrigir' + (nN ? ' em ' + nN + (nN === 1 ? ' nota' : ' notas') : '') + ', no período escolhido.</p></div>' +
     '<div class="ach-cols">' +
-    '<div class="ach-c favor"><span class="small">' + (fechado ? 'Possível recuperação' : 'A favor da empresa') + '</span><b class="num">' + m0(favor) + '</b><span class="small">' + (fechado ? 'imposto pago a mais ou crédito não aproveitado em período já fechado' : 'imposto pago a mais ou crédito não aproveitado') + '</span></div>' +
+    '<div class="ach-c favor"><span class="small">' + (fechado ? 'Pago a mais' : 'A favor da empresa') + '</span><b class="num">' + m0(favor) + '</b><span class="small">' + (fechado ? 'imposto pago a mais ou crédito não aproveitado em período já fechado' : 'imposto pago a mais ou crédito não aproveitado') + '</span></div>' +
     '<div class="ach-c contra"><span class="small">A recolher a mais</span><b class="num">' + m0(contra) + '</b><span class="small">risco de autuação se não for corrigido</span></div>' +
     '<div class="ach-c"><span class="small">Pendências</span><b class="num">' + erros.length + (erros.length === 1 ? ' erro' : ' erros') + ' · ' + alertas.length + (alertas.length === 1 ? ' alerta' : ' alertas') + '</b><button type="button" class="link" data-tab="pendencias">Ver o que corrigir</button></div></div>';
   if (simples && (T.rMono || T.rSTicms)) h += '<p class="small ach-nota">No Simples Nacional, ' + m0(T.rMono + T.rSTpc) + ' de receita monofásica e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária não pagam esses tributos no DAS quando segregados no PGDAS-D. Se não foram segregados, parte do DAS pago pode ser recuperada.</p>';
   if (fechado && favor > 0) h += '<p class="small ach-nota">Como o período já foi apurado, valores pagos a mais podem ser recuperados por compensação ou restituição (em geral, dos últimos 5 anos). É uma estimativa: a RG Fiscal confirma caso a caso.</p>';
-  h += '<div class="ach-cta">' + (S.teste ? '<span>Quer o relatório completo e ajuda para corrigir e recuperar?</span><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div>'
+  h += '<div class="ach-cta">' + (S.teste ? '<span>Quer o relatório completo com todos os apontamentos?</span><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div>'
     : '<span>Quer ver isso com as notas da sua empresa? É grátis e nada sai do seu computador.</span><button class="btn primary" type="button" data-act="teste">' + I.up + 'Testar com as minhas notas</button>') + '</div></div>';
   return h;
 }
@@ -853,7 +853,7 @@ function tabComparativo(ds, T) {
   if (c.foraConta) obs.push(c.foraConta + (c.foraConta === 1 ? ' pendência ficou' : ' pendências ficaram') + ' como está' + (S.cmpAlertas ? ' (conferidas, sem ação)' : ' (alertas, avisos ou conferidas, sem ação)'));
   if (c.semEfeito) obs.push(c.semEfeito + (c.semEfeito === 1 ? ' pendência não muda' : ' pendências não mudam') + ' o valor dos impostos: CFOP, produto sem classificação, ST retida pelo fornecedor, nota duplicada e semelhantes. Elas aparecem na aba Pendências');
   if (obs.length) h += '<p class="note">' + obs.join('. ') + '.</p>';
-  h += '<p class="note">Crédito de ICMS de nota de fornecedor só pode ser aproveitado depois que o fornecedor corrigir a nota (complementar ou substituta). Na aba Apuração, o ICMS está como as notas foram emitidas e o PIS/COFINS já segue a regra (1,65% e 7,6% sobre a receita sem ICMS, monofásicos sem débito). Aqui, a primeira coluna mostra o PIS/COFINS que resultaria de seguir o destaque das notas com erro.</p>';
+  h += '<p class="note">Crédito de ICMS de nota de fornecedor só pode ser aproveitado depois que o fornecedor corrigir a nota (complementar ou substituta). Na aba Resumo, o ICMS está como as notas foram emitidas e o PIS/COFINS já segue a regra (1,65% e 7,6% sobre a receita sem ICMS, monofásicos sem débito). Aqui, a primeira coluna mostra o PIS/COFINS que resultaria de seguir o destaque das notas com erro.</p>';
   return h;
 }
 
@@ -902,7 +902,7 @@ function tabPendencias(pend) {
   f.slice(0, S.teste ? LIM_TESTE : S.imprimindo ? 1e9 : 500).forEach(function (p) {
     h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
-  if (restoTeste) h += '<tr class="mais-teste"><td colspan="8"><div class="mais-teste-c"><div><b>Mais ' + restoTeste + (restoTeste === 1 ? ' pendência' : ' pendências') + ' encontradas nas suas notas.</b> O relatório completo traz cada uma com a explicação, o valor e como corrigir, além da apuração por mês e do Excel.</div><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div></td></tr>';
+  if (restoTeste) h += '<tr class="mais-teste"><td colspan="8"><div class="mais-teste-c"><div><b>Mais ' + restoTeste + (restoTeste === 1 ? ' pendência' : ' pendências') + ' encontradas nas suas notas.</b> O relatório completo traz cada uma com a explicação, o valor e como corrigir, além do resumo por mês e do Excel.</div><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div></td></tr>';
   h += '</tbody></table></div>';
   if (f.length > 500 && !S.imprimindo && !S.teste) h += '<p class="note">Mostrando 500 de ' + f.length + '. Use a busca ou os filtros.</p>';
   if (!S.teste) h += '<div><button class="btn" type="button" data-act="csv">Baixar pendências (CSV)</button></div>';
@@ -914,7 +914,7 @@ function tabNotas(notas) {
   notas = notas.filter(function (n) { return S.fNota === 'todas' || (S.fNota === 'pend' ? pendN(n) && !resolvida(n.ch) : S.fNota === 'ok' ? (!pendN(n) || resolvida(n.ch)) : !!acompDe(n.ch)); });
   var h = editorAcomp() + '<div class="toolbar"><div class="chips" role="group" aria-label="Filtrar notas">' + [['todas', 'Todas'], ['pend', 'Com pendência em aberto'], ['ok', 'Corretas ou resolvidas'], ['anot', 'Com anotação']].map(function (c) { return '<button type="button" class="chip" data-fnota="' + c[0] + '" aria-pressed="' + (S.fNota === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt[c[0]] + ')</span></button>'; }).join('') + '</div></div>';
   if (!notas.length) return h + '<div class="empty"><p class="note">Nenhuma nota neste filtro' + (S.q ? ' e busca' : '') + '.</p></div>';
-  h += '<div class="tscroll"><table><thead><tr><th>Tipo</th><th>Data</th><th>Nota</th><th>Emitente / destinatário</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">PIS/COFINS</th><th>Auditoria</th><th>Acompanhamento</th></tr></thead><tbody>';
+  h += '<div class="tscroll"><table><thead><tr><th>Tipo</th><th>Data</th><th>Nota</th><th>Emitente / destinatário</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">PIS/COFINS</th><th>Conferência</th><th>Acompanhamento</th></tr></thead><tbody>';
   notas.slice(0, S.imprimindo ? 1e9 : 400).forEach(function (n) {
     var t = n.T, icms = n.dir === 'S' ? t.icmsD : t.icmsC, pc = n.dir === 'S' ? t.pisD + t.cofD : t.pisC + t.cofC;
     h += '<tr><td><span class="pill ' + (n.dir === 'X' ? 'E' : n.dir) + '">' + (n.dir === 'S' ? 'Saída' : n.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><div class="small">' + (n.tipo === 'cte' ? 'CT-e' + (n.extra && !n.extra.tomadora ? ' · ' + esc(n.extra.papel) : '') : n.tipo === 'nfse' ? 'NFS-e · cód. ' + esc(n.extra.cod) : (n.mod === '65' ? 'NFC-e' : 'NF-e') + (n.interna ? ' · interna' : ' · interestadual')) + '</div></td><td class="num">' + brFull(n.dt) + '</td><td class="num"><button type="button" class="link" data-ver="' + esc(n.ch) + '" title="Ver a nota">' + esc(n.n) + '</button><div class="small mono" title="' + esc(n.ch) + '">' + esc(n.ch.slice(0, 4) + '…' + n.ch.slice(-8)) + '</div></td><td>' + esc(n.parte.n || 'Consumidor final') + '<div class="small">' + esc(fmtCnpj(n.parte.c)) + (n.parte.uf ? ' · ' + esc(n.parte.uf) : '') + '</div></td><td class="r num">' + m0(n.vNF) + '</td><td class="r num">' + m0(icms) + '<div class="small">' + (n.dir === 'S' ? 'débito' : n.dir === 'X' ? 'sem crédito' : 'crédito') + '</div></td><td class="r num">' + m0(pc) + '</td><td>' + (n.pior && n.pior !== 'info' ? (resolvida(n.ch) ? '<span class="pill ok">' + n.nIss + (n.nIss === 1 ? ' ponto resolvido' : ' pontos resolvidos') + '</span>' : '<span class="pill ' + n.pior + '">' + n.nIss + ' ' + (n.nIss === 1 ? 'ponto' : 'pontos') + '</span>') : '<span class="pill ok">Correta</span>') + (n.info ? '<div class="small" style="max-width:34ch;margin-top:4px">' + esc(n.info.charAt(0).toUpperCase() + n.info.slice(1)) + '</div>' : '') + '</td><td>' + celAcomp(n.ch, n.pior === 'erro' || n.pior === 'alerta') + '</td></tr>';
@@ -1401,7 +1401,7 @@ function passosTour0() {
     { el: '.tabs [data-tab="pendencias"]', t: 'Cada erro explicado', x: 'Na aba Pendências, cada erro aparece com a nota, o produto, o valor e a base legal, em linguagem simples, para corrigir no sistema emissor ou pedir ao fornecedor.' },
     ufEmp() === 'PR' && !S.teste ? { el: '.tabs [data-tab="stpr"]', t: 'ST do Paraná e a guia', x: 'Compras de São Paulo que vieram com ICMS próprio e sem ST: aqui está a antecipação a recolher na entrada, nota a nota, com a MVA ajustada. Em cada nota, o botão Preparar guia separa os dados da GR-PR para copiar.' } : null,
     { el: '.tabs [data-tab="comparativo"]', t: 'Antes e depois', x: 'Aqui o ICMS, o PIS e a COFINS lado a lado: como as notas foram emitidas e como ficam depois das correções.' },
-    S.teste ? { el: '.ach-cta', t: 'Quer o relatório completo?', x: 'Fale com a RG Fiscal: enviamos o relatório com todas as pendências, a apuração mês a mês e o que dá para recuperar.' }
+    S.teste ? { el: '.ach-cta', t: 'Quer o relatório completo?', x: 'Fale com a RG Fiscal: enviamos o relatório com todas as pendências, o resumo mês a mês e os valores pagos a mais.' }
       : { el: '.ach-cta [data-act="teste"]', t: 'Agora com as suas notas', x: 'Envie os XMLs de um mês já fechado e veja o resultado da sua empresa na hora. É grátis e os arquivos não saem do seu computador.' }
   ];
   return [
@@ -1510,7 +1510,7 @@ async function baixarExcel() {
     abas.push({ nome: 'Resumo', titulo: tit, filtro: false, cols: [{ t: 'Item', w: 38 }, { t: 'Valor', w: 18, f: 'din' }],
       rows: rs.map(function (r) { return [r[0], typeof r[1] === 'number' && r[0].indexOf('Erros') < 0 && r[0].indexOf('Alertas') < 0 ? r[1] : (r[1] === '' ? '' : String(r[1]))]; }) });
 
-    // Apuração por mês, semana e dia
+    // Resumo por mês, semana e dia
     var colsAp = [{ t: 'Período', w: 26 }, { t: 'Saídas', w: 8, f: 'int' }, { t: 'Entradas', w: 9, f: 'int' }, { t: 'Vendas', w: 15, f: 'din' }, { t: 'Compras', w: 15, f: 'din' }, { t: 'ICMS débito', w: 14, f: 'din' }, { t: 'ICMS crédito', w: 14, f: 'din' }, { t: 'ICMS saldo', w: 14, f: 'din' }, { t: 'PIS débito', w: 13, f: 'din' }, { t: 'PIS crédito', w: 13, f: 'din' }, { t: 'PIS saldo', w: 13, f: 'din' }, { t: 'COFINS débito', w: 14, f: 'din' }, { t: 'COFINS crédito', w: 14, f: 'din' }, { t: 'COFINS saldo', w: 14, f: 'din' }];
     var visaoX = S.apVisao === 'corr' ? 'após as correções' : 'como as notas foram emitidas';
     var linhaAp0 = function (lbl, t, dias) { return linhaAp(lbl, regimeEmp() === 'simples' ? t : visaoApur(dias, t)); };
@@ -1521,9 +1521,9 @@ async function baixarExcel() {
     S.per.semanas.slice().reverse().forEach(function (w) { var x = w.dias.filter(function (d) { return ds.indexOf(d) >= 0; }); if (x.length) porSem.push(linhaAp0('Sem. ' + w.num + ' · ' + brFull(w.ini) + ' a ' + brFull(w.fim), F.somaDias(S.res.dias, x), x)); });
     ds.forEach(function (d) { porDia.push(linhaAp0(d, F.somaDias(S.res.dias, [d]), [d])); });
     var titAp = tit + (regimeEmp() === 'simples' ? '' : ' · ' + visaoX);
-    abas.push({ nome: 'Apuração por mês', titulo: titAp, cols: colsAp, rows: porMes, total: tot });
-    abas.push({ nome: 'Apuração por semana', titulo: titAp, cols: colsAp, rows: porSem, total: tot });
-    abas.push({ nome: 'Apuração por dia', titulo: titAp, cols: [{ t: 'Data', w: 12, f: 'data' }].concat(colsAp.slice(1)), rows: porDia, total: tot });
+    abas.push({ nome: 'Resumo por mês', titulo: titAp, cols: colsAp, rows: porMes, total: tot });
+    abas.push({ nome: 'Resumo por semana', titulo: titAp, cols: colsAp, rows: porSem, total: tot });
+    abas.push({ nome: 'Resumo por dia', titulo: titAp, cols: [{ t: 'Data', w: 12, f: 'data' }].concat(colsAp.slice(1)), rows: porDia, total: tot });
 
     // Comparativo
     var cmpL = function (al) {
@@ -1545,7 +1545,7 @@ async function baixarExcel() {
     // Notas
     var notas = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0; }).slice().sort(function (a, b) { return a.dt < b.dt ? -1 : a.dt > b.dt ? 1 : 0; });
     var tipoDoc = function (n) { return n.tipo === 'cte' ? 'CT-e' : n.tipo === 'nfse' ? 'NFS-e' : n.mod === '65' ? 'NFC-e' : 'NF-e'; };
-    abas.push({ nome: 'Notas', titulo: tit, cols: [{ t: 'Data', w: 11, f: 'data' }, { t: 'Tipo', w: 11 }, { t: 'Documento', w: 8 }, { t: 'Número', w: 11 }, { t: 'Chave de acesso', w: 47 }, { t: 'Emitente / destinatário', w: 36 }, { t: 'CNPJ/CPF', w: 19 }, { t: 'UF', w: 5 }, { t: 'Operação', w: 13 }, { t: 'Valor', w: 14, f: 'din' }, { t: 'ICMS (débito ou crédito)', w: 14, f: 'din' }, { t: 'PIS', w: 12, f: 'din' }, { t: 'COFINS', w: 12, f: 'din' }, { t: 'Auditoria', w: 16 }, { t: 'Tratamento', w: 50 }, { t: 'Situação', w: 18 }, { t: 'Anotação', w: 40 }],
+    abas.push({ nome: 'Notas', titulo: tit, cols: [{ t: 'Data', w: 11, f: 'data' }, { t: 'Tipo', w: 11 }, { t: 'Documento', w: 8 }, { t: 'Número', w: 11 }, { t: 'Chave de acesso', w: 47 }, { t: 'Emitente / destinatário', w: 36 }, { t: 'CNPJ/CPF', w: 19 }, { t: 'UF', w: 5 }, { t: 'Operação', w: 13 }, { t: 'Valor', w: 14, f: 'din' }, { t: 'ICMS (débito ou crédito)', w: 14, f: 'din' }, { t: 'PIS', w: 12, f: 'din' }, { t: 'COFINS', w: 12, f: 'din' }, { t: 'Conferência', w: 16 }, { t: 'Tratamento', w: 50 }, { t: 'Situação', w: 18 }, { t: 'Anotação', w: 40 }],
       rows: notas.map(function (n) {
         var t = n.T, S_ = n.dir === 'S', a = acompDe(n.ch);
         var aud = n.pior && n.pior !== 'info' ? (resolvida(n.ch) ? n.nIss + ' resolvido(s)' : n.nIss + (n.pior === 'erro' ? ' com erro' : ' alerta(s)')) : 'Correta';
@@ -1654,7 +1654,7 @@ function vNota() {
   h += '<div class="ver-head"><div><span class="eyebrow">' + tipo + ' · ' + (r.dir === 'S' ? 'Saída' : r.dir === 'X' ? 'Informativo' : 'Entrada') + '</span><h2 style="font-size:26px">Nº ' + esc(n.n) + (n.s ? ' <span class="small">série ' + esc(n.s) + '</span>' : '') + '</h2>' +
     '<div class="small mono" style="overflow-wrap:anywhere">' + esc(n.ch.replace(/(\d{4})(?=\d)/g, '$1 ')) + '</div></div>' +
     '<div class="r"><div class="small">Emissão</div><b>' + brFull(n.dt) + '</b>' + (x && xt(x, 'nProt') ? '<div class="small">Protocolo ' + esc(xt(x, 'nProt')) + '</div>' : '') +
-    '<div style="margin-top:6px">' + (r.pior && r.pior !== 'info' ? '<span class="pill ' + (resolvida(v.ch) ? 'ok' : r.pior) + '">' + pend.filter(function (p) { return p.sev !== 'info'; }).length + (resolvida(v.ch) ? ' resolvido(s)' : ' ponto(s) da auditoria') + '</span>' : '<span class="pill ok">Correta</span>') + '</div></div></div>';
+    '<div style="margin-top:6px">' + (r.pior && r.pior !== 'info' ? '<span class="pill ' + (resolvida(v.ch) ? 'ok' : r.pior) + '">' + pend.filter(function (p) { return p.sev !== 'info'; }).length + (resolvida(v.ch) ? ' resolvido(s)' : ' ponto(s) da conferência') + '</span>' : '<span class="pill ok">Correta</span>') + '</div></div></div>';
   if (r.info) h += '<div class="banner ok"><span class="grow">' + esc(r.info.charAt(0).toUpperCase() + r.info.slice(1)) + '</span></div>';
   var ac = acompDe(v.ch);
   if (ac) h += '<div class="banner info"><span class="grow"><b>' + SIT[ac.s] + '.</b> ' + esc(ac.t || '') + ' <span class="small">(' + new Date(ac.em).toLocaleDateString('pt-BR') + ')</span></span></div>';
@@ -1665,7 +1665,7 @@ function vNota() {
 
   var notaToda = pend.filter(function (p) { return !p.item; });
   if (pend.length && n.tipoDoc) notaToda = pend;
-  if (notaToda.length) h += '<div><h3>Auditoria</h3>' + notaToda.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</div>';
+  if (notaToda.length) h += '<div><h3>Conferência</h3>' + notaToda.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</div>';
   if (v.carregando) h += '<p class="small">Carregando o XML original…</p>';
   else if (v.semXml) h += '<p class="note">O XML original desta nota não está guardado (ela foi importada antes desta versão do portal). Reimporte o arquivo para ver endereços, transporte, cobrança e informações complementares e para baixar o XML.</p>';
   h += '</div>';
