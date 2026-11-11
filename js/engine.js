@@ -355,9 +355,34 @@ var Fiscal = (function () {
   function analisar(notas, cfg) {
     cfg = cfg || {};
     var cnpj = String(cfg.cnpj || '').replace(/\D/g, '');
-    var corte = cfg.corte || '2026-10-01';
-    var aliqInt = cfg.aliqInterna || 18;
+    var ufEmp = cfg.uf || 'SP', isPR = ufEmp === 'PR', sp = ufEmp === 'SP';
+    // No Paraná autopeças e pneus seguem na ST (RICMS/PR, Anexo IX, Seções V e XXI): não há data de saída
+    var corte = isPR ? '9999-12-31' : (cfg.corte || '2026-10-01');
+    var aliqInt = cfg.aliqInterna || (isPR ? 19.5 : 18);
     var segmento = cfg.segmento || 'autopecas', regime = cfg.regime || 'real', varejo = segmento !== 'autopecas';
+    /* ---------- Paraná: ST de autopeças e pneus ----------
+       MVA original: Resolução SEFA 571/2019, art. 5º (autopeças) e art. 21 (pneus, câmaras e protetores).
+       MVA ajustada nas compras interestaduais: RICMS/PR, Anexo IX, art. 1º, § 5º. Antecipação na entrada sem retenção: art. 11 e art. 74, VII, "a". */
+    function mvaPR(ncm) {
+      ncm = String(ncm || '');
+      if (ncm.indexOf('40111000') === 0) return { m: 40.73, d: 'pneus de automóveis (CEST 16.001.00)' };
+      if (ncm.indexOf('401140') === 0) return { m: 65.58, d: 'pneus de motocicletas (CEST 16.003.00)' };
+      if (ncm.indexOf('401150') === 0) return { m: 105, d: 'pneus de bicicletas (CEST 16.005.00)' };
+      if (/^4011(20|30|70|80)/.test(ncm)) return { m: 31.03, d: 'pneus de caminhões, ônibus, aviões, máquinas e tratores (CEST 16.002.00)' };
+      if (ncm.indexOf('4011') === 0) return { m: 55.32, d: 'outros pneus (CEST 16.004.00)' };
+      if (ncm.indexOf('401290') === 0) return { m: 74.58, d: 'protetores de borracha (CEST 16.007.00)' };
+      if (ncm.indexOf('401320') === 0) return { m: 105, d: 'câmaras de ar de bicicletas (CEST 16.009.00)' };
+      if (ncm.indexOf('4013') === 0) return { m: 74.58, d: 'câmaras de ar (CEST 16.008.00)' };
+      return { m: 71.78, d: 'autopeças (Resolução SEFA 571/2019, art. 5º, II; 36,56% só para montadora com fidelidade ou fabricante de máquinas agrícolas e rodoviárias com distribuição exclusiva)' };
+    }
+    function stPR(nt, it, interna) {
+      var mv = mvaPR(it.ncm), base = (it.vp || 0) - (it.vd || 0) + (it.vf || 0) + (it.vIPI || 0);
+      var inter = interna ? aliqInt : (it.p > 0 && it.p <= 12 ? it.p : (IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12));
+      var mvaAj = interna || inter >= aliqInt ? mv.m : ((1 + mv.m / 100) * (1 - inter / 100) / (1 - aliqInt / 100) - 1) * 100;
+      var bcST = base * (1 + mvaAj / 100), propria = it.v > 0 ? it.v : base * inter / 100;
+      var st = Math.max(0, bcST * aliqInt / 100 - propria);
+      return { mva: mv.m, mvaD: mv.d, mvaAj: Math.round(mvaAj * 100) / 100, inter: inter, base: base, bcST: Math.round(bcST * 100) / 100, propria: Math.round(propria * 100) / 100, st: Math.round(st * 100) / 100 };
+    }
     // PIS/COFINS: não cumulativo no Lucro Real, cumulativo no Presumido; no Simples vai no DAS
     var PIS = regime === 'presumido' ? 0.0065 : 0.0165, COF = regime === 'presumido' ? 0.03 : 0.076;
     var monoRegra = makeMono(cfg.mono && cfg.mono.length ? cfg.mono : DEFAULT_MONO);
@@ -424,6 +449,31 @@ var Fiscal = (function () {
         }
       }
       return null;
+    }
+    function auditarPR(nt, it, dir, proprio, nat, interna, receita, tribST, seg, issue) {
+      var nPR = '(RICMS/PR, Anexo IX, ' + (/^401[123]/.test(it.ncm) ? 'Seção XXI, art. 116' : 'Seção V, art. 28') + ')';
+      if (dir === 'E' && seg && nat === 'compra') {
+        var c = stPR(nt, it, interna);
+        var reg = { ch: nt.ch, n: nt.n, dt: nt.dt, forn: nt.eN, fc: nt.eC, uf: nt.eUF, x: it.x, ncm: it.ncm, cest: it.cest, cst: it.cst, base: c.base, icms: c.propria, inter: c.inter, mva: c.mva, mvaAj: c.mvaAj, bcST: c.bcST, stDev: c.st, stRet: it.vst || 0, dif: 0 };
+        if ((it.vst || 0) > 0.009) {
+          reg.dif = Math.max(0, c.st - it.vst);
+          if (reg.dif > Math.max(1, c.st * 0.03)) issue('alerta', it, 'PR_ST_MENOR', 'ICMS-ST retido de ' + money(it.vst) + ', abaixo do calculado pela MVA ' + (interna ? 'original' : 'ajustada') + ' de ' + String(c.mvaAj).replace('.', ',') + '% (' + c.mvaD + '): ST devida de ' + money(c.st) + ' ' + nPR + '. A diferença de ' + money(reg.dif) + ' é do fornecedor substituto; confira a base de cálculo da nota (preço sugerido ou MVA).', reg.dif);
+        } else {
+          reg.dif = c.st;
+          if (c.st > 0.009) issue('erro', it, 'PR_ST_ANTEC', 'Produto com ST no Paraná ' + nPR + ' comprado sem retenção (CST ' + (it.cst || '–') + ', ICMS próprio de ' + money(c.propria) + '). Quem recebe recolhe a ST na entrada da mercadoria no Paraná (Anexo IX, art. 11; art. 74, VII, "a"): base de ' + money(c.bcST) + ' (valor ' + money(c.base) + ' + MVA ' + (interna ? 'original' : 'ajustada') + ' de ' + String(c.mvaAj).replace('.', ',') + '%, ' + c.mvaD + ') × ' + String(aliqInt).replace('.', ',') + '% − ICMS da nota = ' + money(c.st) + ' a recolher. A nota entra sem crédito do ICMS próprio, que é abatido da ST.', c.st, { c: { icmsD: c.st } });
+        }
+        res.stPR.push(reg);
+        return;
+      }
+      if (dir === 'S' && proprio && nat === 'venda') {
+        if (interna && seg && it.v > 0) {
+          issue('erro', it, 'PR_ST_SAIDA', 'Venda dentro do Paraná de produto com ST ' + nPR + ' com ICMS destacado (CST ' + it.cst + ', ' + money(it.v) + '). A ST encerra a tributação: a saída é com CST 60, sem destaque, informando a base e o ICMS retido (Anexo IX, art. 5º, II, "a"). O destaque vira débito a mais na apuração. Se a ST não foi paga na compra, o devido é a antecipação, não esse débito.', it.v, { c: { icmsD: -it.v } });
+        } else if (interna && !seg && tribST && nat === 'venda') {
+          issue('alerta', it, 'PR_ST_INDEV', 'Venda com CST ' + it.cst + ' (ST) de produto que não está na lista de autopeças e pneus da ST do Paraná (NCM ' + it.ncm + (it.cest ? ', CEST ' + it.cest : '') + '). Se não houver outro segmento de ST para ele, a venda deve destacar ICMS de ' + String(aliqInt).replace('.', ',') + '% (RICMS/PR, art. 17, V).', receita * aliqInt / 100, { c: { icmsD: receita * aliqInt / 100 } });
+        } else if (!interna && seg && tribST) {
+          issue('info', it, 'PR_ST_RESS', 'Venda para ' + (nt.dUF || 'outro estado') + ' de produto comprado com ST. O ICMS retido na compra pode ser recuperado na EFD (código PR020211) ou ressarcido junto ao fornecedor substituto, proporcionalmente às quantidades vendidas (RICMS/PR, Anexo IX, art. 6º).', 0);
+        }
+      }
     }
     function auditarDevolucao(nt, it, receita, issue) {
       if (nt.refs && !nt.refs.length && /^[56](202|411)$/.test(it.cf) && !auditarDevolucao['sr' + nt.ch]) {
@@ -559,7 +609,7 @@ var Fiscal = (function () {
       }
     }
 
-    var res = { notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {}, servicos: {}, fretes: [] };
+    var res = { stPR: [], notas: [], pend: [], dias: {}, ignoradas: 0, canceladas: 0, mono: { vendas: 0, compras: 0 }, produtos: {}, servicos: {}, fretes: [] };
     var seen = {};
     var porChave = {}; notas.forEach(function (n) { if (!n.tipoDoc) porChave[n.ch] = n; });
 
@@ -731,11 +781,11 @@ var Fiscal = (function () {
         var receita = it.vp - it.vd + it.vf;
         var calcIcms = r2(it.bc * it.p / 100);
         var tribST = ['10', '30', '60', '70', '201', '202', '203', '500'].indexOf(it.cst) >= 0;
-        var credIcms = dir === 'E' && !(!pos && seg && tribST) && ['uso', 'ativo', 'insumo'].indexOf(nat) < 0;
+        var credIcms = dir === 'E' && !(!pos && seg && tribST) && !(isPR && seg && nat === 'compra') && ['uso', 'ativo', 'insumo'].indexOf(nat) < 0;
         var ajC = function (campo, v) { if (campo === 'icmsC' && !credIcms) return null; var o = {}; o[campo] = v; return { c: o }; };
         /* NF de entrada emitida pela própria empresa na compra de pessoa física (sem inscrição): não há ICMS cobrado anteriormente, logo não há crédito.
            A nota documenta a entrada (RICMS/SP, art. 136, I, "a", e art. 138) sem destaque; crédito só do imposto anteriormente cobrado (arts. 59 e 61). */
-        if (dir === 'E' && proprio && nt.tp === '0' && credIcms && it.v > 0 && nat !== 'devVenda' && !nt.dIEn && (String(nt.dC || '').length === 11 || nt.dIE === '9')) {
+        if (sp && dir === 'E' && proprio && nt.tp === '0' && credIcms && it.v > 0 && nat !== 'devVenda' && !nt.dIEn && (String(nt.dC || '').length === 11 || nt.dIE === '9')) {
           issue('erro', it, 'ENT_PF_CRED', 'Nota de entrada emitida pela empresa na compra de pessoa física (' + (nt.dN || 'sem nome') + '), com ICMS de ' + money(it.v) + ' destacado. A pessoa física não recolheu ICMS, então não há imposto anteriormente cobrado para creditar (RICMS/SP, arts. 59 e 61). A nota de entrada serve para documentar a mercadoria recebida (art. 136, I, "a", e art. 138; RC 5.239/2015, pneus usados) e deve sair sem destaque de ICMS e ser escriturada sem crédito. Se o crédito já foi lançado, estorne. Compra de pessoa física também não gera crédito de PIS/COFINS (Leis 10.637/2002 e 10.833/2003, art. 3º, § 3º, I).', it.v, ajC('icmsC', -it.v));
         }
 
@@ -743,7 +793,7 @@ var Fiscal = (function () {
         if (dir === 'S') {
           T.icmsD += it.v;
         } else {
-          var stAnterior = (!pos && seg && tribST) || (varejo && tribST);
+          var stAnterior = (!pos && seg && tribST) || (varejo && tribST) || (isPR && seg && nat === 'compra');
           if (stAnterior) { /* regime de ST: imposto encerrado, sem crédito */ }
           else if (nat === 'uso') { T.icmsUso += it.v; T.compOut += receita + it.vIPI; }
           else if (nat === 'ativo') { T.ciap += it.v; T.compOut += receita + it.vIPI; }
@@ -780,8 +830,9 @@ var Fiscal = (function () {
           issue('erro', it, 'ICMS_CALC', 'ICMS destacado (' + money(it.v) + ') não confere com base × alíquota (' + money(calcIcms) + ').', Math.abs(calcIcms - it.v), ajC(dir === 'S' ? 'icmsD' : 'icmsC', calcIcms - it.v));
         }
 
-        var regRem = dir === 'S' && proprio && nat !== 'devCompra' && nt.tp === '1' ? regraRemessa(it.cf) : null;
-        if (dir === 'S' && proprio && nat === 'devCompra') auditarDevolucao(nt, it, receita, issue);
+        var regRem = sp && dir === 'S' && proprio && nat !== 'devCompra' && nt.tp === '1' ? regraRemessa(it.cf) : null;
+        if (isPR) auditarPR(nt, it, dir, proprio, nat, interna, receita, tribST, seg, issue);
+        if (sp && dir === 'S' && proprio && nat === 'devCompra') auditarDevolucao(nt, it, receita, issue);
         else if (regRem) auditarRemessa(nt, it, regRem, receita, issue);
         else if (dir === 'S' && proprio) {
           if (pos && seg && interna && !tribST && /^5(401|403|405)$/.test(it.cf) && (it.cst === '00' || it.cst === '20') && it.v > 0) {
@@ -793,7 +844,7 @@ var Fiscal = (function () {
           } else if (pos && seg && interna && ['40', '41', '50', '51', '90'].indexOf(it.cst) >= 0 && nat === 'venda') {
             issue('alerta', it, 'SEM_TRIB', 'Venda sem destaque de ICMS (CST ' + it.cst + '). Conferir fundamento.', receita * aliqInt / 100, ajC('icmsD', receita * aliqInt / 100));
           }
-          if (varejo && classif && interna && nat === 'venda') {
+          if (sp && varejo && classif && interna && nat === 'venda') {
             var cI = cls(it);
             if (cI && !cI.erro && !cI.icms.cond && cI.st.st !== 'cest') {
               var ge = cI.icms.cst === '60' || cI.icms.cst === '500' ? 'st' : (cI.icms.cst === '40' || cI.icms.cst === '103') ? 'isento' : cI.icms.cst === '20' ? 'red' : 'trib';
@@ -868,7 +919,7 @@ var Fiscal = (function () {
           }
           if (!interna && nt.mod === '55' && it.p > 0) {
             var espE = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;
-            if (it.p !== espE) issue('erro', it, 'ALIQ_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' aplicou ' + it.p + '% (esperado ' + espE + '% para SP, origem ' + it.o + ').', Math.abs(it.bc * (it.p - espE) / 100), ajC('icmsC', it.bc * (espE - it.p) / 100));
+            if (it.p !== espE) issue('erro', it, 'ALIQ_INTER_FORN', 'Fornecedor de ' + nt.eUF + ' aplicou ' + it.p + '% (esperado ' + espE + '% para ' + ufEmp + ', origem ' + it.o + ').', Math.abs(it.bc * (it.p - espE) / 100), ajC('icmsC', it.bc * (espE - it.p) / 100));
           }
           if (!interna && pos && seg && it.vst === 0 && (it.cst === '60' || it.cst === '500' || ((it.cst === '00' || it.cst === '20' || CFOP_ST.test(it.cf)) && !(it.v > 0)))) {
             var espI = IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12;

@@ -114,12 +114,12 @@ function montarEmpresa(e, d) {
     difal: (function () { var a = {}; (d.difal || []).forEach(function (x) { a[x.documento] = x.tipo; }); return a; })(),
     difalCli: (function () { var a = {}; (d.difal || []).forEach(function (x) { if (x.pelo_cliente) a[x.documento] = 1; }); return a; })() };
 }
-function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
+function metaDe(e) { return { cnpj: e.cnpj, nome: e.razao_social, corte: e.corte_st, segmento: e.segmento || 'autopecas', regime: e.regime || 'real', uf: e.uf || 'SP', mono: e.ncm_monofasico || [], st: e.ncm_st || [], publicado: e.publicado_em ? new Date(e.publicado_em).getTime() : null }; }
 function pendentesPublicar() { if (!S.emp || S.exemplo) return 0; var n = 0; for (var k in S.emp.pub) if (!S.emp.pub[k]) n++; return n; }
 
 function cfgAtual() {
   var e = S.emp, m = e.meta;
-  return { cnpj: m.cnpj, segmento: m.segmento || 'autopecas', regime: m.regime || 'real', classificar: Regras.classificar, corte: m.corte || '2026-10-01', mono: (m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO, st: (m.st && m.st.length) ? m.st : F.DEFAULT_ST, canceladas: e.canc,
+  return { cnpj: m.cnpj, uf: m.uf || 'SP', segmento: m.segmento || 'autopecas', regime: m.regime || 'real', classificar: Regras.classificar, corte: m.corte || '2026-10-01', mono: (m.mono && m.mono.length) ? m.mono : F.DEFAULT_MONO, st: (m.st && m.st.length) ? m.st : F.DEFAULT_ST, canceladas: e.canc,
     produtos: mapa(e.prodCad), ncmClasse: mapa(e.ncmCad) };
 }
 function mapa(o) { var r = {}; Object.keys(o || {}).forEach(function (k) { if (o[k] && o[k].c) r[k] = o[k].c; }); return r; }
@@ -323,6 +323,7 @@ function renderOffice() {
   h += '<div class="row"><div class="field"><label for="cnpj">CNPJ do cliente</label><input id="cnpj" value="' + esc(fmtCnpj(m.cnpj)) + '" disabled></div><div class="field"><label for="nome">Razão social</label><input id="nome" value="' + esc(m.nome || '') + '"' + (S.exemplo ? ' disabled' : '') + '></div></div>';
   var seg = m.segmento || 'autopecas', auto = seg === 'autopecas';
   h += '<div class="row"><div class="field"><label for="segm">Segmento</label><select id="segm"' + (S.exemplo ? '' : '') + '>' + SEGMENTOS.map(function (x) { return '<option value="' + x[0] + '"' + (seg === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="ufm">Estado da empresa</label><select id="ufm">' + [['SP', 'São Paulo'], ['PR', 'Paraná']].map(function (x) { return '<option value="' + x[0] + '"' + ((m.uf || 'SP') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="regm">Regime tributário</label><select id="regm">' + REGIMES.map(function (x) { return '<option value="' + x[0] + '"' + ((m.regime || 'real') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     '<button class="btn" type="button" data-act="salvarSeg">Salvar e recalcular</button></div>';
   h += '<p class="note">' + (auto ? 'Pneus e autopeças: PIS/COFINS pela lista de monofásicos abaixo (Lei 10.485/2002) e auditoria da saída da ST em 01/10/2026.' : 'PIS/COFINS pelas regras da aba Classificação fiscal (monofásicos, alíquota zero da cesta básica e ST), mais a lista abaixo. Produtos comprados entram como revenda. As notas de venda são conferidas com o ICMS esperado de cada produto em SP, e as diferenças viram pendências.') +
@@ -407,7 +408,7 @@ function kpi(nome, icone, d, c, extra) {
   return '<div class="card kpi"><div class="lbl"><span class="badge">' + icone + '</span>' + nome + '</div><div><div class="big num' + (saldo < 0 ? ' credor' : '') + '">' + m0(Math.abs(saldo)) + '</div><div class="state">' + (saldo >= 0 ? 'a recolher no período' : '<span class="credor">saldo credor no período</span>') + '</div></div>' +
     '<dl class="num"><dt>Débitos</dt><dd>' + m0(d) + '</dd><dt>Créditos</dt><dd>' + m0(c) + '</dd>' + (extra || '') + '</dl></div>';
 }
-function seloRevisao() { return '<span class="selo-rev" title="As regras de ICMS, ICMS-ST, PIS/COFINS e CBS/IBS usadas no portal são conferidas semanalmente com a legislação federal e de SP. Esta é a data da última revisão.">' + I.ok + 'Regras fiscais revisadas em ' + esc(Regras.REVISAO) + ' conforme a legislação vigente</span>'; }
+function seloRevisao() { return '<span class="selo-rev" title="As regras de ICMS, ICMS-ST, PIS/COFINS e CBS/IBS usadas no portal são conferidas semanalmente com a legislação federal e a do estado da empresa. Esta é a data da última revisão.">' + I.ok + 'Regras fiscais revisadas em ' + esc(Regras.REVISAO) + ' conforme a legislação vigente</span>'; }
 function renderHeaderSub() {
   var sub = $('subtitle'); if (!sub) return;
   var e = S.emp, nome = e.meta.nome || nomeDe(e.notas, e.meta.cnpj) || fmtCnpj(e.meta.cnpj);
@@ -492,7 +493,10 @@ function renderMain() {
   var notasF = S.res.notas.filter(function (n) { return ds.indexOf(n.dt) >= 0 && bate(S.q, [n.n, n.ch, n.parte.n, n.parte.c]); });
   var nPend = Object.values(S.res.produtos).filter(function (p) { return p.classe === 'pendente'; }).length;
   var tabs = [['apuracao', 'Apuração', ''], ['comparativo', 'Antes × depois', ''], ['pendencias', 'Pendências', '<span class="count' + (erros.length ? ' err' : '') + '">' + (erros.length + alertas.length) + '</span>'],
-    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['difal', 'DIFAL', ''], ['reforma', 'IBS/CBS 2026', '']];
+    ['notas', 'Notas', '<span class="count">' + notasF.length + '</span>'], ['produtos', 'Produtos', '<span class="count' + (nPend ? ' err' : '') + '">' + (nPend ? nPend + ' sem classe' : Object.keys(S.res.produtos).length) + '</span>'], ['classif', 'Classificação fiscal', ''], ['servicos', 'Serviços e fretes', (function () { var n = Object.values(S.res.servicos).filter(function (x) { return x.classe === 'pendente'; }).length; return n ? '<span class="count">' + n + ' sem classe</span>' : ''; })()], ['difal', 'DIFAL', ''], ['stpr', 'ST Paraná', ''], ['reforma', 'IBS/CBS 2026', '']];
+  if (ufEmp() !== 'PR') tabs = tabs.filter(function (t) { return t[0] !== 'stpr'; });
+  else tabs = tabs.map(function (t) { return t[0] === 'stpr' ? ['stpr', 'ST Paraná', (function () { var q = (S.res.stPR || []).filter(function (x) { return ds.indexOf(x.dt) >= 0 && !(x.stRet > 0.009) && x.dif > 0.009; }).length; return q ? '<span class="count err">' + q + '</span>' : ''; })()] : t; });
+  if (S.tab === 'stpr' && ufEmp() !== 'PR') S.tab = 'apuracao';
   h += '<div class="card painel-abas"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
   if (S.tab === 'apuracao') h += tabApuracao(ds, T);
   else if (S.tab === 'comparativo') h += tabComparativo(ds, T);
@@ -502,6 +506,7 @@ function renderMain() {
   else if (S.tab === 'classif') h += tabClassif(ds);
   else if (S.tab === 'servicos') h += tabServicos(ds, T);
   else if (S.tab === 'difal') h += tabDifal(ds);
+  else if (S.tab === 'stpr') h += tabSTPR(ds);
   else h += tabReforma(ds, T);
   h += '</div></div>';
   h += '<p class="legal">' + textoLegal() + '</p>';
@@ -689,6 +694,7 @@ function produtosClassif(ds) {
 function tabClassif(ds) {
   var q = S.cq || { ncm: '', cest: '', destino: 'cf', uf: 'SP', contrib: false, importado: false };
   var h = '<p class="note">Classificação de PIS/COFINS, ICMS, ICMS-ST, IPI e CBS/IBS por NCM, para revenda pelo comércio em SP. As regras foram revisadas em ' + Regras.REVISAO + ' pela legislação federal (Leis 10.147/2000, 10.865/2004, 10.925/2004, 13.097/2015 e LC 214/2025) e pelo RICMS/SP. É orientação: casos marcados com "Conferir" dependem da descrição do produto.</p>';
+  if (ufEmp() !== 'SP') h += '<div class="banner"><span class="grow"><b>Atenção:</b> as regras de ICMS e ICMS-ST desta aba são as de São Paulo. Para esta empresa de ' + ufEmp() + ', valem só as de PIS/COFINS, IPI e CBS/IBS; a ST de autopeças e pneus do Paraná está na aba ST Paraná.</span></div>';
   h += '<form id="fClassif" class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px"><h3>Consultar um NCM</h3><div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end">' +
     '<div class="field" style="max-width:150px"><label for="cqNcm">NCM</label><input id="cqNcm" inputmode="numeric" maxlength="10" placeholder="0000.00.00" value="' + esc(q.ncm) + '" required></div>' +
     '<div class="field" style="max-width:130px"><label for="cqCest">CEST (opcional)</label><input id="cqCest" inputmode="numeric" maxlength="9" value="' + esc(q.cest) + '"></div>' +
@@ -765,6 +771,7 @@ function vTeste() {
   h += '<div class="card teste-card">';
   h += '<div class="teste-passo"><span class="teste-n">1</span><div><h2>Conte o ramo e o regime</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
     '<div class="field"><label for="tSeg">Ramo</label><select id="tSeg">' + [['autopecas', 'Pneus e autopeças'], ['varejo', 'Mercadinho, supermercado ou varejo de alimentos'], ['moda', 'Calçados, roupas, bolsas e acessórios'], ['outros', 'Outro comércio']].map(function (o) { return '<option value="' + o[0] + '"' + (t.seg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="tUF">Estado</label><select id="tUF">' + [['SP', 'São Paulo'], ['PR', 'Paraná']].map(function (o) { return '<option value="' + o[0] + '"' + ((t.uf || 'SP') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="tReg">Regime</label><select id="tReg">' + [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real']].map(function (o) { return '<option value="' + o[0] + '"' + (t.reg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div></div></div>';
   h += '<div class="teste-passo"><span class="teste-n">2</span><div style="flex:1;min-width:0"><h2>Envie os XMLs</h2><p class="note">Use um mês já fechado, por exemplo setembro: o que aparecer de imposto pago a mais pode ser recuperado. Inclua as notas de venda (NF-e e NFC-e) e as de compra; um arquivo .zip serve.</p>' +
     (S.testeLendo ? '<div class="drop"><b>Lendo ' + S.testeLendo + '…</b><span class="small">Isso leva alguns segundos.</span></div>'
@@ -788,14 +795,14 @@ function bindDropTeste() {
 async function testarArquivos(files) {
   files = files.filter(function (f) { return /\.(zip|xml)$/i.test(f.name); });
   if (!files.length) { toast('Envie arquivos .zip ou .xml.'); return; }
-  var t = S.testeCfg = { seg: ($('tSeg') || {}).value || 'autopecas', reg: ($('tReg') || {}).value || 'simples' };
+  var t = S.testeCfg = { seg: ($('tSeg') || {}).value || 'autopecas', reg: ($('tReg') || {}).value || 'simples', uf: ($('tUF') || {}).value || 'SP' };
   S.testeLendo = files.length === 1 ? files[0].name : files.length + ' arquivos'; render();
   try {
     var acc = await lerArquivos(files);
     var nfs = acc.notas.filter(function (n) { return !n.tipoDoc; });
     if (!nfs.length) { S.testeLendo = 0; render(); bindDropTeste(); toast('Não encontramos NF-e nem NFC-e nesses arquivos.'); return; }
     var cnpj = detectarCnpj(nfs), nome = nomeDe(nfs, cnpj);
-    var e = { id: 'teste', meta: { cnpj: cnpj, nome: nome || fmtCnpj(cnpj), segmento: t.seg, regime: t.reg, corte: '2026-10-01', mono: [], st: [], publicado: null },
+    var e = { id: 'teste', meta: { cnpj: cnpj, nome: nome || fmtCnpj(cnpj), segmento: t.seg, regime: t.reg, uf: t.uf || 'SP', corte: '2026-10-01', mono: [], st: [], publicado: null },
       notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
     S.testeLendo = 0; S.teste = true; S.demo = true; S.tourVisto = true; S.tab = 'apuracao';
     abrirEmpresa(e, true, true); S.imp = null; window.scrollTo(0, 0);
@@ -849,8 +856,8 @@ function tabComparativo(ds, T) {
   return h;
 }
 
-var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS indevido na revenda', MONO_CST: 'CST monofásico', MONO_CST_ERR: 'CST de PIS/COFINS do monofásico', DEV_SEM_ICMS: 'Devolução sem o ICMS da compra', DEV_ALIQ: 'Alíquota da devolução', DEV_ST: 'Devolução de compra com ST', DEV_ST_INF: 'ICMS-ST na devolução', DEV_ST_INDEVIDO: 'Devolução com CST de ST indevido', DEV_ICMS_A_MAIS: 'Devolução com ICMS a mais', DEV_SEM_REF: 'Devolução sem nota referenciada', DEV_SEM_ORIG: 'Nota original da devolução', PC_CST_SAIDA: 'CST de PIS/COFINS na venda tributada', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', MONO_COND: 'Monofásico condicionado', CFOP_ST: 'CFOP de ST com ICMS normal', CFOP_FORN: 'CFOP de ST na nota do fornecedor', ICMS_ZERO_FORN: 'Tributado sem ICMS destacado', ST_INTER60_FORN: 'Interestadual sem ICMS após a ST', DUP_NF: 'Possível nota duplicada', PROD_PEND: 'Produto sem classificação', CTE_CALC: 'Cálculo do ICMS do frete', CTE_ALIQ: 'Alíquota do frete', CTE_SP: 'Alíquota do frete em SP', CTE_ST: 'Frete com ST', CTE_MONO: 'Frete de monofásico', CTE_SEM_NF: 'Frete sem a nota da compra', ISS_ALIQ: 'Alíquota do ISS', ISS_CALC: 'Cálculo do ISS', NFSE_PIS: 'PIS/COFINS do serviço', NFSE_CST: 'CST do serviço', SERV_PEND: 'Serviço sem classificação', ISS_RET: 'ISS retido a recolher', MONO_SN: 'Segregação no PGDAS-D', CAD_ICMS: 'ICMS do cadastro do produto', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL', REM_ICMS: 'Remessa com ICMS indevido', REM_CST: 'CST da remessa', REM_PRAZO: 'Remessa sem retorno no prazo', REM_AMOSTRA: 'Amostra grátis com ICMS', REM_TRIB: 'Remessa tributada sem ICMS', REM_TRANSF: 'Transferência interestadual', REM_PC: 'PIS/COFINS em remessa', ENT_PF_CRED: 'Crédito em compra de pessoa física' };
-var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', MONO_CST_ERR: 'pc', DEV_SEM_ICMS: 'icms', DEV_ALIQ: 'icms', DEV_ST: 'icms', DEV_ST_INF: 'icms', DEV_ST_INDEVIDO: 'icms', DEV_ICMS_A_MAIS: 'icms', DEV_SEM_REF: 'icms', DEV_SEM_ORIG: 'icms', PC_CST_SAIDA: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', MONO_COND: 'pc', CFOP_ST: 'icms', CFOP_FORN: 'icms', ICMS_ZERO_FORN: 'icms', ST_INTER60_FORN: 'icms', DUP_NF: 'ambos', PROD_PEND: 'ambos', CTE_CALC: 'icms', CTE_ALIQ: 'icms', CTE_SP: 'icms', CTE_ST: 'icms', CTE_MONO: 'pc', CTE_SEM_NF: 'pc', ISS_ALIQ: 'iss', ISS_CALC: 'iss', NFSE_PIS: 'pc', NFSE_CST: 'pc', SERV_PEND: 'pc', ISS_RET: 'iss', CAD_ICMS: 'icms', MONO_SN: 'pc', REM_ICMS: 'icms', REM_CST: 'icms', REM_PRAZO: 'icms', REM_AMOSTRA: 'icms', REM_TRIB: 'icms', REM_TRANSF: 'icms', REM_PC: 'pc', ENT_PF_CRED: 'icms' };
+var COD_TIT = { ST_SAIDA: 'Saída ainda como ST', ALIQ_INT: 'Alíquota interna', SEM_TRIB: 'Venda sem ICMS', ALIQ_INTER: 'Alíquota interestadual', ST_INTER: 'ST interestadual', MONO_TRIB: 'PIS/COFINS indevido na revenda', MONO_CST: 'CST monofásico', MONO_CST_ERR: 'CST de PIS/COFINS do monofásico', DEV_SEM_ICMS: 'Devolução sem o ICMS da compra', DEV_ALIQ: 'Alíquota da devolução', DEV_ST: 'Devolução de compra com ST', DEV_ST_INF: 'ICMS-ST na devolução', DEV_ST_INDEVIDO: 'Devolução com CST de ST indevido', DEV_ICMS_A_MAIS: 'Devolução com ICMS a mais', DEV_SEM_REF: 'Devolução sem nota referenciada', DEV_SEM_ORIG: 'Nota original da devolução', PC_CST_SAIDA: 'CST de PIS/COFINS na venda tributada', TEMA69: 'ICMS na base do PIS/COFINS', ST_FORN: 'Fornecedor reteve ST', ST60_FORN: 'Fornecedor emitiu como ST', ALIQ_FORN: 'Alíquota do fornecedor', ALIQ_INTER_FORN: 'Alíquota interestadual do fornecedor', ST_INTER_FORN: 'ST de outra UF', MONO_FORN: 'Monofásico na compra', INSUMO_MONO: 'Insumo monofásico', MONO_COND: 'Monofásico condicionado', CFOP_ST: 'CFOP de ST com ICMS normal', CFOP_FORN: 'CFOP de ST na nota do fornecedor', ICMS_ZERO_FORN: 'Tributado sem ICMS destacado', ST_INTER60_FORN: 'Interestadual sem ICMS após a ST', DUP_NF: 'Possível nota duplicada', PROD_PEND: 'Produto sem classificação', CTE_CALC: 'Cálculo do ICMS do frete', CTE_ALIQ: 'Alíquota do frete', CTE_SP: 'Alíquota do frete em SP', CTE_ST: 'Frete com ST', CTE_MONO: 'Frete de monofásico', CTE_SEM_NF: 'Frete sem a nota da compra', ISS_ALIQ: 'Alíquota do ISS', ISS_CALC: 'Cálculo do ISS', NFSE_PIS: 'PIS/COFINS do serviço', NFSE_CST: 'CST do serviço', SERV_PEND: 'Serviço sem classificação', ISS_RET: 'ISS retido a recolher', MONO_SN: 'Segregação no PGDAS-D', CAD_ICMS: 'ICMS do cadastro do produto', ICMS_CALC: 'Cálculo do ICMS', DIFAL: 'DIFAL', REM_ICMS: 'Remessa com ICMS indevido', REM_CST: 'CST da remessa', REM_PRAZO: 'Remessa sem retorno no prazo', REM_AMOSTRA: 'Amostra grátis com ICMS', REM_TRIB: 'Remessa tributada sem ICMS', REM_TRANSF: 'Transferência interestadual', REM_PC: 'PIS/COFINS em remessa', ENT_PF_CRED: 'Crédito em compra de pessoa física', PR_ST_ANTEC: 'Antecipação da ST no Paraná', PR_ST_MENOR: 'ST retida a menor (PR)', PR_ST_SAIDA: 'Venda com ICMS de item com ST (PR)', PR_ST_INDEV: 'CST 60 em item sem ST (PR)', PR_ST_RESS: 'Ressarcimento de ST (PR)' };
+var COD_IMP = { ST_SAIDA: 'icms', ALIQ_INT: 'icms', SEM_TRIB: 'icms', ALIQ_INTER: 'icms', ST_INTER: 'icms', ST_FORN: 'icms', ST60_FORN: 'icms', ALIQ_FORN: 'icms', ALIQ_INTER_FORN: 'icms', ST_INTER_FORN: 'icms', ICMS_CALC: 'icms', DIFAL: 'icms', MONO_TRIB: 'pc', MONO_CST: 'pc', MONO_CST_ERR: 'pc', DEV_SEM_ICMS: 'icms', DEV_ALIQ: 'icms', DEV_ST: 'icms', DEV_ST_INF: 'icms', DEV_ST_INDEVIDO: 'icms', DEV_ICMS_A_MAIS: 'icms', DEV_SEM_REF: 'icms', DEV_SEM_ORIG: 'icms', PC_CST_SAIDA: 'pc', TEMA69: 'pc', MONO_FORN: 'pc', INSUMO_MONO: 'pc', MONO_COND: 'pc', CFOP_ST: 'icms', CFOP_FORN: 'icms', ICMS_ZERO_FORN: 'icms', ST_INTER60_FORN: 'icms', DUP_NF: 'ambos', PROD_PEND: 'ambos', CTE_CALC: 'icms', CTE_ALIQ: 'icms', CTE_SP: 'icms', CTE_ST: 'icms', CTE_MONO: 'pc', CTE_SEM_NF: 'pc', ISS_ALIQ: 'iss', ISS_CALC: 'iss', NFSE_PIS: 'pc', NFSE_CST: 'pc', SERV_PEND: 'pc', ISS_RET: 'iss', CAD_ICMS: 'icms', MONO_SN: 'pc', REM_ICMS: 'icms', REM_CST: 'icms', REM_PRAZO: 'icms', REM_AMOSTRA: 'icms', REM_TRIB: 'icms', REM_TRANSF: 'icms', REM_PC: 'pc', ENT_PF_CRED: 'icms', PR_ST_ANTEC: 'icms', PR_ST_MENOR: 'icms', PR_ST_SAIDA: 'icms', PR_ST_INDEV: 'icms', PR_ST_RESS: 'icms' };
 var IMP_LBL = { icms: 'ICMS', pc: 'PIS/COFINS', iss: 'ISS', ambos: 'ICMS e PIS/COFINS' };
 function impDe(p) { return COD_IMP[p.cod] || 'ambos'; }
 function impOk(p) { var i = impDe(p); return S.fImp === 'todos' || i === S.fImp || i === 'ambos'; }
@@ -1048,6 +1055,29 @@ async function classificarServ(pk, classe) {
   catch (err) { if (a) e.prodCad[pk] = a; else delete e.prodCad[pk]; e.hist.pop(); recalcular(); renderMain(); toast('Não foi possível salvar a classificação: ' + erroTexto(err)); }
 }
 
+/* ---------- ST no Paraná ---------- */
+function ufEmp() { return (S.emp && S.emp.meta.uf) || 'SP'; }
+function tabSTPR(ds) {
+  var L = (S.res.stPR || []).filter(function (x) { return ds.indexOf(x.dt) >= 0; });
+  var h = '<p class="note">No Paraná, autopeças e pneus continuam na substituição tributária (RICMS/PR, Anexo IX, Seção V, arts. 28 a 30, e Seção XXI, arts. 116 e 117). Quando o fornecedor, por exemplo de São Paulo, vende com ICMS próprio e sem reter a ST, quem compra recolhe a ST na entrada da mercadoria no Paraná (Anexo IX, art. 11; art. 74, VII, "a"). Aqui está o cálculo, nota a nota, com a MVA da Resolução SEFA 571/2019, ajustada nas compras de outros estados (Anexo IX, art. 1º, § 5º).</p>';
+  if (!L.length) return h + '<p class="note">Nenhuma compra de autopeças ou pneus para revenda no período.</p>';
+  var semRet = L.filter(function (x) { return !(x.stRet > 0.009); }), comRet = L.filter(function (x) { return x.stRet > 0.009; });
+  var antec = semRet.reduce(function (a, x) { return a + x.dif; }, 0), menor = comRet.reduce(function (a, x) { return a + x.dif; }, 0), ret = comRet.reduce(function (a, x) { return a + x.stRet; }, 0);
+  h += '<div class="difal-kpis"><div class="kpi"><span class="small">Antecipação a recolher (compras sem ST)</span><b class="num">' + m0(antec) + '</b><span class="small">' + semRet.length + (semRet.length === 1 ? ' item' : ' itens') + ' comprados sem retenção</span></div>' +
+    '<div class="kpi"><span class="small">ST retida pelos fornecedores</span><b class="num">' + m0(ret) + '</b><span class="small">' + comRet.length + (comRet.length === 1 ? ' item' : ' itens') + (menor > 0.5 ? ' · retida a menor: ' + m0(menor) : '') + '</span></div></div>';
+  var meses = {}; semRet.forEach(function (x) { var m = x.dt.slice(0, 7); var o = meses[m] = meses[m] || { v: 0, st: 0, n: {} }; o.v += x.base; o.st += x.dif; o.n[x.ch] = 1; });
+  if (Object.keys(meses).length) h += '<div class="tscroll"><table><thead><tr><th>Mês da entrada</th><th class="r">Notas sem ST</th><th class="r">Valor dos itens</th><th class="r">Antecipação</th></tr></thead><tbody>' +
+    Object.keys(meses).sort().map(function (m) { var o = meses[m]; return '<tr><td style="text-transform:capitalize">' + esc(mesNome(m)) + '</td><td class="r num">' + Object.keys(o.n).length + '</td><td class="r num">' + m0(o.v) + '</td><td class="r num"><b>' + m0(o.st) + '</b></td></tr>'; }).join('') + '</tbody></table></div>' +
+    '<p class="note">A antecipação vence na entrada da mercadoria no Paraná (art. 74, VII, "a"), salvo prazo diferente concedido em regime especial (Anexo IX, art. 11, § 6º). A nota de compra entra sem crédito do ICMS próprio, que já foi abatido no cálculo, e a venda sai com CST 60, sem destaque.</p>';
+  h += '<div class="tscroll"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Produto</th><th class="r">Valor</th><th class="r">ICMS da nota</th><th class="r">MVA</th><th class="r">Base da ST</th><th class="r">ST devida</th><th class="r">ST retida</th><th class="r">A recolher</th></tr></thead><tbody>' +
+    L.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; }).map(function (x) {
+      return '<tr><td><button type="button" class="link" data-ver="' + esc(x.ch) + '">Nº ' + esc(x.n) + '</button><div class="small">' + brFull(x.dt) + '</div></td><td>' + esc(x.forn) + '<div class="small">' + esc(x.uf || '') + '</div></td><td>' + esc(x.x) + '<div class="small mono">NCM ' + esc(x.ncm) + (x.cest ? ' · CEST ' + esc(x.cest) : '') + '</div></td>' +
+        '<td class="r num">' + m0(x.base) + '</td><td class="r num">' + m0(x.icms) + '<div class="small">' + x.inter + '%</div></td><td class="r num">' + String(x.mvaAj).replace('.', ',') + '%' + (x.mvaAj !== x.mva ? '<div class="small">original ' + String(x.mva).replace('.', ',') + '%</div>' : '') + '</td>' +
+        '<td class="r num">' + m0(x.bcST) + '</td><td class="r num">' + m0(x.stDev) + '</td><td class="r num">' + (x.stRet > 0.009 ? m0(x.stRet) : '—') + '</td><td class="r num"><b>' + (x.dif > 0.009 ? m0(x.dif) : '—') + '</b></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  h += '<p class="note">A ST só vale para peças de uso automotivo (NCM e descrição do Anexo IX); confira os itens de NCM genérico. A MVA de autopeças é 71,78%; a de 36,56% vale só para compras de montadora com contrato de fidelidade ou de fabricante de máquinas agrícolas e rodoviárias com distribuição exclusiva. Base: valor do item com IPI, frete e despesas; ST = base × ' + '19,5% − ICMS da nota.</p>';
+  return h;
+}
 /* ---------- DIFAL ---------- */
 var DIFAL_TIPOS = [['nao_contribuinte', 'Consumidor final não contribuinte'], ['uso_consumo', 'Contribuinte: uso, consumo ou ativo'], ['revenda', 'Contribuinte: revenda ou industrialização']];
 var ST_CSTS = ['10', '30', '60', '70', '201', '202', '203', '500'];
@@ -1148,6 +1178,7 @@ function tabDifal(ds) {
 
   /* compras */
   h += '<h3 class="sec-tit">Compras de outros estados</h3>';
+  if (ufEmp() !== 'SP') { h += '<p class="note">O cálculo do DIFAL nas compras usa as regras de SP e está desligado para empresas de ' + ufEmp() + '. Nas compras de autopeças e pneus para revenda, veja a antecipação da ST na aba ST Paraná.</p>'; h += simuladorDifal(); h += tabelaAliqUF(); return h; }
   h += '<p class="note">' + (D.simples
     ? 'No Simples Nacional, toda compra de outro estado sem substituição tributária paga a diferença entre a alíquota interna de SP e a interestadual, seja para revenda, industrialização, uso e consumo ou ativo. O valor é recolhido em guia própria até o último dia do segundo mês seguinte ao da entrada (RICMS/SP, art. 115, XV-A, a, e § 8º; LC 123/2006, art. 13, § 1º, XIII, h).'
     : 'No regime normal, o DIFAL é devido nas compras de outros estados para uso e consumo ou ativo imobilizado, com base dupla (RICMS/SP, art. 2º, XIV, e art. 37, VI e § 11). Entra como débito na apuração do ICMS do mês da entrada. Compras para revenda não pagam DIFAL. O portal usa a classificação da aba Produtos.') + '</p>';
@@ -1743,10 +1774,10 @@ document.addEventListener('click', function (ev) {
     B.salvarEmpresa(S.emp.id, { ncm_monofasico: lista, ncm_st: stl, corte_st: corte }).then(function () { toast(msg + ' Salvo.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }
   else if (a === 'salvarSeg') {
-    var sg = $('segm').value, rg = $('regm').value;
-    S.emp.meta.segmento = sg; S.emp.meta.regime = rg; S._cls = {}; S.cq = null; recalcular(); render();
+    var sg = $('segm').value, rg = $('regm').value, ufv = $('ufm') ? $('ufm').value : (S.emp.meta.uf || 'SP');
+    S.emp.meta.segmento = sg; S.emp.meta.regime = rg; S.emp.meta.uf = ufv; S._cls = {}; S.cq = null; recalcular(); render();
     if (S.exemplo) { toast('Análise recalculada.'); return; }
-    B.salvarEmpresa(S.emp.id, { segmento: sg, regime: rg }).then(function () { toast('Segmento e regime salvos. Análise recalculada.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
+    B.salvarEmpresa(S.emp.id, { segmento: sg, regime: rg, uf: ufv }).then(function () { toast('Segmento e regime salvos. Análise recalculada.'); }).catch(function (e) { toast('Não foi possível salvar: ' + erroTexto(e)); });
   }
   else if (a === 'exclPrever') {
     var ini = $('exIni').value, fim = $('exFim').value, mes = $('exMes').value;
@@ -1817,7 +1848,7 @@ document.addEventListener('change', function (ev) {
     if (k === 'b') cf[u].b = t.value === 'dupla' ? 'dupla' : null; else { var nv = parseFloat(String(t.value).replace(',', '.')); if (isFinite(nv) && nv >= 0 && nv < 40) cf[u][k] = nv; }
     ls('pf.difalUF', JSON.stringify(cf)); S.aliqAberto = true; renderMain();
   }
-  else if (t.id === 'tSeg' || t.id === 'tReg') { S.testeCfg = { seg: $('tSeg').value, reg: $('tReg').value }; }
+  else if (t.id === 'tSeg' || t.id === 'tReg' || t.id === 'tUF') { S.testeCfg = { seg: $('tSeg').value, reg: $('tReg').value, uf: $('tUF').value }; }
   else if (t.id === 'nome' && S.emp && !S.exemplo) {
     var nm = t.value.trim(); S.emp.meta.nome = nm;
     B.salvarEmpresa(S.emp.id, { razao_social: nm }).then(function () { toast('Razão social salva.'); renderHeaderSub(); }).catch(function (e) { toast(erroTexto(e)); });

@@ -299,3 +299,30 @@ O parser passou a guardar `indFinal`, a IE do destinatário e o grupo ICMSUFDest
 - Nota de entrada emitida pela empresa (tpNF 0) para pessoa física sem inscrição (CPF ou indicador de IE 9), fora das devoluções de venda: ICMS destacado gera erro `ENT_PF_CRED`, e o "após correções" estorna o crédito. A nota documenta a entrada (RICMS/SP, art. 136, I, "a", e art. 138; RC 5.239/2015) sem destaque, e só há crédito do imposto anteriormente cobrado (arts. 59 e 61).
 - Essas compras também não geram crédito de PIS/COFINS (Leis 10.637/2002 e 10.833/2003, art. 3º, § 3º, I).
 - Devolução feita por consumidor pessoa física (CFOP 1.202/1.411) não entra nessa regra.
+
+## Empresas do Paraná (ST e antecipação)
+
+No cadastro (aba do escritório, bloco do ramo) escolha **Estado da empresa = Paraná**. Com isso:
+
+- Alíquota interna de 19,5% (RICMS/PR, art. 17, V). A regra de corte da ST de São Paulo não se aplica.
+- Autopeças e pneus continuam com ST (RICMS/PR, Anexo IX, Seção V, arts. 28 a 30; Seção XXI, arts. 116 e 117).
+- **Compra de outro estado sem retenção** (`PR_ST_ANTEC`): calcula a antecipação na entrada (Anexo IX, art. 11; art. 74, VII, "a"). Base = valor + frete + IPI − desconto, com a MVA da Resolução SEFA 571/2019 ajustada (Anexo IX, art. 1º, § 5º). Do resultado sai o ICMS próprio da nota.
+- **ST retida a menor** (`PR_ST_MENOR`): mostra a diferença.
+- **Venda interna de item com ST com ICMS destacado** (`PR_ST_SAIDA`): deveria sair com CST 60.
+- **CST 60 em item fora da lista** (`PR_ST_INDEV`).
+- **Venda interestadual de item que já pagou ST** (`PR_ST_RESS`): indica ressarcimento pela EFD (Anexo IX, art. 6º).
+- A aba **ST Paraná** mostra a antecipação a recolher por mês e o cálculo nota a nota.
+- MVAs usadas:
+
+  | Item | MVA |
+  |---|---|
+  | Autopeças | 71,78% |
+  | Pneus de automóvel | 40,73% |
+  | Pneus de caminhão e ônibus | 31,03% |
+  | Pneus de moto | 65,58% |
+  | Outros pneus | 55,32% |
+  | Pneus de bicicleta | 105% |
+  | Câmaras e protetores | 74,58% |
+
+  Elas devem ser conferidas quando sair uma nova resolução da SEFA.
+- As conferências específicas de São Paulo ficam desligadas: crédito de pessoa física, remessas, devoluções, cadastro do varejo e DIFAL de compras.
