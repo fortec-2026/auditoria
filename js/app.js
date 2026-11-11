@@ -7,7 +7,8 @@ var EXEMPLO_URL = 'exemplos/notas-exemplo.zip';
 var DEMOS = {
   pneus: { url: EXEMPLO_URL, cnpj: '12345678000190', nome: 'Pneus e Peças Exemplo Ltda (fictícia)', segmento: 'autopecas', regime: 'real', ramo: 'uma revendedora de pneus e autopeças', rot: 'Pneus e autopeças' },
   moda: { url: 'exemplos/notas-moda.zip', cnpj: '87654321000144', nome: 'Passo Certo Calçados e Moda Exemplo Ltda (fictícia)', segmento: 'moda', regime: 'real', ramo: 'uma loja de calçados, roupas e acessórios', rot: 'Calçados e moda' },
-  mercado: { url: 'exemplos/notas-mercadinho.zip', cnpj: '98765432000155', nome: 'Mercadinho Bom Preço Exemplo Ltda (fictícia)', segmento: 'varejo', regime: 'presumido', ramo: 'um mercadinho', rot: 'Mercadinho' }
+  mercado: { url: 'exemplos/notas-mercadinho.zip', cnpj: '98765432000155', nome: 'Mercadinho Bom Preço Exemplo Ltda (fictícia)', segmento: 'varejo', regime: 'presumido', ramo: 'um mercadinho', rot: 'Mercadinho' },
+  parana: { url: 'exemplos/notas-parana.zip', cnpj: '45678912000133', nome: 'Paraná Pneus e Peças Exemplo Ltda (fictícia)', segmento: 'autopecas', regime: 'real', uf: 'PR', ramo: 'uma revendedora de pneus e autopeças do Paraná', rot: 'Paraná (ST)' }
 };
 var WA_TESTE = 'Olá! Testei o portal da RG Fiscal com as notas da minha empresa e quero receber o relatório completo.';
 
@@ -232,7 +233,7 @@ var LOGO = '<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1"
   [0, 2.4, 3.6, 6, 8.4, 9.6, 12, 13.2, 15.6, 18, 19.2, 21.6].map(function (x, i) { return '<rect x="' + (9 + x) + '" y="28" width="' + (i % 3 === 1 ? 0.8 : 1.4) + '" height="4.5" fill="var(--logo-bar)"/>'; }).join('') + '</svg>';
 function WA(n, msg) { return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg || 'Olá! Vi a demonstração do portal da RG Fiscal e quero saber como funciona para a minha empresa.'); }
 function botoesWA(msg, cls) { return '<a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516981505852', msg) + '">' + I.zap + 'Cassiano</a><a class="btn ' + (cls || 'primary') + '" target="_blank" rel="noopener" href="' + WA('5516993392325', msg) + '">' + I.zap + 'Vinicius</a>'; }
-function hashDemo(k) { return k === 'mercado' ? '#demo-mercado' : k === 'moda' ? '#demo-moda' : '#demo'; }
+function hashDemo(k) { return k === 'mercado' ? '#demo-mercado' : k === 'moda' ? '#demo-moda' : k === 'parana' ? '#demo-parana' : '#demo'; }
 function linkDemo(k) { return location.origin + location.pathname + (k === 'teste' ? '#teste' : hashDemo(k)); }
 function faixa(conteudo, extra) { return '<div class="faixa' + (extra ? ' ' + extra : '') + '">' + conteudo + '</div>'; }
 function temaAtual() { var t = document.documentElement.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
@@ -271,7 +272,7 @@ function vListaCliente() {
 function vEscritorio() {
   var h = faixa(nav() + '<header class="top"><div><h1>Empresas</h1><div class="sub">Área do escritório. O cliente só vê o que for publicado.</div></div>' +
     '<div class="row"><label class="btn primary" for="arqNova">' + I.up + 'Importar XMLs de nova empresa</label><input type="file" id="arqNova" accept=".zip,.xml" multiple hidden>' +
-    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Link da demo: pneus</button><button class="btn" type="button" data-act="copiarDemo" data-k="mercado">' + I.link + 'Link da demo: mercadinho</button><button class="btn" type="button" data-act="copiarDemo" data-k="moda">' + I.link + 'Link da demo: moda</button><button class="btn" type="button" data-act="copiarDemo" data-k="teste">' + I.link + 'Link do teste grátis</button></div></header>');
+    '<button class="btn" type="button" data-act="exemplo">Ver com notas de exemplo</button><button class="btn" type="button" data-act="copiarDemo">' + I.link + 'Link da demo: pneus</button><button class="btn" type="button" data-act="copiarDemo" data-k="mercado">' + I.link + 'Link da demo: mercadinho</button><button class="btn" type="button" data-act="copiarDemo" data-k="moda">' + I.link + 'Link da demo: moda</button><button class="btn" type="button" data-act="copiarDemo" data-k="parana">' + I.link + 'Link da demo: Paraná</button><button class="btn" type="button" data-act="copiarDemo" data-k="teste">' + I.link + 'Link do teste grátis</button></div></header>');
   if (S.imp && (S.imp.lendo || S.imp.gravando)) h += '<div class="banner info">' + (S.imp.gravando ? 'Gravando notas no banco… ' + S.imp.gravadas + ' de ' + S.imp.total : 'Lendo ' + S.imp.arquivos + ' arquivos…') + '</div>';
   if (S.empresas.length) {
     h += '<div class="empresas">' + S.empresas.map(function (e) {
@@ -1391,12 +1392,14 @@ async function desfazerClasse(pk, origem, ncm) {
 }
 
 /* ---------- passo a passo ---------- */
-function passosTour() {
+function passosTour() { return passosTour0().filter(Boolean); }
+function passosTour0() {
   var simples = regimeEmp() === 'simples';
   if (S.demo) return [
     { t: S.teste ? 'Pronto: suas notas foram conferidas' : 'Em 1 minuto: o que o portal encontra', x: S.teste ? 'Veja o que encontramos. Lembre que nada foi enviado nem gravado: a análise rodou no seu navegador.' : 'Esta é uma empresa fictícia de ' + DEMOS[S.demoTipo || 'pneus'].ramo.replace(/^uma? /, '') + ', com notas como as de qualquer loja. Veja em três passos o que o portal da RG Fiscal mostra.' },
     { el: '.achado .ach-main', t: 'O dinheiro em jogo', x: 'O total de tributos a corrigir nas notas: o que a empresa pagou a mais ou deixou de aproveitar de crédito, e o que recolheu a menos e pode virar autuação.' },
     { el: '.tabs [data-tab="pendencias"]', t: 'Cada erro explicado', x: 'Na aba Pendências, cada erro aparece com a nota, o produto, o valor e a base legal, em linguagem simples, para corrigir no sistema emissor ou pedir ao fornecedor.' },
+    ufEmp() === 'PR' && !S.teste ? { el: '.tabs [data-tab="stpr"]', t: 'ST do Paraná e a guia', x: 'Compras de São Paulo que vieram com ICMS próprio e sem ST: aqui está a antecipação a recolher na entrada, nota a nota, com a MVA ajustada. Em cada nota, o botão Preparar guia separa os dados da GR-PR para copiar.' } : null,
     { el: '.tabs [data-tab="comparativo"]', t: 'Antes e depois', x: 'Aqui o ICMS, o PIS e a COFINS lado a lado: como as notas foram emitidas e como ficam depois das correções.' },
     S.teste ? { el: '.ach-cta', t: 'Quer o relatório completo?', x: 'Fale com a RG Fiscal: enviamos o relatório com todas as pendências, a apuração mês a mês e o que dá para recuperar.' }
       : { el: '.ach-cta [data-act="teste"]', t: 'Agora com as suas notas', x: 'Envie os XMLs de um mês já fechado e veja o resultado da sua empresa na hora. É grátis e os arquivos não saem do seu computador.' }
@@ -1908,7 +1911,7 @@ async function carregarExemplo(tipo) {
     else { var r = await fetch(EXEMPLO_URL); if (!r.ok) throw new Error(); blob = await r.blob(); }
     var acc = await lerArquivos([new File([blob], 'exemplo.zip')]);
     S.teste = false;
-    var e = { id: 'exemplo', meta: { cnpj: dm.cnpj, nome: dm.nome, segmento: dm.segmento, regime: dm.regime, corte: '2026-10-01', mono: [], st: [], publicado: null },
+    var e = { id: 'exemplo', meta: { cnpj: dm.cnpj, nome: dm.nome, segmento: dm.segmento, regime: dm.regime, uf: dm.uf || 'SP', corte: '2026-10-01', mono: [], st: [], publicado: null },
       notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
     abrirEmpresa(e, S.demo || !(S.usuario && S.usuario.papel === 'escritorio'), true);
   } catch (err) { toast('Não foi possível carregar o exemplo.'); }
@@ -1921,6 +1924,6 @@ B.aoMudarSessao(function (evento) {
   if (evento === 'PASSWORD_RECOVERY') { S.view = 'recuperar'; render(); }
 });
 if (/^#teste\b/.test(location.hash)) { abrirTeste(); }
-else if (/^#demo\b/.test(location.hash)) { S.demo = true; S.demoTipo = /^#demo-mercado/.test(location.hash) ? 'mercado' : /^#demo-moda/.test(location.hash) ? 'moda' : 'pneus'; S.view = 'carregando'; render(); carregarExemplo(); }
+else if (/^#demo\b/.test(location.hash)) { S.demo = true; S.demoTipo = /^#demo-mercado/.test(location.hash) ? 'mercado' : /^#demo-moda/.test(location.hash) ? 'moda' : /^#demo-parana/.test(location.hash) ? 'parana' : 'pneus'; S.view = 'carregando'; render(); carregarExemplo(); }
 else { render(); iniciar(); }
 })();

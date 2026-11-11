@@ -379,7 +379,7 @@ var Fiscal = (function () {
       var mv = mvaPR(it.ncm), base = (it.vp || 0) - (it.vd || 0) + (it.vf || 0) + (it.vIPI || 0);
       var inter = interna ? aliqInt : (it.p > 0 && it.p <= 12 ? it.p : (IMPORTADO.indexOf(String(it.o)) >= 0 ? 4 : 12));
       var mvaAj = interna || inter >= aliqInt ? mv.m : ((1 + mv.m / 100) * (1 - inter / 100) / (1 - aliqInt / 100) - 1) * 100;
-      var bcST = base * (1 + mvaAj / 100), propria = it.v > 0 ? it.v : base * inter / 100;
+      var bcST = base * (1 + mvaAj / 100), propria = it.v > 0 ? it.v : 0;
       var st = Math.max(0, bcST * aliqInt / 100 - propria);
       return { mva: mv.m, mvaD: mv.d, mvaAj: Math.round(mvaAj * 100) / 100, inter: inter, base: base, bcST: Math.round(bcST * 100) / 100, propria: Math.round(propria * 100) / 100, st: Math.round(st * 100) / 100 };
     }
@@ -453,6 +453,8 @@ var Fiscal = (function () {
     function auditarPR(nt, it, dir, proprio, nat, interna, receita, tribST, seg, issue) {
       var nPR = '(RICMS/PR, Anexo IX, ' + (/^401[123]/.test(it.ncm) ? 'Seção XXI, art. 116' : 'Seção V, art. 28') + ')';
       if (dir === 'E' && seg && nat === 'compra') {
+        // compra dentro do PR já com a ST retida anteriormente (CST 60/500): nada a antecipar
+        if (interna && !((it.vst || 0) > 0.009) && ['60', '500'].indexOf(String(it.cst)) >= 0) return;
         var c = stPR(nt, it, interna);
         var reg = { ch: nt.ch, n: nt.n, dt: nt.dt, ie: nt.dIEn || '', forn: nt.eN, fc: nt.eC, uf: nt.eUF, x: it.x, ncm: it.ncm, cest: it.cest, cst: it.cst, base: c.base, icms: c.propria, inter: c.inter, mva: c.mva, mvaAj: c.mvaAj, bcST: c.bcST, stDev: c.st, stRet: it.vst || 0, dif: 0 };
         if ((it.vst || 0) > 0.009) {
