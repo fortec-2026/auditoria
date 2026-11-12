@@ -36,8 +36,8 @@ var Regras = (function () {
     R({ t: 'zero', p: ['0901', '21011'], d: 'Café (inclusive solúvel)', l: 'Lei 10.925/2004, art. 1º, XXI' }),
     R({ t: 'zero', p: ['17011400', '17019900'], d: 'Açúcar', l: 'Lei 10.925/2004, art. 1º, XXII' }),
     R({ t: 'zero', p: ['1507', '1508', '1509', '1510', '1511', '1512', '1513', '1514'], d: 'Óleos vegetais (inclusive azeite)', l: 'Lei 10.925/2004, art. 1º, XXIII' }),
-    R({ t: 'zero', p: ['34011190'], d: 'Sabonete', l: 'Lei 10.925/2004, art. 1º, XXVI (também monofásico pela Lei 10.147/2000)', cond: true, n: 'Só o Ex 01 (sabões de toucador).' }),
-    R({ t: 'zero', p: ['3306'], d: 'Higiene bucal (creme dental, fio dental, enxaguante)', l: 'Lei 10.925/2004, art. 1º, XXVII (também monofásico pela Lei 10.147/2000)' }),
+    R({ t: 'zero', monoTb: true, p: ['34011190'], d: 'Sabonete', l: 'Lei 10.925/2004, art. 1º, XXVI (também monofásico pela Lei 10.147/2000)', cond: true, n: 'Só o Ex 01 (sabões de toucador).' }),
+    R({ t: 'zero', monoTb: true, p: ['3306'], d: 'Higiene bucal (creme dental, fio dental, enxaguante)', l: 'Lei 10.925/2004, art. 1º, XXVII (também monofásico pela Lei 10.147/2000)' }),
     R({ t: 'zero', p: ['48181000'], d: 'Papel higiênico', l: 'Lei 10.925/2004, art. 1º, XXVIII' })
   ];
 
@@ -144,15 +144,20 @@ var Regras = (function () {
     if (mE && (!rpc || rpc.t !== 'zero')) rpc = mE === 'cond' ? { t: 'mono', cond: true, d: 'Monofásico conforme a destinação', l: 'Lei 10.485/2002, art. 3º, II, e Anexo II', n: 'Só é monofásico quando a peça é própria para as máquinas e veículos indicados no item do Anexo II; se não for, a venda é tributada (CST 01).' } : { t: 'mono', d: 'Monofásico pela lista da empresa', l: 'Lei 10.485/2002 (art. 5º e Anexo I)' };
     var tpc = rpc ? rpc.t : 'normal';
     var pc = { trat: tpc, cst: CST_PC[tpc], regra: rpc, cond: !!(rpc && rpc.cond) };
+    /* LC 224/2025, art. 4º, § 4º, I: desde 01/04/2026 a alíquota zero de PIS/COFINS vira 10% da alíquota padrão, exceto para a Cesta Básica Nacional
+       (Anexo I da LC 214/2025) e os hortícolas, frutas e ovos (Anexo XV), que mantêm a alíquota zero (art. 4º, § 8º, III). */
+    if (tpc === 'zero') { var rcx = acha(CBS, ncm); pc.lc224 = !(rpc && rpc.monoTb) && !(rcx && rcx.r === 100 && (rcx.ct === '200003' || rcx.ct === '200014')); }
+    var dLC = o.data ? new Date(o.data) : new Date(), lc224Vig = dLC >= new Date(2026, 3, 1);
     if (simples) {
       pc.titulo = tpc === 'mono' ? 'Monofásico: segregar no PGDAS-D' : tpc === 'st' ? 'Substituição tributária: segregar no PGDAS-D' : 'Tributado no DAS';
       pc.texto = tpc === 'mono' || tpc === 'st' ? 'Informe a receita como tributação concentrada (monofásica) ou ST no PGDAS-D; o PIS e a COFINS saem da guia.' : tpc === 'zero' ? 'No Simples Nacional a alíquota zero da cesta básica não reduz o DAS: a receita é tributada normalmente.' : 'Receita tributada normalmente no DAS.';
       pc.cst = tpc === 'mono' ? '04' : tpc === 'st' ? '05' : '49';
     } else {
       var aliq = regime === 'presumido' ? '0,65% e 3%' : '1,65% e 7,6%';
-      pc.titulo = { mono: 'Monofásico: alíquota zero na revenda', st: 'Substituição tributária: sem débito na revenda', zero: 'Alíquota zero', normal: 'Tributado (' + aliq + ')' }[tpc];
+      pc.titulo = { mono: 'Monofásico: alíquota zero na revenda', st: 'Substituição tributária: sem débito na revenda', zero: pc.lc224 && lc224Vig ? 'Alíquota zero reduzida pela LC 224 (10% da alíquota)' : 'Alíquota zero', normal: 'Tributado (' + aliq + ')' }[tpc];
       pc.texto = tpc === 'normal' ? 'PIS ' + aliq.split(' e ')[0] + ' e COFINS ' + aliq.split(' e ')[1] + ' sobre a receita, sem o ICMS na base (Tema 69).' + (regime === 'real' ? ' Na compra para revenda gera crédito.' : '') :
-        tpc === 'zero' ? 'Sem PIS e COFINS na venda.' + (regime === 'real' ? ' A compra também não gera crédito.' : '') :
+        tpc === 'zero' ? (pc.lc224 && lc224Vig ? 'Desde 01/04/2026 a alíquota zero deste produto foi reduzida pela LC 224/2025 (art. 4º, § 4º, I): recolhe 10% da alíquota padrão, ou seja, PIS ' + (regime === 'presumido' ? '0,065% e COFINS 0,30%' : '0,165% e COFINS 0,76%') + ' sobre a receita. Na nota o CST continua 06; o valor é informado como ajuste na EFD-Contribuições (registros M220 e M620, Nota Técnica 012/2026). Só a Cesta Básica Nacional (Anexo I da LC 214/2025) e hortícolas, frutas e ovos (Anexo XV) mantêm a alíquota zero integral.' :
+          'Sem PIS e COFINS na venda.' + (pc.lc224 === false ? ' Produto da Cesta Básica Nacional ou dos hortícolas, frutas e ovos da LC 214/2025: a alíquota zero continua integral (LC 224/2025, art. 4º, § 8º, III).' : '')) + (regime === 'real' ? ' A compra também não gera crédito.' : '') :
         'Sem PIS e COFINS na revenda; a compra não gera crédito.';
     }
 

@@ -413,7 +413,7 @@ var Fiscal = (function () {
     var stAprendido = {};
     notas.forEach(function (n) { (n.it || []).forEach(function (i) { if (/^(01|16)/.test(String(i.cest || '').replace(/\D/g, ''))) stAprendido[String(i.ncm)] = 1; }); });
     function isSeg(ncm, cest) { if (varejo) return false; return /^(01|16)/.test(String(cest || '').replace(/\D/g, '')) || stLista(ncm) || !!stAprendido[String(ncm)]; }
-    var condAvisado = {};
+    var condAvisado = {}, lc224Agg = {};
     var CFOP_ST = /^[56]40[1-5]$/;
     // notas de entrada com mesmo fornecedor, data e itens (código + valor) = possível duplicidade
     var assinaturas = {};
@@ -815,6 +815,18 @@ var Fiscal = (function () {
           if (CST_GRUPO(it.cst) === 'st') T.rSTicms += receita;
           if (mono) res.mono.vendas += receita;
           else { var b = Math.max(0, receita - it.v); T.pisD += b * PIS; T.cofD += b * COF; }
+          // LC 224/2025: alíquota zero fora da Cesta Básica Nacional passa a 10% da alíquota padrão desde 01/04/2026
+          if (trPc === 'zero' && regime !== 'simples' && nt.dt >= '2026-04-01') {
+            var cZ = cls(it);
+            if (cZ && cZ.pc && cZ.pc.lc224) {
+              var bZ = Math.max(0, receita - it.v), pZ = bZ * PIS * 0.1, cfZ = bZ * COF * 0.1;
+              T.pisD += pZ; T.cofD += cfZ;
+              var kZ = it.ncm + '|' + nt.dt.slice(0, 7), oZ = lc224Agg[kZ];
+              if (it.vP > 0) { /* já destacou PIS/COFINS na nota */ }
+              else if (oZ) { oZ.imp = r2(oZ.imp + pZ + cfZ); oZ.aj.a.pisD -= pZ; oZ.aj.a.cofD -= cfZ; }
+              else { issue('alerta', it, 'PC_LC224', 'Vendas com alíquota zero de PIS/COFINS (CST ' + (it.cP || '–') + ') neste mês: o valor ao lado soma todas as vendas do NCM no mês. Desde 01/04/2026 a LC 224/2025 (art. 4º, § 4º, I) reduziu esse benefício: recolhe 10% da alíquota padrão, PIS ' + (regime === 'presumido' ? '0,065% e COFINS 0,30%' : '0,165% e COFINS 0,76%') + '. O CST continua 06; o valor entra como ajuste na EFD-Contribuições (M220/M620, Nota Técnica 012/2026). Ficam fora só a Cesta Básica Nacional e os hortícolas, frutas e ovos da LC 214/2025 (art. 4º, § 8º, III).', pZ + cfZ, { a: { pisD: -pZ, cofD: -cfZ } }); lc224Agg[kZ] = issues[issues.length - 1]; }
+            }
+          }
           T.pisDest += it.vP; T.cofDest += it.vC;
         } else if (dir === 'E' && nat === 'devVenda') {
           if (!mono) { var bd = Math.max(0, receita - it.v); T.pisD -= bd * PIS; T.cofD -= bd * COF; }

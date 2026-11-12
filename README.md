@@ -357,3 +357,20 @@ Fontes: páginas oficiais da SEFAZ/SP (legislacao.fazenda.sp.gov.br).
 
 **Incluído em pneus**
 - Compra de pneus de moto, bicicleta e veículos industriais e de câmaras de ar com carga de 12% do fabricante (Anexo II, art. 75) é aceita, com aviso. Para empresa do Simples Nacional, vira alerta.
+
+## PIS/COFINS: LC 224/2025
+
+Desde 01/04/2026, a alíquota zero de PIS/COFINS paga 10% da alíquota padrão (art. 4º, § 4º, I):
+- Lucro Real: PIS 0,165% e COFINS 0,76%;
+- Lucro Presumido: PIS 0,065% e COFINS 0,30%.
+
+**Ficam fora**
+- A Cesta Básica Nacional (LC 214/2025, Anexo I) e os hortícolas, frutas e ovos (Anexo XV), conforme o art. 4º, § 8º, III.
+- Os monofásicos na revenda.
+- O Simples Nacional.
+
+**No portal**
+- A classificação mostra a alíquota reduzida.
+- A apuração soma o débito.
+- O alerta `PC_LC224` aparece uma vez por NCM e mês.
+- A nota mantém o CST 06, e o valor entra como ajuste na EFD-Contribuições (M220/M620, Nota Técnica 012/2026).
