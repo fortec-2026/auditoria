@@ -627,7 +627,7 @@ var REGIMES = [['real', 'Lucro Real'], ['presumido', 'Lucro Presumido'], ['simpl
 function regimeEmp() { return (S.emp && S.emp.meta.regime) || 'real'; }
 var SEGMENTOS = [['autopecas', 'Pneus e autopeças'], ['varejo', 'Varejo de alimentos (mercadinho)'], ['moda', 'Calçados, vestuário e acessórios'], ['outros', 'Outros (comércio em geral)']];
 function monoEmp() {
-  if (!S._monoFn || S._monoFnDe !== S.emp) { var f = F.makeMono(cfgAtual().mono); S._monoFn = function (n) { return f(n) === 'mono'; }; S._monoFnDe = S.emp; }
+  if (!S._monoFn || S._monoFnDe !== S.emp) { var f = F.makeMono(cfgAtual().mono); S._monoFn = function (n) { return f(n); }; S._monoFnDe = S.emp; }
   return S._monoFn;
 }
 function classifDe(ncm, cest, destino, uf, contrib, importado) {

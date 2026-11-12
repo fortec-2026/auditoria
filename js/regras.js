@@ -77,6 +77,7 @@ var Regras = (function () {
     R({ t: 'red', red: 7, p: ['190590'], d: 'Pão francês, de forma e bisnaga', l: 'RICMS/SP, Anexo II, art. 3º, XIV e XXI', cond: true, n: 'Bolos e outros produtos de padaria do mesmo NCM: 18%.' }),
     R({ t: 'red', red: 7, p: ['1001', '110100', '190120', '190211', '190219'], d: 'Trigo, farinha de trigo, pré-misturas e massas não cozidas', l: 'RICMS/SP, Anexo II, art. 3º, XVI a XX', n: 'Na compra interestadual, o crédito fica limitado a 7%.' }),
     R({ t: 'red', red: 7, p: ['110620', '2501', '021020', '1601', '160413', '2209'], d: 'Farinha de mandioca, sal, charque, embutidos (linguiça, salsicha, mortadela), sardinha em lata e vinagre', l: 'RICMS/SP, Anexo II, art. 3º, XXII e XXIII' }),
+    R({ t: 'red', red: 5.6, p: ['8201', '8432', '8433', '8436', '870191', '870192', '870193', '870194', '870195', '871620'], d: 'Máquinas e implementos agrícolas e suas partes e peças (Convênio ICMS 52/91, Anexo II)', l: 'RICMS/SP, art. 54, V, e Anexo II, art. 12, IV (até 31/12/2026)', cond: true, txt: 'Alíquota de 12% com redução da base de cálculo para carga de 5,6% (base de 46,67% do valor), válida até 31/12/2026. Posição da SEFAZ/SP: na venda a consumidor final, contribuinte ou não, vale a redução (RC 29618/2024); a lista é taxativa, só para os produtos descritos e classificados no convênio (RC 19194/2019). Na venda a estabelecimento rural contribuinte (produtor rural), cabe o diferimento do Decreto 51.608/2007, que prevalece sobre a redução (CST 51).', n: 'Confirme se o produto corresponde à descrição do Anexo II do Convênio ICMS 52/91; fora dele, 18%.' }),
     R({ t: 'aliq', a: 12, p: ['330610', '96032100'], d: 'Creme dental e escova de dente', l: 'RICMS/SP, art. 54, XVIII' }),
     R({ t: 'aliq', a: 20, fecoep: 2, p: ['2203'], d: 'Cerveja e chope', l: 'RICMS/SP, art. 54-A; adicional de 2% (FECOEP), art. 56-C' }),
     R({ t: 'aliq', a: 25, p: ['2204', '2205', '2208'], d: 'Vinhos e destilados', l: 'RICMS/SP, art. 55, II' }),
@@ -183,7 +184,7 @@ var Regras = (function () {
         icms.texto = ri.t === 'isentoCF' ? 'Isento na venda a consumidor final em SP. O crédito da compra pode ser mantido até 7%.' : 'Isento nas saídas internas.';
       } else if (ri && (ri.t === 'red' || ri.t === 'isentoCF')) {
         var cRed = cf && ri.redCF ? ri.redCF : (ri.red || 7);
-        icms.titulo = 'Base reduzida: carga de ' + cRed + '%'; icms.cst = simples ? '102' : '20'; icms.carga = cRed;
+        icms.titulo = 'Base reduzida: carga de ' + String(cRed).replace('.', ',') + '%'; icms.cst = simples ? '102' : '20'; icms.carga = cRed;
         icms.texto = ri.txt || ('Redução da base de cálculo para que a carga fique em 7% (cesta básica, Convênio ICMS 128/94), válida até 31/12/2026.' + (ri.t === 'isentoCF' ? ' Para consumidor final o produto é isento.' : ''));
       } else {
         var a = ri && ri.t === 'aliq' ? ri.a : 18;
