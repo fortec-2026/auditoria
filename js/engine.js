@@ -348,6 +348,9 @@ var Fiscal = (function () {
     var ncm = String(it.ncm || ''), vig = !dt || dt <= '2026-12-31';
     if (vig && RED_AGRO.some(function (p) { return ncm.indexOf(p) === 0; }) && (it.cst !== '20' || Math.abs(carga - 5.6) <= 0.1))
       return { carga: 5.6, d: 'redução de base para carga de 5,6% (máquinas e implementos agrícolas, inclusive peças e partes, do Anexo II do Convênio ICMS 52/91)', l: 'RICMS/SP, Anexo II, art. 12, IV, até 31/12/2026' };
+    /* Pneus de moto, bicicleta e veículos industriais e câmaras de ar: carga de 12% na saída interna do fabricante, exceto para Simples Nacional e consumidor final (RICMS/SP, Anexo II, art. 75, até 31/12/2026). */
+    if (vig && /^(40114000|40115000|40118090|40132000|40139000)/.test(ncm) && Math.abs(carga - 12) <= 0.15)
+      return { carga: 12, d: 'carga de 12% na venda interna do fabricante de pneus de moto, bicicleta e veículos industriais e de câmaras de ar (não vale para destinatário do Simples Nacional nem consumidor final; distribuidor e revenda tributam a 18%)', l: 'RICMS/SP, Anexo II, art. 75, até 31/12/2026', fab: true };
     if (vig && /^84|^85|^90/.test(ncm) && it.cst === '20' && Math.abs(carga - 8.8) <= 0.1)
       return { carga: 8.8, d: 'redução de base para carga de 8,8% (máquinas e equipamentos industriais do Anexo I do Convênio ICMS 52/91)', l: 'RICMS/SP, Anexo II, art. 12, II, até 31/12/2026' };
     return null;
@@ -923,7 +926,10 @@ var Fiscal = (function () {
             } else if ((it.cst === '00' || it.cst === '20') && it.p && (it.p !== aliqInt || it.cst === '20')) {
               var cargaF = cargaEfetiva(it), redF = reducaoConhecida(it, nt.dt, cargaF);
               if (redF) {
-                if (it.cst === '20') { /* redução de base prevista na legislação de SP: tributação correta */ }
+                if (redF.fab) {
+                  if (regime === 'simples') issue('alerta', it, 'ALIQ_FORN', 'Fornecedor usou carga de 12% (' + redF.l + '). Esse benefício não vale para venda a empresa do Simples Nacional: o destaque correto seria de ' + aliqInt + '%.', 0);
+                  else issue('info', it, 'ALIQ_FORN', 'Carga de 12% aceita: ' + redF.d + ' (' + redF.l + '). Só está correta se o fornecedor for o fabricante; se for distribuidor, o destaque deveria ser de ' + aliqInt + '%.', 0);
+                } else if (it.cst === '20') { /* redução de base prevista na legislação de SP: tributação correta */ }
                 else issue('info', it, 'ALIQ_FORN', 'Fornecedor usou ' + it.p + '% sem redução de base (CST ' + it.cst + '). Para este produto há ' + redF.d + ' (' + redF.l + '); confira se o destaque deveria ser menor.', 0);
               } else if (it.cst === '20') {
                 if (Math.abs(cargaF - aliqInt) > 0.15) issue('alerta', it, 'ALIQ_FORN', 'Fornecedor reduziu a base de cálculo (CST 20): carga efetiva de ' + fmtPct(cargaF) + ' sobre o valor do item, com alíquota de ' + it.p + '%. O portal não reconheceu um benefício de SP para o NCM ' + it.ncm + ' com essa carga: confirme com o fornecedor qual dispositivo do Anexo II do RICMS/SP ele aplicou.', 0);

@@ -337,3 +337,23 @@ No cadastro (aba do escritório, bloco do ramo) escolha **Estado da empresa = Pa
   - RC 29618/2024: consumidor final, contribuinte ou não, sem diferimento, usa a redução para 5,6%;
   - RC 19194/2019: a lista é taxativa, só para os produtos descritos no convênio.
 - Quando o comprador tem IE, o alerta lembra do diferimento do Decreto 51.608/2007 para estabelecimento rural.
+
+## Revisão de benefícios do RICMS/SP (12/11/2026)
+
+Fontes: páginas oficiais da SEFAZ/SP (legislacao.fazenda.sp.gov.br).
+
+**Corrigido no varejo**
+- **Carnes:** carga de 11% na venda a consumidor final e de 7% nas demais (Anexo II, art. 74, até 31/12/2026). A regra antiga citava o art. 3º, XIII, que está revogado. Carne defumada fica fora (RC 32410/2025).
+- **Queijos:** 18% desde a revogação do art. 51 em 01/04/2021. Compra de fabricante ou atacadista a 12% é correta (art. 39).
+- **Leite:**
+  - longa vida (UHT) saiu do art. 3º, II, que hoje alcança só o leite em pó: fica condicionado a 18%;
+  - leite cru, pasteurizado ou reidratado é isento (Anexo I, art. 103).
+
+**Incluído no varejo**
+- Alho (art. 3º, VI)
+- Biscoitos de trigo simples (art. 3º, XX)
+- Apresuntado (art. 3º, X)
+- Água em garrafão de 10 ou 20 L (art. 3º, XXV)
+
+**Incluído em pneus**
+- Compra de pneus de moto, bicicleta e veículos industriais e de câmaras de ar com carga de 12% do fabricante (Anexo II, art. 75) é aceita, com aviso. Para empresa do Simples Nacional, vira alerta.

@@ -3,7 +3,7 @@
    A regra de prefixo mais longo vence. É orientação: o escritório revisa antes de valer para o cliente. */
 var Regras = (function () {
   // Data da última revisão das regras pela legislação vigente (atualizar a cada revisão aprovada)
-  var REVISAO = '09/11/2026';
+  var REVISAO = '12/11/2026';
   function R(o) { return o; }
 
   /* ---------- PIS/COFINS (revenda pelo comércio, Lucro Real ou Presumido) ---------- */
@@ -56,16 +56,23 @@ var Regras = (function () {
   /* ---------- ICMS/SP: tratamento nas saídas internas ---------- */
   var ICMS = [
     R({ t: 'isento', p: ['0701', '0702', '0703', '0704', '0705', '0706', '0707', '0708', '0709', '0714', '0803', '0804', '0805', '0806', '0807', '0809', '0810', '040721', '040729'], x: ['08062', '0709599'], d: 'Hortifrutigranjeiros em estado natural e ovos', l: 'RICMS/SP, Anexo I, art. 36; Lei 16.887/2018', cst: '40', n: 'Vale para o produto em estado natural ou minimamente processado, sem cozimento nem adição de outros produtos. Congelados, secos e industrializados são tributados.' }),
-    R({ t: 'isentoCF', p: ['1006'], d: 'Arroz', l: 'RICMS/SP, Anexo I, art. 168 (até 31/12/2026); para revenda, Anexo II, art. 3º, XXII', cst: '40', red: 7 }),
-    R({ t: 'isentoCF', p: ['071333', '071335'], d: 'Feijão', l: 'RICMS/SP, Anexo I, art. 169 (até 31/12/2026); para revenda, Anexo II, art. 3º, XXII', cst: '40', red: 7 }),
-    R({ t: 'red', red: 7, p: ['0201', '0202', '0203', '0204', '0206', '0207', '0208', '0209', '0210'], d: 'Carnes e produtos comestíveis do abate', l: 'RICMS/SP, Anexo II, art. 3º, I e XIII (cesta básica)' }),
-    R({ t: 'red', red: 7, p: ['04011010', '04012010', '04021', '04022'], d: 'Leite longa vida (UHT) e leite em pó', l: 'RICMS/SP, Anexo II, art. 3º, II' }),
+    R({ t: 'isentoCF', p: ['1006'], d: 'Arroz', l: 'RICMS/SP, Anexo I, art. 168 (até 31/12/2026); para revenda, Anexo II, art. 3º, XXVI', cst: '40', red: 7 }),
+    R({ t: 'isentoCF', p: ['071333', '071335'], d: 'Feijão', l: 'RICMS/SP, Anexo I, art. 169 (até 31/12/2026); para revenda, Anexo II, art. 3º, XXVII', cst: '40', red: 7 }),
+    R({ t: 'red', red: 7, redCF: 11, p: ['0201', '0202', '0203', '0204', '0206', '0207', '0208', '0209', '0210'], d: 'Carnes e produtos comestíveis do abate (frescos, resfriados, congelados, salgados, secos ou temperados)', l: 'RICMS/SP, Anexo II, art. 74 (até 31/12/2026)', txt: 'Redução da base de cálculo: carga de 11% na venda a consumidor final e de 7% nas demais saídas internas (RICMS/SP, Anexo II, art. 74), válida até 31/12/2026.', n: 'Carne defumada ou industrializada fica fora da redução (SEFAZ/SP, RC 32410/2025: a lista é interpretada literalmente).' }),
+    R({ t: 'red', red: 7, p: ['04021', '04022'], d: 'Leite em pó', l: 'RICMS/SP, Anexo II, art. 3º, II' }),
+    R({ t: 'isento', p: ['04011090', '04012090'], d: 'Leite cru, pasteurizado ou reidratado', l: 'RICMS/SP, Anexo I, art. 103 (até 31/12/2026)', cst: '40', cond: true, n: 'Leite fermentado, longa vida (UHT) e outros lácteos ficam fora.' }),
+    R({ t: 'aliq', a: 18, p: ['04011010', '04012010'], d: 'Leite longa vida (UHT)', l: 'RICMS/SP, art. 52, I; Anexo II, art. 3º, II, hoje só alcança o leite em pó', cond: true, n: 'O leite longa vida saiu da cesta básica do art. 3º, II. Na venda a consumidor final segue a alíquota de 18%. O fabricante tem crédito outorgado (Anexo III, art. 32) e o fabricante ou atacadista pode vender a contribuinte com carga de 12% (Anexo II, art. 39): compras a 12% são corretas.' }),
     R({ t: 'red', red: 7, p: ['09012'], d: 'Café torrado e moído', l: 'RICMS/SP, Anexo II, art. 3º, III' }),
     R({ t: 'red', red: 7, p: ['1507', '1508', '1510', '1511', '1512', '1513', '1514', '1515'], d: 'Óleos vegetais comestíveis', l: 'RICMS/SP, Anexo II, art. 3º, IV', n: 'Azeite de oliva fica fora.' }),
     R({ t: 'red', red: 7, p: ['170114', '170199'], d: 'Açúcar cristal ou refinado', l: 'RICMS/SP, Anexo II, art. 3º, V' }),
     R({ t: 'red', red: 7, p: ['110220', '110313', '110419', '110423'], d: 'Fubá e farinha de milho', l: 'RICMS/SP, Anexo II, art. 3º, VII' }),
     R({ t: 'red', red: 7, p: ['0302', '0303', '0304'], d: 'Peixes', l: 'RICMS/SP, Anexo II, art. 3º, VIII' }),
-    R({ t: 'red', red: 7, p: ['0406', '040510', '151710', '151790'], d: 'Queijos mussarela, prato e minas, manteiga, margarina e creme vegetal', l: 'RICMS/SP, Anexo II, art. 3º, IX', cond: true, n: 'Outros queijos são tributados a 18%.' }),
+    R({ t: 'red', red: 7, p: ['040510', '151710', '151790'], d: 'Manteiga, margarina e creme vegetal', l: 'RICMS/SP, Anexo II, art. 3º, IX', cond: true, n: 'O NCM 1517.90 também tem outros produtos, que seguem 18%.' }),
+    R({ t: 'aliq', a: 18, p: ['0406'], d: 'Queijos', l: 'RICMS/SP, art. 52, I (Anexo II, art. 51, revogado desde 01/04/2021)', n: 'A redução para mussarela, prato e minas acabou em 01/04/2021. Compras de fabricante ou atacadista com carga de 12% são corretas (Anexo II, art. 39), mas a venda a consumidor final é a 18%.' }),
+    R({ t: 'red', red: 7, p: ['070320'], d: 'Alho', l: 'RICMS/SP, Anexo II, art. 3º, VI', n: 'O alho não está na isenção dos hortifrutigranjeiros (Anexo I, art. 36).' }),
+    R({ t: 'red', red: 7, p: ['190531'], d: 'Biscoitos e bolachas de trigo sem cacau, recheio, cobertura ou manteiga (cream cracker, água e sal, maria e similares)', l: 'RICMS/SP, Anexo II, art. 3º, XX', cond: true, n: 'Biscoitos recheados, com cobertura, chocolate ou manteiga seguem 18%.' }),
+    R({ t: 'red', red: 7, p: ['160241', '160249'], d: 'Apresuntado', l: 'RICMS/SP, Anexo II, art. 3º, X', cond: true, n: 'Presunto e outras preparações de carne do mesmo NCM seguem 18%.' }),
+    R({ t: 'red', red: 7, p: ['220110'], d: 'Água mineral em garrafão retornável de 10 ou 20 litros', l: 'RICMS/SP, Anexo II, art. 3º, XXV', cond: true, n: 'Outras embalagens de água seguem 18%.' }),
     R({ t: 'red', red: 7, p: ['0808'], d: 'Maçãs e peras', l: 'RICMS/SP, Anexo II, art. 3º, XI' }),
     R({ t: 'red', red: 7, p: ['190590'], d: 'Pão francês, de forma e bisnaga', l: 'RICMS/SP, Anexo II, art. 3º, XIV e XXI', cond: true, n: 'Bolos e outros produtos de padaria do mesmo NCM: 18%.' }),
     R({ t: 'red', red: 7, p: ['1001', '110100', '190120', '190211', '190219'], d: 'Trigo, farinha de trigo, pré-misturas e massas não cozidas', l: 'RICMS/SP, Anexo II, art. 3º, XVI a XX', n: 'Na compra interestadual, o crédito fica limitado a 7%.' }),
@@ -175,8 +182,9 @@ var Regras = (function () {
         icms.titulo = 'Isento'; icms.cst = simples ? '103' : '40';
         icms.texto = ri.t === 'isentoCF' ? 'Isento na venda a consumidor final em SP. O crédito da compra pode ser mantido até 7%.' : 'Isento nas saídas internas.';
       } else if (ri && (ri.t === 'red' || ri.t === 'isentoCF')) {
-        icms.titulo = 'Base reduzida: carga de 7%'; icms.cst = simples ? '102' : '20'; icms.carga = 7;
-        icms.texto = 'Redução da base de cálculo para que a carga fique em 7% (cesta básica, Convênio ICMS 128/94), válida até 31/12/2026.' + (ri.t === 'isentoCF' ? ' Para consumidor final o produto é isento.' : '');
+        var cRed = cf && ri.redCF ? ri.redCF : (ri.red || 7);
+        icms.titulo = 'Base reduzida: carga de ' + cRed + '%'; icms.cst = simples ? '102' : '20'; icms.carga = cRed;
+        icms.texto = ri.txt || ('Redução da base de cálculo para que a carga fique em 7% (cesta básica, Convênio ICMS 128/94), válida até 31/12/2026.' + (ri.t === 'isentoCF' ? ' Para consumidor final o produto é isento.' : ''));
       } else {
         var a = ri && ri.t === 'aliq' ? ri.a : 18;
         icms.titulo = 'Tributado a ' + a + '%' + (ri && ri.fecoep && cf ? ' + 2% FECOEP' : ''); icms.cst = simples ? '102' : '00'; icms.carga = a;
