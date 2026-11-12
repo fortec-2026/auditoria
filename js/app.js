@@ -867,6 +867,17 @@ var SIT = { aberta: 'Em aberto', contatado: 'Emitente avisado', corrigida: 'Corr
 var SIT_PILL = { aberta: 'alerta', contatado: 'info', corrigida: 'ok', aceita: 'ok' };
 function acompDe(ch) { return S.emp && S.emp.acomp ? S.emp.acomp[ch] : null; }
 function resolvida(ch) { var a = acompDe(ch); return !!a && (a.s === 'corrigida' || a.s === 'aceita'); }
+/* Texto da pendência: primeira frase visível e o restante em "Ver explicação" (abre ao clicar) */
+function msgResumo(m) {
+  m = String(m || '');
+  if (m.length <= 170) return esc(m);
+  var re = /\. (?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ(])/g, x, corte = -1;
+  while ((x = re.exec(m))) { if (x.index >= 25) { corte = x.index + 1; break; } }
+  if (corte < 0 || corte > 260) { corte = m.lastIndexOf(' ', 160); if (corte < 40) corte = 160; }
+  var ini = m.slice(0, corte).trim(), resto = m.slice(corte).trim();
+  if (!resto) return esc(m);
+  return esc(ini) + ' <details class="msg-det"><summary>Ver explicação</summary><div>' + esc(resto) + '</div></details>';
+}
 function celAcomp(ch, temPend) {
   var a = acompDe(ch), h = '';
   if (a) h += '<span class="pill ' + SIT_PILL[a.s] + '">' + SIT[a.s] + '</span>' + (a.t ? '<div class="small" style="max-width:32ch">' + esc(a.t) + '</div>' : '') + '<div class="small">' + new Date(a.em).toLocaleDateString('pt-BR') + '</div>';
@@ -900,7 +911,7 @@ function tabPendencias(pend) {
   h += '<div class="tscroll"><table><thead><tr><th>Gravidade</th><th>Imposto</th><th>Nota</th><th>Emitente / destinatário</th><th>Item</th><th>O que corrigir</th><th class="r">Impacto est.</th><th>Acompanhamento</th></tr></thead><tbody>';
   var LIM_TESTE = 5, restoTeste = S.teste ? Math.max(0, f.length - LIM_TESTE) : 0;
   f.slice(0, S.teste ? LIM_TESTE : S.imprimindo ? 1e9 : 500).forEach(function (p) {
-    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
+    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + msgResumo(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
   if (restoTeste) h += '<tr class="mais-teste"><td colspan="8"><div class="mais-teste-c"><div><b>Mais ' + restoTeste + (restoTeste === 1 ? ' pendência' : ' pendências') + ' encontradas nas suas notas.</b> O relatório completo traz cada uma com a explicação, o valor e como corrigir, além do resumo por mês e do Excel.</div><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div></td></tr>';
   h += '</tbody></table></div>';
