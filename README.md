@@ -374,3 +374,16 @@ Desde 01/04/2026, a alíquota zero de PIS/COFINS paga 10% da alíquota padrão (
 - A apuração soma o débito.
 - O alerta `PC_LC224` aparece uma vez por NCM e mês.
 - A nota mantém o CST 06, e o valor entra como ajuste na EFD-Contribuições (M220/M620, Nota Técnica 012/2026).
+
+## Consumidor final × revenda nas vendas
+
+A conferência do cadastro (`CAD_ICMS`) e a aba Classificação usam o tipo de comprador de cada nota.
+
+**Como o portal decide**
+- **Consumidor final:** NFC-e, `indFinal` = 1 ou comprador sem IE.
+- **Revenda:** comprador contribuinte com IE.
+
+**Exemplos**
+- Carne: 11% para consumidor final e 7% para revenda.
+- Arroz e feijão: isentos para consumidor final e 7% para revenda.
+- Cerveja e cigarro: FECOEP só para consumidor final.

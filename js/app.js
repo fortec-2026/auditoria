@@ -663,7 +663,7 @@ function produtosClassif(ds) {
       var g = mapa[k] || (mapa[k] = { k: k, venda: venda, x: it.x, cp: it.cp, ncm: it.ncm, cest: it.cest, n: 0, v: 0, cP: {}, cI: {}, carga: {}, div: [], cf: 0, uf: {}, forn: venda ? '' : r.parte.n });
       g.n++; g.v += it.vp - it.vd; if (it.cest && !g.cest) g.cest = it.cest;
       if (!venda) return;
-      var cf = n.mod === '65' || n.dIE === '9', uf = n.dUF || 'SP', contrib = n.dIE === '1';
+      var cf = n.mod === '65' || n.indF === '1' || n.dIE !== '1', uf = n.dUF || 'SP', contrib = n.dIE === '1';
       if (cf) g.cf++;
       g.uf[uf] = 1;
       var c = classifDe(it.ncm, it.cest, cf ? 'cf' : 'revenda', uf, contrib, ['1', '2', '3', '8'].indexOf(String(it.o)) >= 0);

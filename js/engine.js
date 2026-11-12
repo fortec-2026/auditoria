@@ -390,7 +390,9 @@ var Fiscal = (function () {
     var PIS = regime === 'presumido' ? 0.0065 : 0.0165, COF = regime === 'presumido' ? 0.03 : 0.076;
     var monoRegra = makeMono(cfg.mono && cfg.mono.length ? cfg.mono : DEFAULT_MONO);
     var classif = cfg.classificar || null, clsCache = {};
-    function cls(it) { if (!classif) return null; var k = it.ncm + '|' + (it.cest || ''); return clsCache[k] || (clsCache[k] = classif({ ncm: it.ncm, cest: it.cest, destino: 'cf', uf: 'SP', regime: regime })); }
+    /* destino da venda: NFC-e, indFinal = 1 ou comprador sem IE = consumidor final; comprador contribuinte com IE = revenda */
+    function destDe(nt) { if (!nt) return 'cf'; if (nt.mod === '65' || nt.indF === '1') return 'cf'; return nt.dIE === '1' ? 'revenda' : 'cf'; }
+    function cls(it, nt) { if (!classif) return null; var dst = destDe(nt), k = it.ncm + '|' + (it.cest || '') + '|' + dst; return clsCache[k] || (clsCache[k] = classif({ ncm: it.ncm, cest: it.cest, destino: dst, uf: 'SP', regime: regime })); }
     // tratamento de PIS/COFINS do item: lista da empresa e, fora de autopeças, as regras gerais (monofásico, ST, alíquota zero)
     // regra condicionada segue o CST da nota (02, 04, 05 ou 06)
     function pcTrat(it) {
@@ -875,7 +877,7 @@ var Fiscal = (function () {
             }
           }
           if (sp && varejo && classif && interna && nat === 'venda') {
-            var cI = cls(it);
+            var cI = cls(it, nt);
             if (cI && !cI.erro && !cI.icms.cond && cI.st.st !== 'cest') {
               var ge = cI.icms.cst === '60' || cI.icms.cst === '500' ? 'st' : (cI.icms.cst === '40' || cI.icms.cst === '103') ? 'isento' : cI.icms.cst === '20' ? 'red' : 'trib';
               var gn = CST_GRUPO(it.cst), base0 = it.vp - it.vd, carga = base0 > 0 ? it.v / base0 * 100 : 0;
@@ -888,7 +890,7 @@ var Fiscal = (function () {
               if (erroI) {
                 var espV = simples ? it.v : (ge === 'st' || ge === 'isento') ? 0 : base0 * cI.icms.carga / 100;
                 var lei = cI.st.st === 'sim' && cI.st.regra ? cI.st.regra.l : cI.icms.regra ? cI.icms.regra.l : 'RICMS/SP, art. 52, I';
-                issue('erro', it, 'CAD_ICMS', 'Saiu com CST ' + (it.cst || '–') + (carga ? ' e carga de ' + r2(carga) + '%' : ' sem ICMS') + '; o esperado é ' + cI.icms.titulo.charAt(0).toLowerCase() + cI.icms.titulo.slice(1) + ' (CST ' + cI.icms.cst + '; ' + lei + '). Corrigir o cadastro do produto no sistema emissor.', Math.abs(espV - it.v), simples ? null : { c: { icmsD: espV - it.v } });
+                issue('erro', it, 'CAD_ICMS', 'Saiu com CST ' + (it.cst || '–') + (carga ? ' e carga de ' + r2(carga) + '%' : ' sem ICMS') + '; o esperado ' + (destDe(nt) === 'cf' ? 'na venda a consumidor final' : 'na venda a contribuinte (revenda)') + ' é ' + cI.icms.titulo.charAt(0).toLowerCase() + cI.icms.titulo.slice(1) + ' (CST ' + cI.icms.cst + '; ' + lei + '). Corrigir o cadastro do produto no sistema emissor.', Math.abs(espV - it.v), simples ? null : { c: { icmsD: espV - it.v } });
               }
             }
           }
