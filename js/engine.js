@@ -846,6 +846,19 @@ var Fiscal = (function () {
           } else if (pos && seg && interna && ['40', '41', '50', '51', '90'].indexOf(it.cst) >= 0 && nat === 'venda') {
             issue('alerta', it, 'SEM_TRIB', 'Venda sem destaque de ICMS (CST ' + it.cst + '). Conferir fundamento.', receita * aliqInt / 100, ajC('icmsD', receita * aliqInt / 100));
           }
+          /* Máquinas e implementos agrícolas (Convênio ICMS 52/91, Anexo II): venda interna tributada acima da carga de 5,6%.
+             SEFAZ/SP, RC 19194/2019 e RC 29618/2024: sem diferimento, aplica-se 12% com redução de base para carga de 5,6%, só para os produtos descritos no convênio. */
+          if (sp && interna && nat === 'venda' && nt.dt <= '2026-12-31' && (it.cst === '00' || it.cst === '20') && it.v > 0 &&
+              RED_AGRO.some(function (p) { return String(it.ncm || '').indexOf(p) === 0; })) {
+            var baseAg = (it.vp || 0) - (it.vd || 0) + (it.vf || 0), cargaAg = baseAg > 0 ? it.v / baseAg * 100 : 0, devAg = baseAg * 5.6 / 100;
+            if (cargaAg > 5.7) {
+              var comIE = !!nt.dIEn || nt.dIE === '1';
+              issue('alerta', it, 'RED_AGRO_SAIDA', 'Venda com carga de ' + fmtPct(cargaAg) + ' (CST ' + it.cst + ', ' + it.p + '%). Máquinas, implementos agrícolas e suas partes e peças do Anexo II do Convênio ICMS 52/91 têm alíquota de 12% com redução de base para carga de 5,6% (RICMS/SP, art. 54, V, e Anexo II, art. 12, IV; benefício até 31/12/2026): ICMS de ' + money(devAg) + ' em vez de ' + money(it.v) + '. ' +
+                'Posição da SEFAZ/SP: na venda a consumidor final, contribuinte ou não, não há diferimento e vale a redução para 5,6% (RC 29618/2024); a lista é taxativa, só para os produtos descritos e classificados no convênio (RC 19194/2019). ' +
+                (comIE ? 'O comprador tem inscrição estadual: se for estabelecimento rural (produtor rural), cabe o diferimento do Decreto 51.608/2007, que prevalece sobre a redução (CST 51, sem destaque). ' : '') +
+                'Confirmar se a peça corresponde à descrição do Anexo II do convênio antes de corrigir.', Math.max(0, it.v - devAg), ajC('icmsD', devAg - it.v));
+            }
+          }
           if (sp && varejo && classif && interna && nat === 'venda') {
             var cI = cls(it);
             if (cI && !cI.erro && !cI.icms.cond && cI.st.st !== 'cest') {

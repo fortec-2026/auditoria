@@ -328,3 +328,12 @@ No cadastro (aba do escritório, bloco do ramo) escolha **Estado da empresa = Pa
 - As conferências específicas de São Paulo ficam desligadas: crédito de pessoa física, remessas, devoluções, cadastro do varejo e DIFAL de compras.
 - **Demonstração**: `#demo-parana` (Paraná Pneus e Peças Exemplo Ltda, fictícia, Lucro Real, ago a out/2026): compras de SP com ICMS próprio e sem ST, compras com ST retida a menor, compra interna com CST 60, uma peça importada a 4% e vendas com ICMS destacado em itens com ST. Notas em `exemplos/notas-parana.zip`.
 - **Preparar guia**: em cada mês e em cada nota da aba ST Paraná, mostra os dados da GR-PR prontos para copiar (código de receita 122-8, marcado como "a confirmar"; CNPJ; IE; referência; valor; vencimento; informações complementares com a chave da NF-e) e o link para a emissão no site da Receita Estadual do PR. A guia em si é emitida no site oficial.
+
+## Peças e máquinas agrícolas nas vendas (SP)
+
+`RED_AGRO_SAIDA` (alerta): venda interna de NCM 8201, 8432, 8433, 8436 ou trator agrícola com carga acima de 5,6%, até 31/12/2026.
+- Base legal: RICMS/SP, art. 54, V, e Anexo II, art. 12, IV; Convênio ICMS 52/91, Anexo II.
+- Posição da SEFAZ/SP:
+  - RC 29618/2024: consumidor final, contribuinte ou não, sem diferimento, usa a redução para 5,6%;
+  - RC 19194/2019: a lista é taxativa, só para os produtos descritos no convênio.
+- Quando o comprador tem IE, o alerta lembra do diferimento do Decreto 51.608/2007 para estabelecimento rural.
