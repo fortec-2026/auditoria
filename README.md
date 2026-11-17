@@ -387,3 +387,15 @@ A conferência do cadastro (`CAD_ICMS`) e a aba Classificação usam o tipo de c
 - Carne: 11% para consumidor final e 7% para revenda.
 - Arroz e feijão: isentos para consumidor final e 7% para revenda.
 - Cerveja e cigarro: FECOEP só para consumidor final.
+
+## Teste grátis: um por CNPJ
+
+**Antes do teste:** a pessoa informa nome e WhatsApp, com aviso de que a RG Fiscal recebe o contato, o CNPJ e o resumo do resultado. As notas continuam sem sair do navegador.
+
+**Registro:** depois de ler os XMLs, o portal chama a função `registrar_teste` (Supabase, tabela `testes_gratis`, gravação só por funções SECURITY DEFINER).
+- Se o CNPJ já testou, mostra o aviso "Esta empresa já fez o teste grátis" com os botões do WhatsApp, sem o resultado.
+- Se é o primeiro teste, grava total, valor a favor, valor contra, erros e alertas com `resultado_teste`.
+
+**No resultado do teste:** aparecem só o card do achado e as 5 primeiras pendências. As outras abas mostram um cadeado e o convite para o relatório completo. Períodos, totais de vendas e compras e o Resumo ficam ocultos.
+
+**Na área do escritório:** o card "Testes grátis" lista os contatos com o link do WhatsApp. O botão "Liberar novo teste" (`liberar_teste`, só o escritório) permite à empresa testar de novo.

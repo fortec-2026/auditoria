@@ -136,7 +136,13 @@ var Banco = (function () {
 
   async function removerAcesso(cnpj, userId) { return ok(await sb.from('empresa_usuarios').delete().eq('empresa_cnpj', cnpj).eq('user_id', userId)); }
 
-  return { sessao: sessao, entrar: entrar, criarConta: criarConta, sair: sair, esqueciSenha: esqueciSenha, novaSenha: novaSenha, aoMudarSessao: aoMudarSessao, perfil: perfil,
+  /* Teste grátis: um por CNPJ (registro só do CNPJ, contato e resultado; as notas não são enviadas) */
+  async function registrarTeste(d) { return ok(await sb.rpc('registrar_teste', { p_cnpj: d.cnpj, p_razao: d.razao || null, p_nome: d.nome, p_whatsapp: d.whatsapp, p_uf: d.uf || null, p_segmento: d.segmento || null, p_regime: d.regime || null, p_qtd: d.qtd || null, p_periodo: d.periodo || null })); }
+  async function resultadoTeste(id, r) { return ok(await sb.rpc('resultado_teste', { p_id: id, p_total: r.total, p_favor: r.favor, p_contra: r.contra, p_erros: r.erros, p_alertas: r.alertas })); }
+  async function testesGratis() { return ok(await sb.from('testes_gratis').select('*').order('criado_em', { ascending: false }).limit(500)); }
+  async function liberarTeste(cnpj) { return ok(await sb.rpc('liberar_teste', { p_cnpj: cnpj })); }
+
+  return { registrarTeste: registrarTeste, resultadoTeste: resultadoTeste, testesGratis: testesGratis, liberarTeste: liberarTeste, sessao: sessao, entrar: entrar, criarConta: criarConta, sair: sair, esqueciSenha: esqueciSenha, novaSenha: novaSenha, aoMudarSessao: aoMudarSessao, perfil: perfil,
     empresas: empresas, contarNotas: contarNotas, garantirEmpresa: garantirEmpresa, salvarEmpresa: salvarEmpresa, apagarEmpresa: apagarEmpresa,
     carregar: carregar, salvarDifalTipo: salvarDifalTipo, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar, excluirPeriodo: excluirPeriodo,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,

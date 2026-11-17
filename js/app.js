@@ -159,7 +159,7 @@ async function iniciar() {
     if (!p) { S.usuario = null; S.view = S.view === 'recuperar' ? 'recuperar' : 'login'; render(); return; }
     S.usuario = p;
     S.empresas = await B.empresas();
-    if (p.papel === 'escritorio') { S.view = 'escritorio'; render(); contarTudo(); carregarEquipe(); }
+    if (p.papel === 'escritorio') { S.view = 'escritorio'; render(); contarTudo(); carregarEquipe(); carregarTestes(); }
     else if (S.empresas.length === 1) await abrirDoBanco(S.empresas[0].cnpj, true);
     else { S.view = 'cliente'; render(); }
   } catch (e) { S.view = 'login'; S.erro = erroTexto(e); render(); }
@@ -167,6 +167,26 @@ async function iniciar() {
 async function carregarEquipe() {
   try { S.equipe = await B.equipe(); } catch (e) { S.equipe = []; }
   if (S.view === 'escritorio') render();
+}
+async function carregarTestes() {
+  try { S.testes = await B.testesGratis(); } catch (e) { S.testes = []; }
+  if (S.view === 'escritorio') render();
+}
+function vTestes() {
+  var L = S.testes || [];
+  var h = '<div class="card" style="padding:18px;display:flex;flex-direction:column;gap:14px"><div><h2>Testes grátis</h2><p class="note">Quem testou o portal com as próprias notas. Cada CNPJ tem um teste; tentativas repetidas e testes liberados aparecem como "não conta no limite". Use "Liberar novo teste" se quiser deixar a empresa testar de novo.</p></div>';
+  if (S.testes == null) h += '<p class="small">Carregando…</p>';
+  else if (!L.length) h += '<p class="small">Ninguém fez o teste ainda.</p>';
+  else h += '<div class="tscroll"><table><thead><tr><th>Data</th><th>Empresa</th><th>Contato</th><th>Ramo</th><th class="r">Encontrado</th><th></th></tr></thead><tbody>' + L.map(function (t) {
+    var wa = String(t.whatsapp || ''), waL = wa.length <= 11 ? '55' + wa : wa;
+    return '<tr><td class="num">' + new Date(t.criado_em).toLocaleDateString('pt-BR') + '<div class="small">' + new Date(t.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '</div></td>' +
+      '<td>' + esc(t.razao || '') + '<div class="small mono">' + fmtCnpj(t.cnpj) + (t.bloqueado ? ' · não conta no limite' : '') + '</div></td>' +
+      '<td>' + esc(t.nome) + '<div class="small"><a href="https://wa.me/' + esc(waL) + '" target="_blank" rel="noopener">' + esc(wa) + '</a></div></td>' +
+      '<td class="small">' + esc([{ autopecas: 'Pneus e autopeças', varejo: 'Varejo', moda: 'Moda', outros: 'Outro' }[t.segmento] || t.segmento || '', t.uf || '', { simples: 'Simples', presumido: 'Presumido', real: 'Real' }[t.regime] || ''].filter(Boolean).join(' · ')) + (t.qtd_notas ? '<div>' + t.qtd_notas + ' notas' + (t.periodo ? ' · ' + esc(t.periodo) : '') + '</div>' : '') + '</td>' +
+      '<td class="r num">' + (t.total != null ? m0(t.total) + '<div class="small">' + (t.erros || 0) + ' erros · ' + (t.alertas || 0) + ' alertas</div>' : '–') + '</td>' +
+      '<td class="r">' + (!t.bloqueado ? '<button class="link" type="button" data-libteste="' + esc(t.cnpj) + '">Liberar novo teste</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+  return h + '</div>';
 }
 function vEquipe() {
   var h = '<div class="card" style="padding:18px;display:flex;flex-direction:column;gap:14px"><div><h2>Equipe do escritório</h2><p class="note">Quem está aqui vê e altera todas as empresas: importa notas, classifica, publica e libera o acesso dos clientes.</p></div>';
@@ -282,6 +302,7 @@ function vEscritorio() {
         (c ? (c.pendentes ? '<span><span class="pill alerta">' + c.pendentes + ' notas não publicadas</span></span>' : '<span><span class="pill ok">Publicado</span></span>') : '') + '</button>';
     }).join('') + '</div>';
   } else h += '<div class="card"><div class="empty"><h2>Nenhuma empresa cadastrada</h2><p class="note">Importe os XMLs de uma empresa para começar. O CNPJ é detectado pelas notas.</p></div></div>';
+  h += vTestes();
   h += vEquipe();
   return h;
 }
@@ -295,7 +316,7 @@ function vPainel() {
     '<div><label class="search" for="q">' + I.search + '<input id="q" type="search" placeholder="Buscar nota, fornecedor, NCM, pendência…" autocomplete="off" value="' + esc(S.q) + '"></label></div></header>' +
     '<div class="veredito" id="veredito"></div>');
   var pend = pendentesPublicar();
-  if (S.demo && S.teste) h += '<div class="banner demo"><span class="grow"><b>Resultado do teste com as suas notas.</b> A análise rodou só no seu navegador: nenhum arquivo foi enviado nem gravado, e tudo some ao fechar a página. Os valores são estimativas para conferir com a RG Fiscal.</span>' +
+  if (S.demo && S.teste) h += '<div class="banner demo"><span class="grow"><b>Resultado do teste com as suas notas.</b> As notas não foram enviadas: a análise rodou no seu navegador e some ao fechar a página. A RG Fiscal recebeu só seu contato, o CNPJ e o total encontrado. Os valores são estimativas para conferir com a RG Fiscal.</span>' +
     '<button class="btn" type="button" data-act="teste">Testar outro arquivo</button>' + botoesWA(WA_TESTE) + '</div>';
   else if (S.demo) { var dm = DEMOS[S.demoTipo || 'pneus']; h += '<div class="banner demo"><span class="grow"><b>Demonstração com notas fictícias</b> de ' + dm.ramo + '. Navegue à vontade: veja as pendências, abra as notas e baixe o Excel.' +
     '<span class="seg demo-ramo" role="group" aria-label="Ramo da demonstração">' + Object.keys(DEMOS).map(function (k) { return '<button type="button" data-demo="' + k + '" aria-pressed="' + ((S.demoTipo || 'pneus') === k) + '">' + DEMOS[k].rot + '</button>'; }).join('') + '</span></span>' +
@@ -437,6 +458,7 @@ function renderMain() {
   var eI = erros.filter(function (p) { return impDe(p) === 'icms' || impDe(p) === 'ambos'; }).length, eP = erros.filter(function (p) { return impDe(p) === 'pc'; }).length, eS = erros.filter(function (p) { return impDe(p) === 'iss'; }).length;
 
   var h = S.demo ? cardAchado(ds, T, erros, alertas) : '';
+  if (!S.teste) {
   h += '<div class="periods" role="group" aria-label="Período">';
   h += '<div class="pgroup"><span class="eyebrow">Período</span><div class="pcards"><button type="button" class="pcard" data-per="all" aria-pressed="' + (S.periodo === 'all') + '"><span class="t">' + (S.grupo === 'semana' ? 'Todas as semanas' : 'Todos os meses') + '</span><span class="d">' + (S.grupo === 'semana' ? S.per.semanas.length + ' semanas' : S.per.meses.length + ' meses') + '</span><span class="m"><span class="dot"></span>' + S.res.notas.length + ' notas</span></button></div></div>';
   if (S.grupo === 'semana') {
@@ -444,6 +466,8 @@ function renderMain() {
     Object.keys(porMes).sort().reverse().forEach(function (m) { h += '<div class="pgroup"><span class="eyebrow">' + esc(mesNome(m)) + '</span><div class="pcards">' + porMes[m].map(semanaCard).join('') + '</div></div>'; });
   } else h += '<div class="pgroup"><span class="eyebrow">Meses</span><div class="pcards">' + S.per.meses.map(mesCard).join('') + '</div></div>';
   h += '</div>';
+  }
+  if (!S.teste) {
   h += '<div class="toolbar"><div class="seg" role="group" aria-label="Agrupar períodos"><button type="button" data-grupo="semana" aria-pressed="' + (S.grupo === 'semana') + '">Semanas</button><button type="button" data-grupo="mes" aria-pressed="' + (S.grupo === 'mes') + '">Meses</button></div><span class="small grow">A apuração oficial é mensal. Dia e semana servem para acompanhamento.</span><div class="row no-print" style="gap:8px">' + (S.teste ? '<a class="btn" target="_blank" rel="noopener" href="' + WA('5516981505852', WA_TESTE) + '">' + I.zap + 'Receber o relatório completo</a>' : '<button class="btn" type="button" data-act="excel"' + (S.gerando ? ' disabled' : '') + '>' + I.up.replace('M12 16V4M7 9l5-5 5 5', 'M12 4v12M7 11l5 5 5-5') + (S.gerando ? 'Gerando…' : 'Baixar Excel') + '</button><button class="btn" type="button" data-act="imprimirPainel">Imprimir</button>') + '</div></div>';
 
   h += '<div class="mov card"><div><span class="small">Vendas</span><b class="num">' + m0(T.vendas) + '</b><span class="small">' + T.nS + ' notas de saída</span></div>' +
@@ -478,11 +502,13 @@ function renderMain() {
     h += '<p class="small" style="margin-top:-8px">Detalhes por ocorrência na aba <button type="button" class="link" data-tab="comparativo">Antes × depois</button>. Pendências "Conferida, sem ação" ficam como estão.</p>';
   }
 
+  }
 
   var vd = $('veredito');
   if (vd) {
     var frase;
-    if (regimeEmp() === 'simples') frase = 'No período, a receita de vendas e serviços soma ' + m0(T.vendas + T.servPrest) + ', sendo ' + m0(T.rMono + T.rSTpc) + ' de PIS/COFINS monofásico ou com ST e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária, para segregar no PGDAS-D.';
+    if (S.teste) frase = (erros.length || alertas.length ? 'Encontramos ' + erros.length + (erros.length === 1 ? ' erro' : ' erros') + ' e ' + alertas.length + (alertas.length === 1 ? ' alerta' : ' alertas') + ' nas suas notas. Veja abaixo as primeiras pendências.' : 'Não encontramos erros nas notas enviadas.');
+    else if (regimeEmp() === 'simples') frase = 'No período, a receita de vendas e serviços soma ' + m0(T.vendas + T.servPrest) + ', sendo ' + m0(T.rMono + T.rSTpc) + ' de PIS/COFINS monofásico ou com ST e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária, para segregar no PGDAS-D.';
     else {
       var cv = comparativo(ds, T, S.cmpAlertas), sI = cv.atual.icms, sPC = cv.atual.pis + cv.atual.cof, dif = (cv.corr.icms + cv.corr.pis + cv.corr.cof) - (cv.atual.icms + cv.atual.pis + cv.atual.cof);
       frase = 'No período, o ICMS fecha ' + (sI < 0 ? 'com saldo credor de ' + m0(-sI) : 'com ' + m0(sI) + ' a recolher') + ' e PIS e COFINS ' + (sPC < 0 ? 'com saldo credor de ' + m0(-sPC) : 'somam ' + m0(sPC) + ' a recolher') + ', como as notas foram emitidas.';
@@ -498,8 +524,10 @@ function renderMain() {
   if (ufEmp() !== 'PR') tabs = tabs.filter(function (t) { return t[0] !== 'stpr'; });
   else tabs = tabs.map(function (t) { return t[0] === 'stpr' ? ['stpr', 'ST Paraná', (function () { var q = (S.res.stPR || []).filter(function (x) { return ds.indexOf(x.dt) >= 0 && !(x.stRet > 0.009) && x.dif > 0.009; }).length; return q ? '<span class="count err">' + q + '</span>' : ''; })()] : t; });
   if (S.tab === 'stpr' && ufEmp() !== 'PR') S.tab = 'apuracao';
+  if (S.teste) tabs = tabs.map(function (t) { return t[0] === 'pendencias' ? t : [t[0], t[1], '<span class="tab-lock" aria-label="no relatório completo">' + I.lock + '</span>']; });
   h += '<div class="card painel-abas"><div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + t[2] + '</button>'; }).join('') + '</div><div class="pbody">';
-  if (S.tab === 'apuracao') h += tabApuracao(ds, T);
+  if (S.teste && S.tab !== 'pendencias') h += tabBloqueadaTeste(tabs.filter(function (t) { return t[0] === S.tab; }).map(function (t) { return t[1]; })[0] || '');
+  else if (S.tab === 'apuracao') h += tabApuracao(ds, T);
   else if (S.tab === 'comparativo') h += tabComparativo(ds, T);
   else if (S.tab === 'pendencias') h += tabPendencias(pendTodas);
   else if (S.tab === 'notas') h += tabNotas(notasF);
@@ -513,6 +541,11 @@ function renderMain() {
   h += '<p class="legal">' + textoLegal() + '</p>';
   el.innerHTML = h;
   bindChart();
+}
+
+function tabBloqueadaTeste(nome) {
+  var o = { 'Resumo': 'o ICMS, o PIS e a COFINS a recolher mês a mês, com débitos e créditos', 'Antes × depois': 'como fica cada imposto depois das correções', 'Notas': 'a lista de notas com o que foi conferido em cada uma', 'Produtos': 'a classificação de cada produto vendido', 'Classificação fiscal': 'o tratamento de ICMS, ST, PIS/COFINS e CBS/IBS de cada NCM', 'DIFAL': 'o DIFAL das vendas e compras de outros estados', 'ST Paraná': 'a antecipação da ST nota a nota e os dados da guia', 'Serviços e fretes': 'os serviços tomados e os fretes', 'IBS/CBS 2026': 'o destaque de IBS e CBS nas notas' }[nome] || 'esta análise';
+  return '<div class="tab-bloq">' + I.lock + '<h3>' + esc(nome) + ' fica no relatório completo</h3><p>Aqui aparece ' + o + '. No teste grátis você vê o total encontrado e as primeiras pendências.</p><div class="row" style="gap:8px;justify-content:center">' + botoesWA(WA_TESTE) + '</div></div>';
 }
 
 /* ---------- gráfico: ICMS débito x crédito ---------- */
@@ -739,6 +772,18 @@ function tabClassif(ds) {
 
 /* ---------- comparativo: como as notas foram emitidas × após corrigir as pendências ---------- */
 var CAMPOS_AJ = ['icmsD', 'icmsC', 'pisD', 'pisC', 'cofD', 'cofC'];
+function achadoTotais(ds) {
+  var favor = 0, contra = 0, er = 0, al = 0;
+  S.res.pend.forEach(function (p) {
+    if (ds.indexOf(p.dt) < 0 || p.sev === 'info' || resolvida(p.ch)) return;
+    if (p.sev === 'erro') er++; else al++;
+    var A = (p.aj && p.aj.a) || {}, C = (p.aj && p.aj.c) || {};
+    var d = 0; ['icms', 'pis', 'cof'].forEach(function (t) { d += ((C[t + 'D'] || 0) - (A[t + 'D'] || 0)) - ((C[t + 'C'] || 0) - (A[t + 'C'] || 0)); });
+    if (!p.aj && p.imp && /^(MONO_TRIB|REM_PC|REM_ICMS|DEV_ICMS_A_MAIS)$/.test(p.cod)) d = -p.imp;
+    if (d < 0) favor -= d; else contra += d;
+  });
+  return { total: Math.round((favor + contra) * 100) / 100, favor: Math.round(favor * 100) / 100, contra: Math.round(contra * 100) / 100, erros: er, alertas: al };
+}
 function cardAchado(ds, T, erros, alertas) {
   var favor = 0, contra = 0, notasP = {};
   S.res.pend.forEach(function (p) {
@@ -762,22 +807,28 @@ function cardAchado(ds, T, erros, alertas) {
   if (simples && (T.rMono || T.rSTicms)) h += '<p class="small ach-nota">No Simples Nacional, ' + m0(T.rMono + T.rSTpc) + ' de receita monofásica e ' + m0(T.rSTicms) + ' com ICMS por substituição tributária não pagam esses tributos no DAS quando segregados no PGDAS-D. Se não foram segregados, parte do DAS pago pode ser recuperada.</p>';
   if (fechado && favor > 0) h += '<p class="small ach-nota">Como o período já foi apurado, valores pagos a mais podem ser recuperados por compensação ou restituição (em geral, dos últimos 5 anos). É uma estimativa: a RG Fiscal confirma caso a caso.</p>';
   h += '<div class="ach-cta">' + (S.teste ? '<span>Quer o relatório completo com todos os apontamentos?</span><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div>'
-    : '<span>Quer ver isso com as notas da sua empresa? É grátis e nada sai do seu computador.</span><button class="btn primary" type="button" data-act="teste">' + I.up + 'Testar com as minhas notas</button>') + '</div></div>';
+    : '<span>Quer ver isso com as notas da sua empresa? É grátis e as notas não saem do seu computador.</span><button class="btn primary" type="button" data-act="teste">' + I.up + 'Testar com as minhas notas</button>') + '</div></div>';
   return h;
 }
 function vTeste() {
   var navR = '<button class="btn ghost" type="button" data-act="verDemo">Ver a demonstração</button><button class="btn ghost" type="button" data-act="voltar">Já sou cliente</button>';
   var t = S.testeCfg || { seg: 'autopecas', reg: 'simples' };
   var h = faixa(nav(navR) + '<div class="faixa-login"><h1>Teste grátis com as notas da sua empresa</h1><p>Envie os XMLs de um mês e veja em segundos os erros nas notas, o imposto pago a mais e os créditos que ficaram para trás.</p></div>', 'alta');
+  var L0 = S.testeLead || {};
+  if (S.testeBloq) h += '<div class="card teste-bloq"><h2>Esta empresa já fez o teste grátis</h2><p>O CNPJ ' + fmtCnpj(S.testeBloq.cnpj) + (S.testeBloq.nome ? ' (' + esc(S.testeBloq.nome) + ')' : '') + ' já usou o teste' + (S.testeBloq.em ? ' em ' + new Date(S.testeBloq.em).toLocaleDateString('pt-BR') : '') + '. O teste grátis é um por empresa. Para conferir as notas todo mês, com o relatório completo, fale com a RG Fiscal.</p><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div>';
   h += '<div class="card teste-card">';
-  h += '<div class="teste-passo"><span class="teste-n">1</span><div><h2>Conte o ramo e o regime</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
+  h += '<div class="teste-passo"><span class="teste-n">1</span><div style="flex:1;min-width:0"><h2>Seus dados</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
+    '<div class="field"><label for="tNome">Seu nome</label><input id="tNome" type="text" autocomplete="name" maxlength="120" value="' + esc(L0.nome || '') + '"></div>' +
+    '<div class="field"><label for="tWa">WhatsApp com DDD</label><input id="tWa" type="tel" inputmode="tel" autocomplete="tel" placeholder="(16) 99999-9999" maxlength="20" value="' + esc(L0.whatsapp || '') + '"></div></div>' +
+    '<p class="small" style="margin-top:6px">A RG Fiscal recebe seu nome, WhatsApp, o CNPJ das notas e o resumo do resultado para entrar em contato. As notas não são enviadas. O teste grátis é um por empresa.</p></div></div>';
+  h += '<div class="teste-passo"><span class="teste-n">2</span><div><h2>Conte o ramo e o regime</h2><div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px">' +
     '<div class="field"><label for="tSeg">Ramo</label><select id="tSeg">' + [['autopecas', 'Pneus e autopeças'], ['varejo', 'Mercadinho, supermercado ou varejo de alimentos'], ['moda', 'Calçados, roupas, bolsas e acessórios'], ['outros', 'Outro comércio']].map(function (o) { return '<option value="' + o[0] + '"' + (t.seg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="tUF">Estado</label><select id="tUF">' + [['SP', 'São Paulo'], ['PR', 'Paraná']].map(function (o) { return '<option value="' + o[0] + '"' + ((t.uf || 'SP') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label for="tReg">Regime</label><select id="tReg">' + [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real']].map(function (o) { return '<option value="' + o[0] + '"' + (t.reg === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div></div></div>';
-  h += '<div class="teste-passo"><span class="teste-n">2</span><div style="flex:1;min-width:0"><h2>Envie os XMLs</h2><p class="note">Use um mês já fechado, por exemplo setembro: o que aparecer de imposto pago a mais pode ser recuperado. Inclua as notas de venda (NF-e e NFC-e) e as de compra; um arquivo .zip serve.</p>' +
+  h += '<div class="teste-passo"><span class="teste-n">3</span><div style="flex:1;min-width:0"><h2>Envie os XMLs</h2><p class="note">Use um mês já fechado, por exemplo setembro: o que aparecer de imposto pago a mais pode ser recuperado. Inclua as notas de venda (NF-e e NFC-e) e as de compra; um arquivo .zip serve.</p>' +
     (S.testeLendo ? '<div class="drop"><b>Lendo ' + S.testeLendo + '…</b><span class="small">Isso leva alguns segundos.</span></div>'
       : '<label class="drop" id="dropTeste" for="arqTeste"><b>' + I.up + ' Arraste os arquivos aqui</b><span class="small">ou clique para escolher · .zip ou .xml</span></label><input id="arqTeste" type="file" accept=".zip,.xml" multiple hidden>') + '</div></div>';
-  h += '<div class="teste-priv">' + I.lock + '<div><b>Seus arquivos não saem do seu computador.</b> A análise roda no seu navegador: nada é enviado para a internet nem gravado, e tudo some ao fechar a página. Você vê o resumo completo e as primeiras pendências; o relatório detalhado fica com a RG Fiscal, se você quiser.</div></div>';
+  h += '<div class="teste-priv">' + I.lock + '<div><b>Seus arquivos não saem do seu computador.</b> A análise roda no seu navegador: as notas não são enviadas para a internet nem gravadas, e tudo some ao fechar a página. Você vê o total encontrado e as primeiras pendências; o relatório detalhado fica com a RG Fiscal, se você quiser.</div></div>';
   h += '</div>';
   return h;
 }
@@ -797,16 +848,26 @@ async function testarArquivos(files) {
   files = files.filter(function (f) { return /\.(zip|xml)$/i.test(f.name); });
   if (!files.length) { toast('Envie arquivos .zip ou .xml.'); return; }
   var t = S.testeCfg = { seg: ($('tSeg') || {}).value || 'autopecas', reg: ($('tReg') || {}).value || 'simples', uf: ($('tUF') || {}).value || 'SP' };
+  var lead = S.testeLead = { nome: (($('tNome') || {}).value || '').trim(), whatsapp: (($('tWa') || {}).value || '').trim() };
+  var waD = lead.whatsapp.replace(/\D/g, '').replace(/^0+/, '');
+  if (lead.nome.length < 2) { toast('Informe seu nome para fazer o teste.'); if ($('tNome')) $('tNome').focus(); return; }
+  if (waD.length < 10 || waD.length > 13) { toast('Informe o WhatsApp com DDD.'); if ($('tWa')) $('tWa').focus(); return; }
+  S.testeBloq = null;
   S.testeLendo = files.length === 1 ? files[0].name : files.length + ' arquivos'; render();
   try {
     var acc = await lerArquivos(files);
     var nfs = acc.notas.filter(function (n) { return !n.tipoDoc; });
     if (!nfs.length) { S.testeLendo = 0; render(); bindDropTeste(); toast('Não encontramos NF-e nem NFC-e nesses arquivos.'); return; }
     var cnpj = detectarCnpj(nfs), nome = nomeDe(nfs, cnpj);
+    var dts = nfs.map(function (n) { return n.dt; }).filter(Boolean).sort(), perTxt = dts.length ? brFull(dts[0]) + ' a ' + brFull(dts[dts.length - 1]) : '';
+    var reg = null;
+    try { reg = await B.registrarTeste({ cnpj: cnpj, razao: nome, nome: lead.nome, whatsapp: waD, uf: t.uf || 'SP', segmento: t.seg, regime: t.reg, qtd: nfs.length, periodo: perTxt }); } catch (eR) { reg = null; }
+    if (reg && reg.ja_testou) { S.testeLendo = 0; S.testeBloq = { cnpj: cnpj, nome: nome, em: reg.primeiro_em }; render(); bindDropTeste(); window.scrollTo(0, 0); return; }
     var e = { id: 'teste', meta: { cnpj: cnpj, nome: nome || fmtCnpj(cnpj), segmento: t.seg, regime: t.reg, uf: t.uf || 'SP', corte: '2026-10-01', mono: [], st: [], publicado: null },
       notas: acc.notas, pub: {}, canc: acc.canc, prodCad: {}, ncmCad: {}, hist: [], acomp: {}, xmls: acc.xml };
-    S.testeLendo = 0; S.teste = true; S.demo = true; S.tourVisto = true; S.tab = 'apuracao';
+    S.testeLendo = 0; S.teste = true; S.demo = true; S.tourVisto = true; S.tab = 'pendencias'; S.periodo = 'all';
     abrirEmpresa(e, true, true); S.imp = null; window.scrollTo(0, 0);
+    if (reg && reg.id) { try { var tot = achadoTotais(diasSel()); B.resultadoTeste(reg.id, tot).catch(function () {}); } catch (eT) {} }
   } catch (err) { S.testeLendo = 0; render(); bindDropTeste(); toast('Não foi possível ler os arquivos: ' + erroTexto(err)); }
 }
 function comparativo(ds, T, comAlertas) {
@@ -1407,7 +1468,7 @@ function passosTour() { return passosTour0().filter(Boolean); }
 function passosTour0() {
   var simples = regimeEmp() === 'simples';
   if (S.demo) return [
-    { t: S.teste ? 'Pronto: suas notas foram conferidas' : 'Em 1 minuto: o que o portal encontra', x: S.teste ? 'Veja o que encontramos. Lembre que nada foi enviado nem gravado: a análise rodou no seu navegador.' : 'Esta é uma empresa fictícia de ' + DEMOS[S.demoTipo || 'pneus'].ramo.replace(/^uma? /, '') + ', com notas como as de qualquer loja. Veja em três passos o que o portal da RG Fiscal mostra.' },
+    { t: S.teste ? 'Pronto: suas notas foram conferidas' : 'Em 1 minuto: o que o portal encontra', x: S.teste ? 'Veja o que encontramos. Lembre que as notas não foram enviadas: a análise rodou no seu navegador.' : 'Esta é uma empresa fictícia de ' + DEMOS[S.demoTipo || 'pneus'].ramo.replace(/^uma? /, '') + ', com notas como as de qualquer loja. Veja em três passos o que o portal da RG Fiscal mostra.' },
     { el: '.achado .ach-main', t: 'O dinheiro em jogo', x: 'O total de tributos a corrigir nas notas: o que a empresa pagou a mais ou deixou de aproveitar de crédito, e o que recolheu a menos e pode virar autuação.' },
     { el: '.tabs [data-tab="pendencias"]', t: 'Cada erro explicado', x: 'Na aba Pendências, cada erro aparece com a nota, o produto, o valor e a base legal, em linguagem simples, para corrigir no sistema emissor ou pedir ao fornecedor.' },
     ufEmp() === 'PR' && !S.teste ? { el: '.tabs [data-tab="stpr"]', t: 'ST do Paraná e a guia', x: 'Compras de São Paulo que vieram com ICMS próprio e sem ST: aqui está a antecipação a recolher na entrada, nota a nota, com a MVA ajustada. Em cada nota, o botão Preparar guia separa os dados da GR-PR para copiar.' } : null,
@@ -1772,6 +1833,7 @@ document.addEventListener('click', function (ev) {
   if (d.limpafiltro) { S.fNcm = ''; S.fNome = ''; S.fForn = ''; renderMain(); return; }
   if (d.cserv) { if (!S.readonly) classificarServ(d.pk, d.cserv); return; }
   if (d.pedeeq) { S.confirmEquipe = d.pedeeq; render(); return; }
+  if (d.libteste) { B.liberarTeste(d.libteste).then(function () { toast('Teste liberado: a empresa pode testar de novo.'); carregarTestes(); }).catch(function (e) { toast(erroTexto(e)); }); return; }
   if (d.rmeq) { B.removerEquipe(d.rmeq).then(function () { S.confirmEquipe = null; toast('Removido da equipe.'); carregarEquipe(); }).catch(function (e) { toast(erroTexto(e)); }); return; }
   if (d.desfazer) { desfazerClasse(d.desfazer, d.origem, d.ncm); return; }
   if (d.abrir) { abrirDoBanco(d.abrir, !(S.usuario && S.usuario.papel === 'escritorio')); return; }
@@ -1899,6 +1961,7 @@ document.addEventListener('change', function (ev) {
     if (k === 'b') cf[u].b = t.value === 'dupla' ? 'dupla' : null; else { var nv = parseFloat(String(t.value).replace(',', '.')); if (isFinite(nv) && nv >= 0 && nv < 40) cf[u][k] = nv; }
     ls('pf.difalUF', JSON.stringify(cf)); S.aliqAberto = true; renderMain();
   }
+  else if (t.id === 'tNome' || t.id === 'tWa') { S.testeLead = { nome: ($('tNome') || {}).value || '', whatsapp: ($('tWa') || {}).value || '' }; }
   else if (t.id === 'tSeg' || t.id === 'tReg' || t.id === 'tUF') { S.testeCfg = { seg: $('tSeg').value, reg: $('tReg').value, uf: $('tUF').value }; }
   else if (t.id === 'nome' && S.emp && !S.exemplo) {
     var nm = t.value.trim(); S.emp.meta.nome = nm;

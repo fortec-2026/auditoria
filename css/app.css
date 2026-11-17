@@ -405,3 +405,11 @@ tbody tr.grp-prod:hover td{background:var(--surface-2)}
 .msg-det[open] summary{margin-bottom:4px}
 .msg-det div{font-size:.95em;line-height:1.45;color:inherit;background:rgba(127,127,127,.07);border-radius:8px;padding:8px 10px}
 @media print{.msg-det summary{display:none}.msg-det div{background:none;padding:0}.msg-det:not([open]) div{display:block}}
+.tab-lock{display:inline-flex;margin-left:6px;opacity:.55}
+.tab-lock .ico{width:13px;height:13px}
+.tab-bloq{text-align:center;padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.tab-bloq>.ico{width:28px;height:28px;opacity:.6}
+.tab-bloq p{max-width:520px;margin:0}
+.teste-bloq{max-width:760px;margin:0 auto 16px;box-sizing:border-box;padding:18px 26px;border:2px solid #d4a000;background:#fff7e0;display:flex;flex-direction:column;gap:10px}
+.teste-bloq h2{margin:0}
+@media (prefers-color-scheme: dark){.teste-bloq{background:rgba(212,160,0,.12)}}
