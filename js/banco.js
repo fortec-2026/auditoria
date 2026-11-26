@@ -93,6 +93,16 @@ var Banco = (function () {
   /* ---------- acessos dos clientes ---------- */
   async function acessos(cnpj) { return ok(await sb.rpc('clientes_da_empresa', { p_cnpj: cnpj })); }
   // a conta é criada no servidor (função criar-acesso), que confere se quem pede é do escritório
+  // nova senha para um cliente que esqueceu a dele (só o escritório; a função confere)
+  async function senhaCliente(email, senha) {
+    var r = await sb.functions.invoke('criar-acesso', { body: { acao: 'senha', email: email, senha: senha } });
+    if (r.error) {
+      var msg = r.error.message;
+      try { var j = await r.error.context.json(); if (j && j.erro) msg = j.erro; } catch (e) {}
+      throw new Error(msg);
+    }
+    return r.data;
+  }
   async function criarAcesso(cnpj, email, senha) {
     var r = await sb.functions.invoke('criar-acesso', { body: { email: email, senha: senha, cnpj: cnpj } });
     if (r.error) {
@@ -146,7 +156,7 @@ var Banco = (function () {
     empresas: empresas, contarNotas: contarNotas, garantirEmpresa: garantirEmpresa, salvarEmpresa: salvarEmpresa, apagarEmpresa: apagarEmpresa,
     carregar: carregar, salvarDifalTipo: salvarDifalTipo, salvarNotas: salvarNotas, salvarCancelamentos: salvarCancelamentos, publicar: publicar, excluirPeriodo: excluirPeriodo,
     classificarProduto: classificarProduto, removerProduto: removerProduto, classificarNcm: classificarNcm, removerNcm: removerNcm,
-    acessos: acessos, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
+    acessos: acessos, senhaCliente: senhaCliente, criarAcesso: criarAcesso, removerAcesso: removerAcesso,
     equipe: equipe, adicionarEquipe: adicionarEquipe, removerEquipe: removerEquipe,
     salvarAcompanhamento: salvarAcompanhamento, removerAcompanhamento: removerAcompanhamento,
     salvarXmls: salvarXmls, xmlDe: xmlDe };

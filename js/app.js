@@ -380,7 +380,7 @@ function renderOffice() {
   else {
     if (S.acessos === null) h += '<p class="small">Carregando…</p>';
     else if (!S.acessos.length) h += '<p class="small">Nenhum acesso cadastrado.</p>';
-    else h += '<div class="tscroll"><table><tbody>' + S.acessos.map(function (a) { return '<tr><td>' + esc(a.email) + '<div class="small">' + (a.confirmado ? (a.ultimo_acesso ? 'último acesso ' + new Date(a.ultimo_acesso).toLocaleDateString('pt-BR') : 'nunca entrou') : 'aguardando confirmar o e-mail') + '</div></td><td class="r"><button class="link" type="button" data-remover="' + esc(a.user_id) + '">Remover</button></td></tr>'; }).join('') + '</tbody></table></div>';
+    else h += '<div class="tscroll"><table><tbody>' + S.acessos.map(function (a) { return '<tr><td>' + esc(a.email) + '<div class="small">' + (a.confirmado ? (a.ultimo_acesso ? 'último acesso ' + new Date(a.ultimo_acesso).toLocaleDateString('pt-BR') : 'nunca entrou') : 'aguardando confirmar o e-mail') + '</div>' + (S.senhaPara === a.email ? '<form class="row nova-senha" data-form="senhaCli" style="gap:8px;margin-top:8px;flex-wrap:wrap"><input id="novaSenhaCli" type="text" minlength="8" autocomplete="off" placeholder="Nova senha (mín. 8 caracteres)" aria-label="Nova senha para ' + esc(a.email) + '"><button class="btn" type="submit"' + (S.salvandoSenha ? ' disabled' : '') + '>' + (S.salvandoSenha ? 'Salvando…' : 'Salvar senha') + '</button><button class="link" type="button" data-novasenha="">Cancelar</button></form><p class="small" style="margin-top:4px">A senha antiga deixa de valer. Envie a nova por WhatsApp ou telefone e peça para o cliente trocá-la em "Esqueci a senha".</p>' : '') + '</td><td class="r" style="white-space:nowrap"><button class="link" type="button" data-novasenha="' + esc(a.email) + '">Nova senha</button> · <button class="link" type="button" data-remover="' + esc(a.user_id) + '">Remover</button></td></tr>'; }).join('') + '</tbody></table></div>';
     h += '<form id="fAcesso" class="row"><div class="field"><label for="acEmail">E-mail do cliente</label><input id="acEmail" type="email" required autocomplete="off"></div><div class="field"><label for="acSenha">Senha inicial</label><input id="acSenha" type="text" minlength="8" required autocomplete="off"></div><button class="btn" type="submit">Liberar acesso</button></form>';
     h += '<p class="note">Se o e-mail ainda não tem conta, ela é criada já pronta para entrar com essa senha. Se já tem conta, só o acesso a esta empresa é liberado e a senha dele não muda. Envie a senha ao cliente por um canal diferente do e-mail e peça para trocá-la em "Esqueci a senha".</p>';
   }
@@ -1846,6 +1846,7 @@ document.addEventListener('click', function (ev) {
   if (d.rmeq) { B.removerEquipe(d.rmeq).then(function () { S.confirmEquipe = null; toast('Removido da equipe.'); carregarEquipe(); }).catch(function (e) { toast(erroTexto(e)); }); return; }
   if (d.desfazer) { desfazerClasse(d.desfazer, d.origem, d.ncm); return; }
   if (d.abrir) { abrirDoBanco(d.abrir, !(S.usuario && S.usuario.papel === 'escritorio')); return; }
+  if (d.novasenha !== undefined) { S.senhaPara = d.novasenha || null; render(); if (S.senhaPara) setTimeout(function () { var i = $('novaSenhaCli'); if (i) i.focus(); }, 0); return; }
   if (d.remover) {
     B.removerAcesso(S.emp.id, d.remover).then(function () { toast('Acesso removido.'); carregarAcessos(); }).catch(function (e) { toast(erroTexto(e)); });
     return;
@@ -1951,6 +1952,13 @@ document.addEventListener('submit', async function (ev) {
     var em = $('acEmail').value.trim(), sn = $('acSenha').value;
     try { var ra = await B.criarAcesso(S.emp.id, em, sn); toast((ra && ra.criado ? 'Conta criada e acesso liberado para ' : 'Acesso liberado para ') + em + '.'); carregarAcessos(); }
     catch (e) { toast('Não foi possível liberar: ' + erroTexto(e)); }
+  } else if (f.dataset.form === 'senhaCli') {
+    var ns = ($('novaSenhaCli') || {}).value || '', para = S.senhaPara;
+    if (ns.length < 8) { toast('A senha precisa ter pelo menos 8 caracteres.'); return; }
+    S.salvandoSenha = true; render();
+    try { await B.senhaCliente(para, ns); S.senhaPara = null; toast('Nova senha salva para ' + para + '. Envie por WhatsApp ou telefone.'); }
+    catch (e) { toast('Não foi possível trocar a senha: ' + erroTexto(e)); }
+    S.salvandoSenha = false; render();
   }
 });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'q') { S.q = ev.target.value.trim(); renderMain(); } else if (ev.target.id === 'simV') { S.sim.v = ev.target.value; var o = $('simSaida'); if (o) o.innerHTML = simResultado(); } });
