@@ -399,3 +399,12 @@ A conferência do cadastro (`CAD_ICMS`) e a aba Classificação usam o tipo de c
 **No resultado do teste:** aparecem só o card do achado e as 5 primeiras pendências. As outras abas mostram um cadeado e o convite para o relatório completo. Períodos, totais de vendas e compras e o Resumo ficam ocultos.
 
 **Na área do escritório:** o card "Testes grátis" lista os contatos com o link do WhatsApp. O botão "Liberar novo teste" (`liberar_teste`, só o escritório) permite à empresa testar de novo.
+
+## Reboques, semirreboques e suas partes (NCM 8716), SP
+
+`RED_8716_SAIDA` (alerta): venda interna de item do NCM 8716 com carga acima de 12%, até 31/12/2026.
+- Base legal: RICMS/SP, Anexo II, art. 65, III (Convênio ICMS 190/17).
+- Vale também para o revendedor (RC 32023/2025, rodas e rodízios no 8716.90.90) e sem estorno de crédito (§ 1º).
+- O alerta traz o quadro "Como a nota deveria sair": CST 20, redução de 33,3333%, alíquota de 18%, carga de 12%.
+- O reboque agrícola (8716.20) fica com o art. 12 (carga de 5,6%).
+- A Classificação fiscal mostra a mesma regra.

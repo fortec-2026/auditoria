@@ -885,6 +885,25 @@ var Fiscal = (function () {
               };
             }
           }
+          /* Reboques, semirreboques e suas partes (NCM 8716): carga de 12% nas saídas internas, inclusive do revendedor
+             (RICMS/SP, Anexo II, art. 65, III; Convênio ICMS 190/17; até 31/12/2026; SEFAZ/SP, RC 32023/2025 e RC 17529/2018). */
+          if (sp && interna && nat === 'venda' && nt.dt <= '2026-12-31' && (it.cst === '00' || it.cst === '20') && it.v > 0 &&
+              String(it.ncm || '').indexOf('8716') === 0 && !RED_AGRO.some(function (p) { return String(it.ncm || '').indexOf(p) === 0; })) {
+            var base65 = (it.vp || 0) - (it.vd || 0) + (it.vf || 0), carga65 = base65 > 0 ? it.v / base65 * 100 : 0, dev65 = base65 * 12 / 100;
+            if (carga65 > 12.1) {
+              issue('alerta', it, 'RED_8716_SAIDA', 'Venda com carga de ' + fmtPct(carga65) + ' (CST ' + it.cst + ', ' + it.p + '%). Reboques, semirreboques e suas partes (NCM 8716) têm redução de base de cálculo para carga de 12% nas saídas internas (RICMS/SP, Anexo II, art. 65, III; Convênio ICMS 190/17; benefício até 31/12/2026): ICMS de ' + money(dev65) + ' em vez de ' + money(it.v) + '. ' +
+                'Posição da SEFAZ/SP: a redução alcança as partes classificadas no NCM 8716, inclusive na venda do revendedor (RC 32023/2025, rodas e rodízios no 8716.90.90; RC 17529/2018). Não é preciso estornar o crédito da compra (art. 65, § 1º). ' +
+                'Confirmar se o produto está corretamente classificado no NCM 8716; peça de trator ou de máquina agrícola tem NCM e benefício próprios.', Math.max(0, it.v - dev65), ajC('icmsD', dev65 - it.v));
+              var bc65 = r2(base65 * 2 / 3), v65 = r2(bc65 * 0.18);
+              issues[issues.length - 1].sug = {
+                titulo: 'Como o item deveria sair (venda interna, com a redução)',
+                linhas: [['CFOP', it.cf], ['CST', '20 (com redução de base de cálculo)'], ['Modalidade da base (modBC)', '3 (valor da operação)'], ['Valor do item', money(base65)],
+                  ['% de redução da base (pRedBC)', '33,3333%'], ['Base de cálculo (vBC)', money(bc65) + ' (66,6667% de ' + money(base65) + ')'], ['Alíquota (pICMS)', '18%'], ['ICMS (vICMS)', money(v65) + ' (carga de 12%)'],
+                  ['Informações complementares', 'Base de cálculo reduzida conforme RICMS/SP, Anexo II, art. 65, III (Convênio ICMS 190/17).']],
+                obs: 'Mantenha o CFOP, o valor e as demais informações da nota. Confirme no seu emissor se ele também pede o ICMS desonerado.'
+              };
+            }
+          }
           if (sp && varejo && classif && interna && nat === 'venda') {
             var cI = cls(it, nt);
             if (cI && !cI.erro && !cI.icms.cond && cI.st.st !== 'cest') {
