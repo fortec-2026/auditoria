@@ -938,6 +938,12 @@ var SIT_PILL = { aberta: 'alerta', contatado: 'info', corrigida: 'ok', aceita: '
 function acompDe(ch) { return S.emp && S.emp.acomp ? S.emp.acomp[ch] : null; }
 function resolvida(ch) { var a = acompDe(ch); return !!a && (a.s === 'corrigida' || a.s === 'aceita'); }
 /* Texto da pendência: primeira frase visível e o restante em "Ver explicação" (abre ao clicar) */
+/* Quadro "Como deveria sair" (campos sugeridos para corrigir o item) */
+function sugHtml(s) {
+  if (!s) return '';
+  function tab(t, L) { return '<div class="sug-t">' + esc(t) + '</div><table class="sug-tab"><tbody>' + L.map(function (l) { return '<tr><th>' + esc(l[0]) + '</th><td>' + esc(l[1]) + '</td></tr>'; }).join('') + '</tbody></table>'; }
+  return '<div class="sug">' + tab(s.titulo, s.linhas) + (s.alt ? tab(s.alt.titulo, s.alt.linhas) : '') + (s.obs ? '<p class="small">' + esc(s.obs) + '</p>' : '') + '</div>';
+}
 function msgResumo(m) {
   m = String(m || '');
   if (m.length <= 170) return esc(m);
@@ -981,7 +987,7 @@ function tabPendencias(pend) {
   h += '<div class="tscroll"><table><thead><tr><th>Gravidade</th><th>Imposto</th><th>Nota</th><th>Emitente / destinatário</th><th>Item</th><th>O que corrigir</th><th class="r">Impacto est.</th><th>Acompanhamento</th></tr></thead><tbody>';
   var LIM_TESTE = 5, restoTeste = S.teste ? Math.max(0, f.length - LIM_TESTE) : 0;
   f.slice(0, S.teste ? LIM_TESTE : S.imprimindo ? 1e9 : 500).forEach(function (p) {
-    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + msgResumo(p.msg) + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
+    h += '<tr><td><span class="pill ' + p.sev + '">' + { erro: 'Erro', alerta: 'Alerta', info: 'Aviso' }[p.sev] + '</span><div class="small">' + (p.quem === 'cliente' ? 'Cliente' : 'Fornecedor') + '</div></td><td><span class="tag">' + IMP_LBL[impDe(p)] + '</span></td><td class="num" style="white-space:nowrap"><button type="button" class="link" data-ver="' + esc(p.ch) + '" title="Ver a nota">Nº ' + esc(p.n) + '</button><div class="small">' + brFull(p.dt) + '</div></td><td>' + esc(p.parte || 'Consumidor final') + '</td><td>' + (p.item ? esc(p.x) + '<div class="small mono">NCM ' + esc(p.ncm) + ' · item ' + p.item + '</div>' : '<span class="small">Nota inteira</span>') + '</td><td class="msg"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + msgResumo(p.msg) + (p.sug ? '<details class="msg-det sug-det"><summary>Como a nota deveria sair</summary>' + sugHtml(p.sug) + '</details>' : '') + (p.cod === 'PROD_PEND' ? ' <button type="button" class="link" data-act="irProdutos">Classificar</button>' : '') + '</td><td class="r num">' + (p.imp ? m0(p.imp) : '–') + '</td><td>' + celAcomp(p.ch, true) + '</td></tr>';
   });
   if (restoTeste) h += '<tr class="mais-teste"><td colspan="8"><div class="mais-teste-c"><div><b>Mais ' + restoTeste + (restoTeste === 1 ? ' pendência' : ' pendências') + ' encontradas nas suas notas.</b> O relatório completo traz cada uma com a explicação, o valor e como corrigir, além do resumo por mês e do Excel.</div><div class="row" style="gap:8px">' + botoesWA(WA_TESTE) + '</div></div></td></tr>';
   h += '</tbody></table></div>';
@@ -1377,7 +1383,7 @@ function tabReforma(ds, T) {
 function csv() {
   var ds = diasSel(), pend = S.res.pend.filter(function (p) { return ds.indexOf(p.dt) >= 0; });
   var linhas = [['gravidade', 'imposto', 'origem', 'data', 'numero', 'chave', 'emitente_destinatario', 'item', 'ncm', 'descricao', 'ocorrencia', 'detalhe', 'impacto_estimado']];
-  pend.forEach(function (p) { linhas.push([p.sev, IMP_LBL[impDe(p)], p.quem, brFull(p.dt), p.n, p.ch, p.parte, p.item || '', p.ncm, p.x, COD_TIT[p.cod] || p.cod, p.msg, String(p.imp).replace('.', ',')]); });
+  pend.forEach(function (p) { linhas.push([p.sev, IMP_LBL[impDe(p)], p.quem, brFull(p.dt), p.n, p.ch, p.parte, p.item || '', p.ncm, p.x, COD_TIT[p.cod] || p.cod, p.msg + (p.sug ? ' | Como deveria sair: ' + p.sug.linhas.map(function (l) { return l[0] + ': ' + l[1]; }).join('; ') + (p.sug.alt ? ' | ' + p.sug.alt.titulo + ': ' + p.sug.alt.linhas.map(function (l) { return l[0] + ': ' + l[1]; }).join('; ') : '') : ''), String(p.imp).replace('.', ',')]); });
   var txt = '﻿' + linhas.map(function (l) { return l.map(function (c) { c = String(c == null ? '' : c); return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n');
   salvarArquivo('pendencias_' + S.emp.meta.cnpj + '.csv', new Blob([txt], { type: 'text/csv;charset=utf-8' }));
 }
@@ -1746,7 +1752,7 @@ function vNota() {
 
   var notaToda = pend.filter(function (p) { return !p.item; });
   if (pend.length && n.tipoDoc) notaToda = pend;
-  if (notaToda.length) h += '<div><h3>Conferência</h3>' + notaToda.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</div>';
+  if (notaToda.length) h += '<div><h3>Conferência</h3>' + notaToda.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + sugHtml(p.sug) + '</div>'; }).join('') + '</div>';
   if (v.carregando) h += '<p class="small">Carregando o XML original…</p>';
   else if (v.semXml) h += '<p class="note">O XML original desta nota não está guardado (ela foi importada antes desta versão do portal). Reimporte o arquivo para ver endereços, transporte, cobrança e informações complementares e para baixar o XML.</p>';
   h += '</div>';
@@ -1763,7 +1769,7 @@ function vNfe(n, x, pend) {
   n.it.forEach(function (it) {
     var ps = pend.filter(function (p) { return p.item === it.k; }), pior = ps.some(function (p) { return p.sev === 'erro'; }) ? 'erro' : ps.some(function (p) { return p.sev === 'alerta'; }) ? 'alerta' : '';
     h += '<tr class="' + (pior ? 'tem-' + pior : '') + '"><td class="num">' + it.k + '</td><td>' + esc(it.x) + '<div class="small">Cód. ' + esc(it.cp || '–') + '</div></td><td class="mono">' + esc(it.ncm) + (it.ex ? ' ex ' + esc(it.ex) : '') + (it.cest ? '<div class="small">' + esc(it.cest) + '</div>' : '') + '</td><td class="num">' + esc(it.cf) + '</td><td class="num">' + esc(it.o + it.cst) + '</td><td class="r num">' + m0(it.vp - it.vd) + '</td><td class="r num">' + m0(it.bc) + '</td><td class="r num">' + m0(it.v) + (it.p ? '<div class="small">' + it.p + '%</div>' : '') + '</td><td class="r num">' + (it.vst ? m0(it.vst) : it.stR ? '<span class="small">ret. ' + m0(it.stR) + '</span>' : '–') + '</td><td class="num">CST ' + esc(it.cP || '–') + (it.vP || it.vC ? '<div class="small">' + m0(it.vP) + ' / ' + m0(it.vC) + '</div>' : '') + '</td></tr>';
-    if (ps.length) h += '<tr class="tem-' + pior + '"><td></td><td colspan="9">' + ps.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + '</div>'; }).join('') + '</td></tr>';
+    if (ps.length) h += '<tr class="tem-' + pior + '"><td></td><td colspan="9">' + ps.map(function (p) { return '<div class="issue ' + p.sev + '"><b>' + esc(COD_TIT[p.cod] || p.cod) + '.</b> ' + esc(p.msg) + sugHtml(p.sug) + '</div>'; }).join('') + '</td></tr>';
   });
   h += '</tbody></table></div></div>';
   var t = n.t || {};

@@ -874,6 +874,15 @@ var Fiscal = (function () {
                 'Posição da SEFAZ/SP: na venda a consumidor final, contribuinte ou não, não há diferimento e vale a redução para 5,6% (RC 29618/2024); a lista é taxativa, só para os produtos descritos e classificados no convênio (RC 19194/2019). ' +
                 (comIE ? 'O comprador tem inscrição estadual: se for estabelecimento rural (produtor rural), cabe o diferimento do Decreto 51.608/2007, que prevalece sobre a redução (CST 51, sem destaque). ' : '') +
                 'Confirmar se a peça corresponde à descrição do Anexo II do convênio antes de corrigir.', Math.max(0, it.v - devAg), ajC('icmsD', devAg - it.v));
+              var bcAg = r2(baseAg * 5.6 / 12), vAg = r2(bcAg * 0.12);
+              issues[issues.length - 1].sug = {
+                titulo: 'Como o item deveria sair (venda interna, com a redução)',
+                linhas: [['CFOP', it.cf], ['CST', '20 (com redução de base de cálculo)'], ['Modalidade da base (modBC)', '3 (valor da operação)'], ['Valor do item', money(baseAg)],
+                  ['% de redução da base (pRedBC)', '53,3333%'], ['Base de cálculo (vBC)', money(bcAg) + ' (46,6667% de ' + money(baseAg) + ')'], ['Alíquota (pICMS)', '12%'], ['ICMS (vICMS)', money(vAg) + ' (carga de 5,6%)'],
+                  ['Informações complementares', 'Base de cálculo reduzida conforme RICMS/SP, Anexo II, art. 12, IV (Convênio ICMS 52/91).']],
+                alt: comIE ? { titulo: 'Se o comprador for produtor rural (estabelecimento rural inscrito)', linhas: [['CST', '51 (diferimento)'], ['Destaque de ICMS', 'nenhum (vICMS 0,00)'], ['Informações complementares', 'ICMS diferido nos termos do Decreto 51.608/2007.']] } : null,
+                obs: 'Mantenha o CFOP, o valor e as demais informações da nota. Confirme no seu emissor se ele também pede o ICMS desonerado.'
+              };
             }
           }
           if (sp && varejo && classif && interna && nat === 'venda') {
