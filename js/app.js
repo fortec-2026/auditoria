@@ -19,7 +19,7 @@ var S = {
   emp: null,               // {id, meta, notas, pub, canc, prodCad, ncmCad, hist}
   readonly: true, exemplo: false, modo: 'cliente',
   res: null, per: null, acessos: null,
-  periodo: 'all', grupo: 'semana', tab: 'apuracao', det: 'semana',
+  periodo: 'all', grupo: 'mes', tab: 'apuracao', det: 'semana',
   q: '', fQuem: 'todos', fSev: 'todos', fImp: 'todos', fProd: 'todos', porNcm: false,
   fSit: 'abertas', fNota: 'todas', editAc: null, imp: null, confirmDel: false, ocupado: false, erro: '', aviso: '', telaLogin: 'entrar', equipe: null, confirmEquipe: null
 };
@@ -129,8 +129,16 @@ function recalcular() {
   if (!S.emp || !S.emp.notas.length) { S.res = null; S.per = null; return; }
   S.res = F.analisar(S.emp.notas, cfgAtual());
   S.per = F.periodos(S.res.dias);
+  if (S.periodo === 'auto') S.periodo = mesPadrao();
   var ok = S.periodo === 'all' || S.per.semanas.some(function (w) { return 'w:' + w.ini === S.periodo; }) || S.per.meses.some(function (m) { return 'm:' + m.mes === S.periodo; });
   if (!ok) S.periodo = 'all';
+}
+/* Mês aberto por padrão: o mês atual, se tiver notas; senão o último mês com notas */
+function mesPadrao() {
+  if (!S.per || !S.per.meses.length) return 'all';
+  var d = new Date(), atual = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  var ms = S.per.meses.map(function (m) { return m.mes; }).sort();
+  return 'm:' + (ms.indexOf(atual) >= 0 ? atual : ms[ms.length - 1]);
 }
 function diasSel() {
   if (!S.per) return [];
@@ -227,7 +235,7 @@ async function carregarAcessos() {
 }
 function abrirEmpresa(e, readonly, exemplo) {
   S.emp = e; S.readonly = !!readonly; S.exemplo = !!exemplo; S.acessos = null;
-  S.view = 'painel'; S.periodo = 'all'; S.q = ''; S.imp = null; S.confirmDel = false;
+  S.view = 'painel'; S.periodo = S.demo ? 'all' : 'auto'; if (!S.demo) S.grupo = 'mes'; S.q = ''; S.imp = null; S.confirmDel = false;
   S.modo = readonly || exemplo ? 'cliente' : (e.notas.length ? 'cliente' : 'escritorio');
   recalcular(); render(); window.scrollTo(0, 0);
   if ((S.readonly || S.demo) && !S.tourVisto && ls('pf.tourOff') !== '1') { S.tourVisto = true; setTimeout(function () { iniciarTour(); }, 350); }
@@ -409,7 +417,7 @@ async function excluirPeriodo() {
     var fora = {}; alvo.forEach(function (a) { fora[a.ch] = 1; });
     e.notas = e.notas.filter(function (a) { return !fora[a.ch]; });
     Object.keys(fora).forEach(function (k) { delete e.pub[k]; if (e.xmls) delete e.xmls[k]; if (e.acomp) delete e.acomp[k]; });
-    S.excl = { aberto: true }; S.ocupado = false; S.periodo = 'all';
+    S.excl = { aberto: true }; S.ocupado = false; S.periodo = 'auto';
     recalcular(); render();
     toast((n === 1 ? '1 nota excluída' : n + ' notas excluídas') + ' do período de ' + brFull(x.ini) + ' a ' + brFull(x.fim) + '.');
   } catch (err) { S.ocupado = false; renderOffice(); toast('Não foi possível excluir: ' + erroTexto(err)); }
@@ -1417,7 +1425,7 @@ async function integrar(acc, cnpj) {
   e.notas = Object.keys(atual).map(function (k) { return atual[k]; });
   canc.forEach(function (c) { e.canc[c] = 1; });
   S.imp = { feito: true, arquivos: acc.arquivos, notas: daEmp.length, canc: canc.length, terceiros: terceiros, erros: acc.erros };
-  S.periodo = 'all'; recalcular(); render();
+  S.periodo = S.demo ? 'all' : 'auto'; recalcular(); render();
   toast(daEmp.length + (daEmp.length === 1 ? ' documento gravado' : ' documentos gravados') + '. Revise e publique para o cliente.');
 }
 
@@ -1805,7 +1813,7 @@ document.addEventListener('click', function (ev) {
   var d = b.dataset;
   if (d.demo) { if (d.demo === S.demoTipo && S.emp) return; S.demoTipo = d.demo; try { history.replaceState(null, '', location.pathname + location.search + hashDemo(d.demo)); } catch (e) {} S.periodo = 'all'; S.tab = 'apuracao'; carregarExemplo(d.demo); return; }
   if (d.per) { S.periodo = d.per; renderMain(); return; }
-  if (d.grupo) { S.grupo = d.grupo; S.periodo = 'all'; renderMain(); return; }
+  if (d.grupo) { S.grupo = d.grupo; S.periodo = d.grupo === 'mes' && !S.demo ? mesPadrao() : 'all'; renderMain(); return; }
   if (d.det) { S.det = d.det; renderMain(); return; }
   if (d.tab) { var fora = !b.closest('.tabs'); S.tab = d.tab; ls('pf.tab', S.tab); renderMain(); if (fora) { var pa = document.querySelector('.painel-abas'); if (pa) pa.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
   if (d.fquem) { S.fQuem = d.fquem; renderMain(); return; }
