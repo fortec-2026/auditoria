@@ -446,3 +446,4 @@ tbody tr.grp-prod:hover td{background:var(--surface-2)}
 .sug table.sug-tab th{padding:3px 16px 3px 0!important;font-size:13px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0}
 .sug table.sug-tab td{padding:3px 0!important;font-size:13px;color:var(--ink);font-weight:600}
 .sug table.sug-tab tr+tr th,.sug table.sug-tab tr+tr td{border-top:1px dashed var(--line)!important}
+.filtros-notas{gap:24px;flex-wrap:wrap;margin-top:-4px;justify-content:flex-start}.chips-lbl{font-size:12px;font-weight:600;color:var(--muted);margin-right:4px;align-self:center}

@@ -995,11 +995,19 @@ function tabPendencias(pend) {
   if (!S.teste) h += '<div><button class="btn" type="button" data-act="csv">Baixar pendências (CSV)</button></div>';
   return h;
 }
+function docDe(n) { return n.tipo === 'cte' ? 'cte' : n.tipo === 'nfse' ? 'nfse' : n.mod === '65' ? 'nfce' : 'nfe'; }
 function tabNotas(notas) {
+  var fDir = S.fDir || 'todas', fDoc = S.fDoc || 'todos';
+  var cDir = { todas: notas.length, S: 0, E: 0, X: 0 }, cDoc = { todos: notas.length, nfe: 0, nfce: 0, cte: 0, nfse: 0 };
+  cDir.todas = 0; cDoc.todos = 0;
+  notas.forEach(function (n) { var dk = docDe(n); if (fDoc === 'todos' || dk === fDoc) { cDir[n.dir] = (cDir[n.dir] || 0) + 1; cDir.todas++; } if (fDir === 'todas' || n.dir === fDir) { cDoc[dk]++; cDoc.todos++; } });
+  notas = notas.filter(function (n) { return (fDir === 'todas' || n.dir === fDir) && (fDoc === 'todos' || docDe(n) === fDoc); });
   var pendN = function (n) { return n.pior === 'erro' || n.pior === 'alerta'; };
   var cnt = { todas: notas.length, pend: notas.filter(function (n) { return pendN(n) && !resolvida(n.ch); }).length, ok: notas.filter(function (n) { return !pendN(n) || resolvida(n.ch); }).length, anot: notas.filter(function (n) { return acompDe(n.ch); }).length };
   notas = notas.filter(function (n) { return S.fNota === 'todas' || (S.fNota === 'pend' ? pendN(n) && !resolvida(n.ch) : S.fNota === 'ok' ? (!pendN(n) || resolvida(n.ch)) : !!acompDe(n.ch)); });
-  var h = editorAcomp() + '<div class="toolbar"><div class="chips" role="group" aria-label="Filtrar notas">' + [['todas', 'Todas'], ['pend', 'Com pendência em aberto'], ['ok', 'Corretas ou resolvidas'], ['anot', 'Com anotação']].map(function (c) { return '<button type="button" class="chip" data-fnota="' + c[0] + '" aria-pressed="' + (S.fNota === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt[c[0]] + ')</span></button>'; }).join('') + '</div></div>';
+  var h = editorAcomp() + '<div class="toolbar"><div class="chips" role="group" aria-label="Filtrar notas">' + [['todas', 'Todas'], ['pend', 'Com pendência em aberto'], ['ok', 'Corretas ou resolvidas'], ['anot', 'Com anotação']].map(function (c) { return '<button type="button" class="chip" data-fnota="' + c[0] + '" aria-pressed="' + (S.fNota === c[0]) + '">' + c[1] + ' <span class="num">(' + cnt[c[0]] + ')</span></button>'; }).join('') + '</div></div>' +
+    '<div class="toolbar filtros-notas"><div class="chips" role="group" aria-label="Entrada ou saída"><span class="chips-lbl">Tipo</span>' + [['todas', 'Todas'], ['S', 'Saídas'], ['E', 'Entradas'], ['X', 'Informativas']].filter(function (c) { return c[0] === 'todas' || cDir[c[0]] || fDir === c[0]; }).map(function (c) { return '<button type="button" class="chip" data-fdir="' + c[0] + '" aria-pressed="' + (fDir === c[0]) + '">' + c[1] + ' <span class="num">(' + (cDir[c[0]] || 0) + ')</span></button>'; }).join('') + '</div>' +
+    '<div class="chips" role="group" aria-label="Documento"><span class="chips-lbl">Documento</span>' + [['todos', 'Todos'], ['nfe', 'NF-e'], ['nfce', 'NFC-e'], ['cte', 'CT-e'], ['nfse', 'NFS-e']].filter(function (c) { return c[0] === 'todos' || cDoc[c[0]] || fDoc === c[0]; }).map(function (c) { return '<button type="button" class="chip" data-fdoc="' + c[0] + '" aria-pressed="' + (fDoc === c[0]) + '">' + c[1] + ' <span class="num">(' + (cDoc[c[0]] || 0) + ')</span></button>'; }).join('') + '</div></div>';
   if (!notas.length) return h + '<div class="empty"><p class="note">Nenhuma nota neste filtro' + (S.q ? ' e busca' : '') + '.</p></div>';
   h += '<div class="tscroll"><table><thead><tr><th>Tipo</th><th>Data</th><th>Nota</th><th>Emitente / destinatário</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">PIS/COFINS</th><th>Conferência</th><th>Acompanhamento</th></tr></thead><tbody>';
   notas.slice(0, S.imprimindo ? 1e9 : 400).forEach(function (n) {
@@ -1828,6 +1836,8 @@ document.addEventListener('click', function (ev) {
   if (d.fprod) { S.fProd = d.fprod; renderMain(); return; }
   if (d.fsit) { S.fSit = d.fsit; renderMain(); return; }
   if (d.fnota) { S.fNota = d.fnota; renderMain(); return; }
+  if (d.fdir) { S.fDir = d.fdir; renderMain(); return; }
+  if (d.fdoc) { S.fDoc = d.fdoc; renderMain(); return; }
   if (d.ver) { abrirNota(d.ver); return; }
   if (d.difalConf) { if (!S.readonly) confirmarDifal([d.difalConf]); return; }
   if (d.difalReset) { var cfR = difalCfg(); delete cfR[d.difalReset]; ls('pf.difalUF', JSON.stringify(cfR)); S.aliqAberto = true; renderMain(); return; }
